@@ -8,7 +8,7 @@
 <!-- 카카오맵 JS SDK -->
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services"></script>
 
-<!-- Firebase SDK (compat 버전 - 반드시 이 방식 유지) -->
+<!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
@@ -16,7 +16,6 @@
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { width:100%; height:100%; font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic",sans-serif; overflow:hidden; }
 
-  /* 로그인 화면 */
   #loginScreen { position:fixed; inset:0; background:linear-gradient(135deg,#1a8754 0%,#0f6e42 100%); display:flex; align-items:center; justify-content:center; z-index:9999; }
   #loginBox { background:#fff; border-radius:16px; padding:32px 24px; width:88%; max-width:360px; box-shadow:0 10px 40px rgba(0,0,0,.2); }
   #loginBox h1 { font-size:22px; color:#1a8754; margin-bottom:6px; text-align:center; }
@@ -28,7 +27,6 @@
   #loginBox button:disabled { background:#999; }
   #loginError { color:#e53935; font-size:13px; text-align:center; margin-top:10px; min-height:18px; }
 
-  /* 지도 화면 */
   #app { display:none; width:100%; height:100%; position:relative; }
   #header { position:absolute; top:0; left:0; right:0; height:56px; background:#fff; border-bottom:1px solid #e0e0e0; display:flex; align-items:center; padding:0 16px; z-index:100; box-shadow:0 2px 4px rgba(0,0,0,.05); }
   #header .title { font-size:16px; font-weight:700; color:#1a8754; flex:1; }
@@ -50,7 +48,6 @@
 
   #statusBar { position:absolute; bottom:0; left:0; right:0; background:rgba(26,135,84,.95); color:#fff; padding:8px 14px; font-size:12px; text-align:center; z-index:50; }
 
-  /* 업장 상세 패널 */
   #storePanel { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top-left-radius:20px; border-top-right-radius:20px; box-shadow:0 -4px 20px rgba(0,0,0,.15); z-index:200; transform:translateY(100%); transition:transform .3s; max-height:85vh; overflow-y:auto; }
   #storePanel.open { transform:translateY(0); }
   #panelHandle { width:40px; height:4px; background:#ccc; border-radius:2px; margin:10px auto 4px; }
@@ -67,12 +64,8 @@
   .badge.grade-none { background:#f5f5f5; color:#757575; }
   .status-ok { color:#2e7d32; font-weight:600; }
   .status-ng { color:#c62828; font-weight:600; }
-  .info-row { display:flex; padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:13px; }
-  .info-row .k { width:90px; color:#999; }
-  .info-row .v { flex:1; color:#333; }
   .memo { background:#fafafa; padding:10px 12px; border-radius:8px; font-size:13px; color:#555; margin:10px 0; white-space:pre-wrap; }
 
-  /* 방문기록 입력폼 */
   #visitForm { margin-top:16px; padding-top:16px; border-top:2px solid #f0f0f0; }
   #visitForm h3 { font-size:14px; color:#1a8754; margin-bottom:10px; }
   .form-row { margin-bottom:10px; }
@@ -87,7 +80,6 @@
 </head>
 <body>
 
-<!-- 로그인 화면 -->
 <div id="loginScreen">
   <div id="loginBox">
     <h1>업박스 영업 지도</h1>
@@ -99,7 +91,6 @@
   </div>
 </div>
 
-<!-- 메인 앱 -->
 <div id="app">
   <div id="header">
     <div class="title">업박스 영업 지도</div>
@@ -125,7 +116,6 @@
   <div id="statusBar">로딩 중...</div>
 </div>
 
-<!-- 업장 상세 패널 -->
 <div id="storePanel">
   <div id="panelHandle"></div>
   <button id="panelClose" onclick="closePanel()">×</button>
@@ -135,22 +125,22 @@
 <script>
 /* ==================== Firebase 초기화 ==================== */
 const firebaseConfig = {
-  apiKey:            "AIzaSyA1TKLHcnnXgwQVNId4pkLSi0QrE-KW7RU",
-  authDomain:        "localsales-map.firebaseapp.com",
-  databaseURL:       "https://localsales-map-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:         "localsales-map",
-  storageBucket:     "localsales-map.firebasestorage.app",
+  apiKey: "AIzaSyA1TKLHcnnXgwQVNId4pkLSi0QrE-KW7RU",
+  authDomain: "localsales-map.firebaseapp.com",
+  databaseURL: "https://localsales-map-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "localsales-map",
+  storageBucket: "localsales-map.firebasestorage.app",
   messagingSenderId: "1077741182559",
-  appId:             "1:1077741182559:web:c07eb3d853676fe59c45ea"
+  appId: "1:1077741182559:web:c07eb3d853676fe59c45ea"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 /* ==================== 전역 상태 ==================== */
-let currentUser = null;        // { name, code, key }
+let currentUser = null;
 let map = null;
-let markers = [];              // { marker, store, grade }
-let allStoresInView = [];      // 현재 지도 영역의 업장 데이터
+let markers = [];
+let allStoresInView = [];
 let currentFilter = 'ALL';
 let currentKeyword = '';
 let selectedStore = null;
@@ -170,15 +160,14 @@ function gradeInfo(grade){
 
 function makeMarkerImage(grade){
   const g = gradeInfo(grade);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
-    <path d="M18 0 C8 0 0 8 0 18 C0 30 18 46 18 46 C18 46 36 30 36 18 C36 8 28 0 18 0 Z" fill="${g.color}" stroke="#fff" stroke-width="2"/>
-    <text x="18" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="${g.text}" font-family="Arial">${g.icon}</text>
-  </svg>`;
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">'
+    + '<path d="M18 0 C8 0 0 8 0 18 C0 30 18 46 18 46 C18 46 36 30 36 18 C36 8 28 0 18 0 Z" fill="' + g.color + '" stroke="#fff" stroke-width="2"/>'
+    + '<text x="18" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="' + g.text + '" font-family="Arial">' + g.icon + '</text>'
+    + '</svg>';
   const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   return new kakao.maps.MarkerImage(url, new kakao.maps.Size(36,46), { offset:new kakao.maps.Point(18,46) });
 }
 
-/* 두 좌표 간 거리(km) */
 function haversine(lat1,lng1,lat2,lng2){
   const R=6371, toRad=x=>x*Math.PI/180;
   const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
@@ -207,18 +196,14 @@ async function doLogin(){
     if (!data){ errEl.textContent="등록되지 않은 파트너 코드입니다."; btn.disabled=false; btn.textContent="로그인"; return; }
     if (String(data.name).trim() !== name){ errEl.textContent="파트너명이 일치하지 않습니다."; btn.disabled=false; btn.textContent="로그인"; return; }
 
-    currentUser = { name, code, key };
+    currentUser = { name: name, code: code, key: key };
     localStorage.setItem("upbox_user", JSON.stringify(currentUser));
     showApp();
   } catch(e){
-  apiKey:            "AIzaSyA1TKLHcnnXgwQVNId4pkLSi0QrE-KW7RU",
-  authDomain:        "localsales-map.firebaseapp.com",
-  databaseURL:       "https://localsales-map-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:         "localsales-map",
-  storageBucket:     "localsales-map.firebasestorage.app",
-  messagingSenderId: "1077741182559",
-  appId:             "1:1077741182559:web:c07eb3d853676fe59c45ea"
-}
+    errEl.textContent = "서버 오류: " + e.message;
+    btn.disabled = false;
+    btn.textContent = "로그인";
+  }
 }
 
 async function verifySession(){
@@ -249,7 +234,7 @@ function showApp(){
   initMap();
 }
 
-/* ==================== 지도 초기화 ==================== */
+/* ==================== 지도 ==================== */
 function initMap(){
   const container = document.getElementById("map");
   map = new kakao.maps.Map(container, {
@@ -257,14 +242,12 @@ function initMap(){
     level: 5
   });
 
-  // 지도 이동/확대 시 해당 영역 업장만 다시 로드
   let moveTimer = null;
-  kakao.maps.event.addListener(map, 'idle', () => {
+  kakao.maps.event.addListener(map, 'idle', function(){
     clearTimeout(moveTimer);
     moveTimer = setTimeout(loadStoresInView, 400);
   });
 
-  // 현재 위치로 이동
   moveToMyLocation();
 }
 
@@ -275,46 +258,42 @@ function moveToMyLocation(){
   }
   setStatus("📍 현재 위치 확인 중...");
   navigator.geolocation.getCurrentPosition(
-    pos => {
+    function(pos){
       const lat = pos.coords.latitude, lng = pos.coords.longitude;
       const loc = new kakao.maps.LatLng(lat, lng);
       map.setCenter(loc);
       map.setLevel(4);
 
       if (userLocationMarker) userLocationMarker.setMap(null);
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="8" fill="#4285F4" stroke="#fff" stroke-width="3"/></svg>';
       userLocationMarker = new kakao.maps.Marker({
         position: loc,
         map: map,
         image: new kakao.maps.MarkerImage(
-          "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="8" fill="#4285F4" stroke="#fff" stroke-width="3"/></svg>`
-          ),
+          "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
           new kakao.maps.Size(20,20),
           { offset: new kakao.maps.Point(10,10) }
         ),
         zIndex: 999
       });
     },
-    err => { setStatus("⚠️ 위치 권한이 필요합니다."); },
+    function(err){ setStatus("⚠️ 위치 권한이 필요합니다."); },
     { enableHighAccuracy:true, timeout:10000 }
   );
 }
 
-/* ==================== 업장 데이터 로딩 (핵심 최적화) ==================== */
+/* ==================== 업장 로딩 ==================== */
 async function loadStoresInView(){
   if (!map) return;
   const bounds = map.getBounds();
   const sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
 
-  // 너무 넓은 영역이면 중심 좌표 기준 반경 10km만
   const centerLat = (sw.getLat()+ne.getLat())/2;
-  const centerLng = (sw.getLng()+ne.getLng())/2;
   const diagKm = haversine(sw.getLat(), sw.getLng(), ne.getLat(), ne.getLng());
 
   let minLat, maxLat;
   if (diagKm > 30){
-    // 너무 확대 축소된 상태 - 반경 10km 고정
-    minLat = centerLat - 0.09;   // 약 10km
+    minLat = centerLat - 0.09;
     maxLat = centerLat + 0.09;
   } else {
     minLat = sw.getLat() - 0.01;
@@ -324,7 +303,6 @@ async function loadStoresInView(){
   setStatus("📍 주변 업장 로딩 중...");
 
   try {
-    // ⭐ 핵심: 위도 범위로만 서버에서 필터 (전체 48,872개가 아닌 범위 내 데이터만 가져옴)
     const snap = await db.ref("stores")
       .orderByChild("lat")
       .startAt(minLat)
@@ -352,20 +330,17 @@ async function loadStoresInView(){
 }
 
 function renderMarkers(){
-  // 기존 마커 제거
-  markers.forEach(m => m.marker.setMap(null));
+  markers.forEach(function(m){ m.marker.setMap(null); });
   markers = [];
 
   const kw = currentKeyword.toLowerCase();
 
-  allStoresInView.forEach(s => {
-    // 필터
+  allStoresInView.forEach(function(s){
     if (currentFilter !== 'ALL'){
       const g = String(s.grade||"미지정").trim() || "미지정";
       const normalized = (g === "기계약" || g === "A" || g === "B" || g === "C") ? g : "미지정";
       if (normalized !== currentFilter) return;
     }
-    // 키워드
     if (kw && !(s.name||"").toLowerCase().includes(kw)) return;
 
     const marker = new kakao.maps.Marker({
@@ -374,14 +349,14 @@ function renderMarkers(){
       map: map
     });
 
-    kakao.maps.event.addListener(marker, 'click', () => openPanel(s));
-    markers.push({ marker, store:s });
+    kakao.maps.event.addListener(marker, 'click', function(){ openPanel(s); });
+    markers.push({ marker: marker, store: s });
   });
 }
 
 function setFilter(grade){
   currentFilter = grade;
-  document.querySelectorAll('.filterChip').forEach(el => {
+  document.querySelectorAll('.filterChip').forEach(function(el){
     el.classList.toggle('active', el.dataset.grade === grade);
   });
   renderMarkers();
@@ -403,60 +378,36 @@ async function openPanel(store){
   const content = document.getElementById("panelContent");
 
   const g = gradeInfo(store.grade);
-  const regBadge = store.reg ? `<span class="badge reg">${store.reg}</span>` : "";
+  const regBadge = store.reg ? '<span class="badge reg">' + store.reg + '</span>' : "";
   const gradeBadgeClass = store.grade === "기계약" ? "grade-contract"
                         : store.grade === "A" ? "grade-A"
                         : store.grade === "B" ? "grade-B"
                         : store.grade === "C" ? "grade-C" : "grade-none";
-  const gradeBadge = `<span class="badge ${gradeBadgeClass}">${g.label}</span>`;
-  const statusBadge = store.active === "Y" || store.active === "가능" || store.active === true
-    ? `<span class="status-ok">🟢 운영가능</span>`
-    : `<span class="status-ng">🔴 운영불가</span>`;
+  const gradeBadge = '<span class="badge ' + gradeBadgeClass + '">' + g.label + '</span>';
+  const statusBadge = (store.active === "Y" || store.active === "가능" || store.active === true)
+    ? '<span class="status-ok">🟢 운영가능</span>'
+    : '<span class="status-ng">🔴 운영불가</span>';
 
-  content.innerHTML = `
-    <h2>${store.name || "(이름없음)"}</h2>
-    <div class="addr">${store.addr || ""}</div>
-    <div style="margin-bottom:10px;">${regBadge}${gradeBadge} ${statusBadge}</div>
-    ${store.memo ? `<div class="memo">📝 ${store.memo}</div>` : ""}
+  const memoHtml = store.memo ? '<div class="memo">📝 ' + store.memo + '</div>' : "";
 
-    <div id="visitForm">
-      <h3>📋 내 방문기록 (${currentUser.name})</h3>
-      <div class="form-row">
-        <label>업체명</label>
-        <input type="text" value="${store.name||''}" disabled style="background:#f5f5f5;">
-      </div>
-      <div class="form-row">
-        <label>월 예상배출량 (kg)</label>
-        <input id="v_amount" type="number" placeholder="예: 500">
-      </div>
-      <div class="form-row">
-        <label>현재 단가 (원/kg)</label>
-        <input id="v_price" type="number" placeholder="예: 150">
-      </div>
-      <div class="form-row">
-        <label>현재 주 수거횟수</label>
-        <input id="v_freq" type="number" placeholder="예: 3">
-      </div>
-      <div class="form-row">
-        <label>비닐 사용여부</label>
-        <select id="v_vinyl">
-          <option value="">선택</option>
-          <option value="사용">사용</option>
-          <option value="미사용">미사용</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <label>기타 특이사항</label>
-        <textarea id="v_note" placeholder="현장 방문 메모"></textarea>
-      </div>
-      <button id="saveBtn" onclick="saveVisit()">💾 저장</button>
-      <div id="saveMsg"></div>
-    </div>
-  `;
+  content.innerHTML =
+    '<h2>' + (store.name || "(이름없음)") + '</h2>' +
+    '<div class="addr">' + (store.addr || "") + '</div>' +
+    '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + ' ' + statusBadge + '</div>' +
+    memoHtml +
+    '<div id="visitForm">' +
+    '<h3>📋 내 방문기록 (' + currentUser.name + ')</h3>' +
+    '<div class="form-row"><label>업체명</label><input type="text" value="' + (store.name||"") + '" disabled style="background:#f5f5f5;"></div>' +
+    '<div class="form-row"><label>월 예상배출량 (kg)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
+    '<div class="form-row"><label>현재 단가 (원/kg)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
+    '<div class="form-row"><label>현재 주 수거횟수</label><input id="v_freq" type="number" placeholder="예: 3"></div>' +
+    '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
+    '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="현장 방문 메모"></textarea></div>' +
+    '<button id="saveBtn" onclick="saveVisit()">💾 저장</button>' +
+    '<div id="saveMsg"></div>' +
+    '</div>';
 
   panel.classList.add("open");
-
-  // 기존 방문기록 불러오기
   await loadMyVisit(store._key);
 }
 
