@@ -149,8 +149,18 @@ let userLocationMarker = null;
 /* ==================== 유틸 ==================== */
 function sanitizeKey(s){ return String(s||"").replace(/[.#$\[\]\/]/g,"_"); }
 
-function gradeInfo(grade){
-  const g = String(grade||"").trim();
+// 실제 Firebase에 저장된 등급 값을 표준 값으로 정규화
+function normalizeGrade(raw){
+  const g = String(raw||"").trim();
+  if (g === "업박스기계약업장" || g === "기계약" || g === "기계약업장") return "기계약";
+  if (g === "A" || g === "A등급") return "A";
+  if (g === "B" || g === "B등급") return "B";
+  if (g === "C" || g === "C등급") return "C";
+  return "미지정";
+}
+
+function gradeInfo(raw){
+  const g = normalizeGrade(raw);
   if (g === "기계약") return { label:"★ 기계약", color:"#FFD700", text:"#333", icon:"★" };
   if (g === "A")     return { label:"A등급",     color:"#E53935", text:"#fff", icon:"A" };
   if (g === "B")     return { label:"B등급",     color:"#FB8C00", text:"#fff", icon:"B" };
@@ -337,8 +347,7 @@ function renderMarkers(){
 
   allStoresInView.forEach(function(s){
     if (currentFilter !== 'ALL'){
-      const g = String(s.grade||"미지정").trim() || "미지정";
-      const normalized = (g === "기계약" || g === "A" || g === "B" || g === "C") ? g : "미지정";
+      const normalized = normalizeGrade(s.grade);
       if (normalized !== currentFilter) return;
     }
     if (kw && !(s.name||"").toLowerCase().includes(kw)) return;
@@ -378,22 +387,39 @@ async function openPanel(store){
   const content = document.getElementById("panelContent");
 
   const g = gradeInfo(store.grade);
-  const regBadge = store.reg ? '<span class="badge reg">' + store.reg + '</span>' : "";
-  const gradeBadgeClass = store.grade === "기계약" ? "grade-contract"
-                        : store.grade === "A" ? "grade-A"
-                        : store.grade === "B" ? "grade-B"
-                        : store.grade === "C" ? "grade-C" : "grade-none";
+  const normalizedGrade = normalizeGrade(store.grade);
+  const regBadge = store.adminType ? '<span class="badge reg">' + store.adminType + '</span>' : "";
+  const gradeBadgeClass = normalizedGrade === "기계약" ? "grade-contract"
+                        : normalizedGrade === "A" ? "grade-A"
+                        : normalizedGrade === "B" ? "grade-B"
+                        : normalizedGrade === "C" ? "grade-C" : "grade-none";
   const gradeBadge = '<span class="badge ' + gradeBadgeClass + '">' + g.label + '</span>';
-  const statusBadge = (store.active === "Y" || store.active === "가능" || store.active === true)
+  const isOperable = store.operable === "Y" || store.operable === "가능" || store.operable === true || store.operable === "운영가능";
+  const statusBadge = isOperable
     ? '<span class="status-ok">🟢 운영가능</span>'
     : '<span class="status-ng">🔴 운영불가</span>';
 
   const memoHtml = store.memo ? '<div class="memo">📝 ' + store.memo + '</div>' : "";
 
+  // 추가 정보 (업종/면적/전화번호/예상배출량)
+  const infoRows = [];
+  if (store.bizType) infoRows.push({k:"업종", v:store.bizType});
+  if (store.area) infoRows.push({k:"면적", v:store.area});
+  if (store.phone) infoRows.push({k:"전화번호", v:store.phone});
+  if (store.volume) infoRows.push({k:"예상배출량", v:store.volume});
+  const infoHtml = infoRows.length > 0
+    ? '<div style="margin:10px 0;">' + infoRows.map(function(r){
+        return '<div style="display:flex;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;">'
+          + '<span style="width:80px;color:#999;">' + r.k + '</span>'
+          + '<span style="flex:1;color:#333;">' + r.v + '</span></div>';
+      }).join('') + '</div>'
+    : "";
+
   content.innerHTML =
     '<h2>' + (store.name || "(이름없음)") + '</h2>' +
-    '<div class="addr">' + (store.addr || "") + '</div>' +
+    '<div class="addr">' + (store.address || "") + '</div>' +
     '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + ' ' + statusBadge + '</div>' +
+    infoHtml +
     memoHtml +
     '<div id="visitForm">' +
     '<h3>📋 내 방문기록 (' + currentUser.name + ')</h3>' +
