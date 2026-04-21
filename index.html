@@ -33,8 +33,7 @@
   #header .user { font-size:13px; color:#666; margin-right:10px; }
   #header .logout { font-size:12px; color:#999; background:none; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer; }
 
-  #searchBar { position:absolute; top:64px; left:10px; right:10px; z-index:50; display:flex; gap:6px; }
-  #searchInput { flex:1; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); outline:none; }
+  #searchInput { position:absolute; top:64px; left:10px; right:10px; width:auto; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); outline:none; z-index:50; }
   #searchInput:focus { border-color:#1a8754; }
 
   /* 검색 결과 드롭다운 */
@@ -51,7 +50,7 @@
   .searchItem .s-grade.g-B { background:#FB8C00; color:#fff; }
   .searchItem .s-grade.g-C { background:#43A047; color:#fff; }
   .searchItem .s-grade.g-none { background:#9E9E9E; color:#fff; }
-  .searchItem .s-visited { display:inline-block; background:#1A237E; color:#fff; font-size:10px; padding:2px 6px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+  .searchItem .s-visited { display:inline-block; background:#4d4678; color:#fff; font-size:10px; padding:2px 6px; border-radius:3px; margin-left:4px; vertical-align:middle; }
   #searchLoading { padding:14px; text-align:center; color:#999; font-size:13px; }
   #searchEmpty { padding:14px; text-align:center; color:#999; font-size:13px; }
 
@@ -189,18 +188,11 @@ function gradeInfo(raw){
 }
 
 function makeMarkerImage(grade, visited){
-  // 방문기록 있으면 남색 마커로 표시 (등급 색상 오버라이드)
-  let color, text, icon;
-  if (visited){
-    color = "#1A237E";  // 남색 (navy)
-    text = "#fff";
-    icon = "✓";
-  } else {
-    const g = gradeInfo(grade);
-    color = g.color;
-    text = g.text;
-    icon = g.icon;
-  }
+  // 방문기록 있으면 #4d4678 마커로 표시 (등급 색상 오버라이드, 아이콘은 등급 유지)
+  const g = gradeInfo(grade);
+  const color = visited ? "#4d4678" : g.color;
+  const text = visited ? "#fff" : g.text;
+  const icon = g.icon;  // 아이콘은 항상 등급 아이콘 유지
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">'
     + '<path d="M18 0 C8 0 0 8 0 18 C0 30 18 46 18 46 C18 46 36 30 36 18 C36 8 28 0 18 0 Z" fill="' + color + '" stroke="#fff" stroke-width="2"/>'
     + '<text x="18" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="' + text + '" font-family="Arial">' + icon + '</text>'
@@ -588,7 +580,7 @@ async function openPanel(store){
   // 기계약이 아닐 때만 방문기록 입력폼 표시
   const visitFormHtml = isContract ? '' : (
     '<div id="visitForm">' +
-    '<h3>📋 내 방문기록 (' + currentUser.name + ')</h3>' +
+    '<h3 id="visitFormTitle">📋 내 방문기록 (' + currentUser.name + ')</h3>' +
     '<div class="form-row"><label>업체명</label><input type="text" value="' + (store.name||"") + '" disabled style="background:#f5f5f5;"></div>' +
     '<div class="form-row"><label>월 예상배출량 (kg)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
     '<div class="form-row"><label>현재 단가 (원/kg)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
@@ -634,6 +626,18 @@ async function loadMyVisit(storeKey){
     if (v.freq !== undefined) document.getElementById("v_freq").value = v.freq;
     if (v.vinyl !== undefined) document.getElementById("v_vinyl").value = v.vinyl;
     if (v.note !== undefined) document.getElementById("v_note").value = v.note;
+
+    // 마지막 방문일자 표시
+    if (v.updatedAt){
+      const titleEl = document.getElementById("visitFormTitle");
+      if (titleEl){
+        const d = new Date(v.updatedAt);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ') <span style="color:#999;font-weight:400;font-size:12px;">| 마지막 방문일자: ' + yyyy + '-' + mm + '-' + dd + '</span>';
+      }
+    }
   } catch(e){ console.error(e); }
 }
 
@@ -661,9 +665,19 @@ async function saveVisit(){
     };
     await db.ref("visits/" + currentUser.key + "/" + recKey).set(payload);
 
-    // 내 방문기록 키 목록 업데이트 → 해당 마커 즉시 남색으로 변경
+    // 내 방문기록 키 목록 업데이트 → 해당 마커 즉시 방문 색상으로 변경
     myVisitedStoreKeys[sanitizeKey(selectedStore._key)] = true;
     renderMarkers();
+
+    // 방문일자 즉시 갱신
+    const titleEl = document.getElementById("visitFormTitle");
+    if (titleEl){
+      const d = new Date(payload.updatedAt);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ') <span style="color:#999;font-weight:400;font-size:12px;">| 마지막 방문일자: ' + yyyy + '-' + mm + '-' + dd + '</span>';
+    }
 
     msg.innerHTML = '<span style="color:#2e7d32;">✅ 저장 완료</span>';
   } catch(e){
