@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>업박스 영업 지도</title>
 
+<!-- Noto Sans KR 폰트 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
 <!-- 카카오맵 JS SDK -->
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services"></script>
 
@@ -13,39 +18,45 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
 <style>
+  :root {
+    --brand-primary: #363859;
+    --brand-accent: #F2AC57;
+    --brand-primary-dark: #262840;
+    --brand-accent-dark: #e09a46;
+  }
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { width:100%; height:100%; font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic",sans-serif; overflow:hidden; }
+  html, body { width:100%; height:100%; font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif; overflow:hidden; }
 
-  #loginScreen { position:fixed; inset:0; background:linear-gradient(135deg,#1a8754 0%,#0f6e42 100%); display:flex; align-items:center; justify-content:center; z-index:9999; }
+  #loginScreen { position:fixed; inset:0; background:linear-gradient(135deg, #363859 0%, #262840 100%); display:flex; align-items:center; justify-content:center; z-index:9999; }
   #loginBox { background:#fff; border-radius:16px; padding:32px 24px; width:88%; max-width:360px; box-shadow:0 10px 40px rgba(0,0,0,.2); }
-  #loginBox h1 { font-size:22px; color:#1a8754; margin-bottom:6px; text-align:center; }
+  #loginBox h1 { font-size:22px; color:#363859; margin-bottom:6px; text-align:center; font-weight:700; }
   #loginBox p.sub { font-size:13px; color:#666; text-align:center; margin-bottom:24px; }
-  #loginBox input { width:100%; padding:14px; border:1.5px solid #e0e0e0; border-radius:10px; font-size:15px; margin-bottom:12px; outline:none; transition:border-color .2s; }
-  #loginBox input:focus { border-color:#1a8754; }
-  #loginBox button { width:100%; padding:14px; background:#1a8754; color:#fff; border:none; border-radius:10px; font-size:16px; font-weight:600; cursor:pointer; }
-  #loginBox button:active { background:#0f6e42; }
+  #loginBox input { width:100%; padding:14px; border:1.5px solid #e0e0e0; border-radius:10px; font-size:15px; margin-bottom:12px; outline:none; transition:border-color .2s; font-family: inherit; }
+  #loginBox input:focus { border-color:#F2AC57; }
+  #loginBox button { width:100%; padding:14px; background:#363859; color:#fff; border:none; border-radius:10px; font-size:16px; font-weight:600; cursor:pointer; font-family: inherit; }
+  #loginBox button:active { background:#262840; }
   #loginBox button:disabled { background:#999; }
   #loginError { color:#e53935; font-size:13px; text-align:center; margin-top:10px; min-height:18px; }
 
   #app { display:none; width:100%; height:100%; position:relative; }
   #header { position:absolute; top:0; left:0; right:0; height:56px; background:#fff; border-bottom:1px solid #e0e0e0; display:flex; align-items:center; padding:0 16px; z-index:100; box-shadow:0 2px 4px rgba(0,0,0,.05); }
-  #header .title { font-size:16px; font-weight:700; color:#1a8754; flex:1; }
+  #header .title { font-size:16px; font-weight:700; color:#363859; flex:1; }
   #header .user { font-size:13px; color:#666; margin-right:10px; }
-  #header .logout { font-size:12px; color:#999; background:none; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer; }
+  #header .logout { font-size:12px; color:#999; background:none; border:1px solid #ddd; padding:6px 10px; border-radius:6px; cursor:pointer; font-family: inherit; }
 
-  #searchInput { position:absolute; top:64px; left:10px; right:10px; width:auto; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); outline:none; z-index:50; }
-  #searchInput:focus { border-color:#1a8754; }
+  #searchInput { position:absolute; top:64px; left:10px; right:10px; width:auto; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); outline:none; z-index:50; font-family: inherit; }
+  #searchInput:focus { border-color:#F2AC57; }
 
   /* 검색 결과 드롭다운 */
   #searchResults { position:absolute; top:100px; left:10px; right:10px; background:#fff; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); z-index:60; max-height:320px; overflow-y:auto; display:none; }
   #searchResults.show { display:block; }
   .searchItem { padding:12px 14px; border-bottom:1px solid #f0f0f0; cursor:pointer; font-size:13px; }
   .searchItem:last-child { border-bottom:none; }
-  .searchItem:hover, .searchItem:active { background:#f5f5f5; }
-  .searchItem .s-name { font-weight:600; color:#333; margin-bottom:2px; }
+  .searchItem:hover, .searchItem:active { background:#faf6ef; }
+  .searchItem .s-name { font-weight:600; color:#363859; margin-bottom:2px; }
   .searchItem .s-addr { font-size:11px; color:#888; }
-  .searchItem .s-grade { display:inline-block; font-size:10px; padding:2px 6px; border-radius:3px; margin-left:4px; vertical-align:middle; }
-  .searchItem .s-grade.g-contract { background:#FFD700; color:#333; }
+  .searchItem .s-grade { display:inline-block; font-size:10px; padding:2px 6px; border-radius:3px; margin-left:4px; vertical-align:middle; font-weight:600; }
+  .searchItem .s-grade.g-contract { background:#F2AC57; color:#fff; }
   .searchItem .s-grade.g-A { background:#E53935; color:#fff; }
   .searchItem .s-grade.g-B { background:#FB8C00; color:#fff; }
   .searchItem .s-grade.g-C { background:#43A047; color:#fff; }
@@ -56,43 +67,50 @@
 
   #filterBar { position:absolute; top:108px; left:10px; right:10px; z-index:50; display:flex; gap:6px; overflow-x:auto; padding:4px 0; -webkit-overflow-scrolling:touch; }
   #filterBar::-webkit-scrollbar { display:none; }
-  .filterChip { flex-shrink:0; padding:6px 12px; background:#fff; border:1px solid #ddd; border-radius:16px; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,.08); }
-  .filterChip.active { background:#1a8754; color:#fff; border-color:#1a8754; }
+  .filterChip { flex-shrink:0; padding:6px 12px; background:#fff; border:1px solid #ddd; border-radius:16px; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,.08); font-family: inherit; font-weight:500; }
+  .filterChip.active { background:#363859; color:#fff; border-color:#363859; }
 
   #map { width:100%; height:100%; }
 
   #myLocBtn { position:absolute; right:14px; bottom:120px; width:44px; height:44px; background:#fff; border:none; border-radius:50%; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:20px; cursor:pointer; z-index:50; }
 
-  #statusBar { position:absolute; bottom:0; left:0; right:0; background:rgba(26,135,84,.95); color:#fff; padding:8px 14px; font-size:12px; text-align:center; z-index:50; }
+  #statusBar { position:absolute; bottom:0; left:0; right:0; background:rgba(54,56,89,.95); color:#fff; padding:8px 14px; font-size:12px; text-align:center; z-index:50; }
 
   #storePanel { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top-left-radius:20px; border-top-right-radius:20px; box-shadow:0 -4px 20px rgba(0,0,0,.15); z-index:200; transform:translateY(100%); transition:transform .3s; max-height:85vh; overflow-y:auto; }
   #storePanel.open { transform:translateY(0); }
   #panelHandle { width:40px; height:4px; background:#ccc; border-radius:2px; margin:10px auto 4px; }
   #panelClose { position:absolute; top:10px; right:14px; background:none; border:none; font-size:24px; color:#999; cursor:pointer; }
   #panelContent { padding:14px 20px 30px; }
-  #panelContent h2 { font-size:18px; margin-bottom:4px; padding-right:30px; }
+  #panelContent h2 { font-size:18px; margin-bottom:4px; padding-right:30px; color:#363859; font-weight:700; }
   #panelContent .addr { font-size:13px; color:#666; margin-bottom:12px; }
   .badge { display:inline-block; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-right:4px; margin-bottom:4px; }
-  .badge.reg { background:#e8f5e9; color:#2e7d32; }
+  .badge.reg { background:#eef0f8; color:#363859; }
   .badge.grade-A { background:#ffebee; color:#c62828; }
   .badge.grade-B { background:#fff3e0; color:#e65100; }
   .badge.grade-C { background:#e8f5e9; color:#2e7d32; }
-  .badge.grade-contract { background:#fff9c4; color:#f57f17; }
+  .badge.grade-contract { background:#F2AC57; color:#fff; }
   .badge.grade-none { background:#f5f5f5; color:#757575; }
   .status-ok { color:#2e7d32; font-weight:600; }
   .status-ng { color:#c62828; font-weight:600; }
-  .memo { background:#fafafa; padding:10px 12px; border-radius:8px; font-size:13px; color:#555; margin:10px 0; white-space:pre-wrap; }
+  .memo { background:#faf6ef; padding:10px 12px; border-radius:8px; font-size:13px; color:#555; margin:10px 0; white-space:pre-wrap; border-left:3px solid #F2AC57; }
 
   #visitForm { margin-top:16px; padding-top:16px; border-top:2px solid #f0f0f0; }
-  #visitForm h3 { font-size:14px; color:#1a8754; margin-bottom:10px; }
+  #visitForm h3 { font-size:14px; color:#363859; margin-bottom:10px; font-weight:600; }
   .form-row { margin-bottom:10px; }
-  .form-row label { display:block; font-size:12px; color:#666; margin-bottom:4px; }
-  .form-row input, .form-row select, .form-row textarea { width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:13px; outline:none; }
-  .form-row input:focus, .form-row textarea:focus, .form-row select:focus { border-color:#1a8754; }
+  .form-row label { display:block; font-size:12px; color:#666; margin-bottom:4px; font-weight:500; }
+  .form-row input, .form-row select, .form-row textarea { width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:13px; outline:none; font-family: inherit; }
+  .form-row input:focus, .form-row textarea:focus, .form-row select:focus { border-color:#F2AC57; }
   .form-row textarea { resize:vertical; min-height:60px; }
-  #saveBtn { width:100%; padding:13px; background:#1a8754; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-top:6px; }
+  #saveBtn { width:100%; padding:13px; background:#F2AC57; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; margin-top:6px; font-family: inherit; }
+  #saveBtn:active { background:#e09a46; }
   #saveBtn:disabled { background:#aaa; }
   #saveMsg { text-align:center; font-size:13px; margin-top:8px; min-height:18px; }
+
+  /* 저장 토스트 (화면 중앙 고정, 스크롤 영향 없음) */
+  #saveToast { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(54,56,89,0.95); color:#fff; padding:16px 28px; border-radius:12px; font-size:15px; font-weight:600; z-index:10000; opacity:0; pointer-events:none; transition:opacity .25s; box-shadow:0 4px 20px rgba(0,0,0,.3); font-family: inherit; }
+  #saveToast.show { opacity:1; }
+  #saveToast.success { background:rgba(54,56,89,0.95); }
+  #saveToast.error { background:rgba(198,40,40,0.95); }
 </style>
 </head>
 <body>
@@ -140,6 +158,9 @@
   <div id="panelContent"></div>
 </div>
 
+<!-- 저장 완료/실패 토스트 (화면 중앙 고정) -->
+<div id="saveToast"></div>
+
 <script>
 /* ==================== Firebase 초기화 ==================== */
 const firebaseConfig = {
@@ -180,7 +201,7 @@ function normalizeGrade(raw){
 
 function gradeInfo(raw){
   const g = normalizeGrade(raw);
-  if (g === "기계약") return { label:"★ 기계약", color:"#FFD700", text:"#333", icon:"★" };
+  if (g === "기계약") return { label:"★ 기계약", color:"#F2AC57", text:"#fff", icon:"★" };
   if (g === "A")     return { label:"A등급",     color:"#E53935", text:"#fff", icon:"A" };
   if (g === "B")     return { label:"B등급",     color:"#FB8C00", text:"#fff", icon:"B" };
   if (g === "C")     return { label:"C등급",     color:"#43A047", text:"#fff", icon:"C" };
@@ -295,6 +316,11 @@ function initMap(){
   kakao.maps.event.addListener(map, 'idle', function(){
     clearTimeout(moveTimer);
     moveTimer = setTimeout(loadStoresInView, 400);
+  });
+
+  // 지도의 빈 영역 클릭 시 상세 패널 닫기
+  kakao.maps.event.addListener(map, 'click', function(){
+    closePanel();
   });
 
   moveToMyLocation();
@@ -581,9 +607,9 @@ async function openPanel(store){
   const visitFormHtml = isContract ? '' : (
     '<div id="visitForm">' +
     '<h3 id="visitFormTitle">📋 내 방문기록 (' + currentUser.name + ')</h3>' +
-    '<div class="form-row"><label>업체명</label><input type="text" value="' + (store.name||"") + '" disabled style="background:#f5f5f5;"></div>' +
-    '<div class="form-row"><label>월 예상배출량 (kg)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
-    '<div class="form-row"><label>현재 단가 (원/kg)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
+    '<div class="form-row"><label>현재 업체명</label><input id="v_storeName" type="text" value="' + (store.name||"") + '" placeholder="업체명"></div>' +
+    '<div class="form-row"><label>월 예상배출량 (L)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
+    '<div class="form-row"><label>현재 단가 (원/L)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
     '<div class="form-row"><label>현재 주 수거횟수</label><input id="v_freq" type="number" placeholder="예: 3"></div>' +
     '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
     '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="현장 방문 메모"></textarea></div>' +
@@ -594,7 +620,7 @@ async function openPanel(store){
 
   // 기계약 안내 문구 (방문기록 입력폼 대체)
   const contractNoticeHtml = isContract
-    ? '<div style="margin-top:16px;padding:14px;background:#fff9c4;border-radius:8px;font-size:13px;color:#f57f17;text-align:center;font-weight:600;">★ 업박스 기계약 업장입니다</div>'
+    ? '<div style="margin-top:16px;padding:14px;background:#F2AC57;border-radius:8px;font-size:13px;color:#fff;text-align:center;font-weight:600;">★ 업박스 기계약 업장입니다</div>'
     : '';
 
   content.innerHTML =
@@ -621,23 +647,21 @@ async function loadMyVisit(storeKey){
     const snap = await db.ref("visits/" + currentUser.key + "/" + recKey).once("value");
     const v = snap.val();
     if (!v) return;
-    if (v.amount !== undefined) document.getElementById("v_amount").value = v.amount;
-    if (v.price !== undefined) document.getElementById("v_price").value = v.price;
-    if (v.freq !== undefined) document.getElementById("v_freq").value = v.freq;
-    if (v.vinyl !== undefined) document.getElementById("v_vinyl").value = v.vinyl;
-    if (v.note !== undefined) document.getElementById("v_note").value = v.note;
 
-    // 마지막 방문일자 표시
-    if (v.updatedAt){
-      const titleEl = document.getElementById("visitFormTitle");
-      if (titleEl){
-        const d = new Date(v.updatedAt);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ') <span style="color:#999;font-weight:400;font-size:12px;">| 마지막 방문일자: ' + yyyy + '-' + mm + '-' + dd + '</span>';
-      }
-    }
+    // 새 구조(current)가 있으면 그것을 우선, 없으면 구버전 평탄 구조 사용
+    const data = v.current || v;
+
+    if (data.currentStoreName !== undefined) document.getElementById("v_storeName").value = data.currentStoreName;
+    if (data.amount !== undefined) document.getElementById("v_amount").value = data.amount;
+    if (data.price !== undefined) document.getElementById("v_price").value = data.price;
+    if (data.freq !== undefined) document.getElementById("v_freq").value = data.freq;
+    if (data.vinyl !== undefined) document.getElementById("v_vinyl").value = data.vinyl;
+    if (data.note !== undefined) document.getElementById("v_note").value = data.note;
+
+    // 최초/마지막 방문일자 표시
+    const firstMs = v.firstVisitAt || v.updatedAt;
+    const lastMs = v.lastUpdatedAt || v.updatedAt;
+    if (firstMs) updateVisitTitleDates(firstMs, lastMs);
   } catch(e){ console.error(e); }
 }
 
@@ -651,41 +675,108 @@ async function saveVisit(){
 
   try {
     const recKey = "REC_" + currentUser.key + "_" + sanitizeKey(selectedStore._key);
-    const payload = {
-      storeKey: selectedStore._key,
-      storeName: selectedStore.name || "",
-      partnerName: currentUser.name,
-      partnerKey: currentUser.key,
+    const now = Date.now();
+
+    // 기존 레코드 조회 (최초 방문일자 보존 + 이력 누적용)
+    const existSnap = await db.ref("visits/" + currentUser.key + "/" + recKey).once("value");
+    const existing = existSnap.val() || {};
+
+    const currentData = {
+      currentStoreName: document.getElementById("v_storeName").value,
       amount: document.getElementById("v_amount").value,
       price: document.getElementById("v_price").value,
       freq: document.getElementById("v_freq").value,
       vinyl: document.getElementById("v_vinyl").value,
       note: document.getElementById("v_note").value,
-      updatedAt: Date.now()
+      updatedAt: now
     };
+
+    // 기존 이력 배열 유지 + 이번 업데이트 추가
+    const history = Array.isArray(existing.history) ? existing.history.slice() : [];
+
+    // 기존 레코드가 구버전(평탄 구조)이면 마이그레이션
+    if (existing.updatedAt && !existing.firstVisitAt && !existing.current){
+      history.push({
+        currentStoreName: existing.currentStoreName || selectedStore.name || "",
+        amount: existing.amount || "",
+        price: existing.price || "",
+        freq: existing.freq || "",
+        vinyl: existing.vinyl || "",
+        note: existing.note || "",
+        updatedAt: existing.updatedAt
+      });
+    }
+
+    // 이번 저장을 이력에 추가
+    history.push(currentData);
+
+    const payload = {
+      storeKey: selectedStore._key,
+      storeName: selectedStore.name || "",
+      partnerName: currentUser.name,
+      partnerKey: currentUser.key,
+      firstVisitAt: existing.firstVisitAt || existing.updatedAt || now,
+      lastUpdatedAt: now,
+      current: currentData,
+      history: history,
+      // 하위호환: 기존 방식의 필드들도 유지
+      currentStoreName: currentData.currentStoreName,
+      amount: currentData.amount,
+      price: currentData.price,
+      freq: currentData.freq,
+      vinyl: currentData.vinyl,
+      note: currentData.note,
+      updatedAt: now
+    };
+
     await db.ref("visits/" + currentUser.key + "/" + recKey).set(payload);
 
     // 내 방문기록 키 목록 업데이트 → 해당 마커 즉시 방문 색상으로 변경
     myVisitedStoreKeys[sanitizeKey(selectedStore._key)] = true;
     renderMarkers();
 
-    // 방문일자 즉시 갱신
-    const titleEl = document.getElementById("visitFormTitle");
-    if (titleEl){
-      const d = new Date(payload.updatedAt);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ') <span style="color:#999;font-weight:400;font-size:12px;">| 마지막 방문일자: ' + yyyy + '-' + mm + '-' + dd + '</span>';
-    }
+    // 최초/마지막 방문일자 즉시 갱신
+    updateVisitTitleDates(payload.firstVisitAt, payload.lastUpdatedAt);
 
-    msg.innerHTML = '<span style="color:#2e7d32;">✅ 저장 완료</span>';
+    msg.innerHTML = '<span style="color:#363859;font-weight:600;">✅ 저장 완료</span>';
+    showToast("✅ 저장 완료", "success");
   } catch(e){
     msg.innerHTML = '<span style="color:#c62828;">❌ 저장 실패: ' + e.message + '</span>';
+    showToast("❌ 저장 실패: " + e.message, "error");
   } finally {
     btn.disabled = false;
     btn.textContent = "💾 저장";
   }
+}
+
+// 화면 중앙에 토스트 메시지 표시 (1.8초 후 자동 사라짐)
+function showToast(msg, type){
+  const toast = document.getElementById("saveToast");
+  if (!toast) return;
+  toast.className = "";
+  toast.classList.add(type || "success");
+  toast.textContent = msg;
+  // 강제 reflow 후 show 클래스 추가 (애니메이션 트리거)
+  void toast.offsetWidth;
+  toast.classList.add("show");
+  setTimeout(function(){ toast.classList.remove("show"); }, 1800);
+}
+
+// 방문일자 제목 갱신 공통 함수
+function updateVisitTitleDates(firstMs, lastMs){
+  const titleEl = document.getElementById("visitFormTitle");
+  if (!titleEl) return;
+  const fmt = function(ms){
+    const d = new Date(ms);
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  };
+  const firstStr = firstMs ? fmt(firstMs) : "-";
+  const lastStr = lastMs ? fmt(lastMs) : "-";
+  const isSame = firstMs && lastMs && firstStr === lastStr;
+  const dateInfo = isSame
+    ? '최초 방문: ' + firstStr
+    : '최초 방문: ' + firstStr + ' | 마지막 수정: ' + lastStr;
+  titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ') <span style="color:#999;font-weight:400;font-size:12px;">| ' + dateInfo + '</span>';
 }
 
 /* ==================== 초기 실행 ==================== */
