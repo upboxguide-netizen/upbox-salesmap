@@ -145,6 +145,7 @@ let currentFilter = 'ALL';
 let currentKeyword = '';
 let selectedStore = null;
 let userLocationMarker = null;
+let myVisitedStoreKeys = {};  // 내가 방문기록을 남긴 업장 키 { storeKey: true }
 
 /* ==================== 유틸 ==================== */
 function sanitizeKey(s){ return String(s||"").replace(/[.#$\[\]\/]/g,"_"); }
@@ -168,11 +169,22 @@ function gradeInfo(raw){
   return               { label:"미지정",         color:"#9E9E9E", text:"#fff", icon:"?" };
 }
 
-function makeMarkerImage(grade){
-  const g = gradeInfo(grade);
+function makeMarkerImage(grade, visited){
+  // 방문기록 있으면 남색 마커로 표시 (등급 색상 오버라이드)
+  let color, text, icon;
+  if (visited){
+    color = "#1A237E";  // 남색 (navy)
+    text = "#fff";
+    icon = "✓";
+  } else {
+    const g = gradeInfo(grade);
+    color = g.color;
+    text = g.text;
+    icon = g.icon;
+  }
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">'
-    + '<path d="M18 0 C8 0 0 8 0 18 C0 30 18 46 18 46 C18 46 36 30 36 18 C36 8 28 0 18 0 Z" fill="' + g.color + '" stroke="#fff" stroke-width="2"/>'
-    + '<text x="18" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="' + g.text + '" font-family="Arial">' + g.icon + '</text>'
+    + '<path d="M18 0 C8 0 0 8 0 18 C0 30 18 46 18 46 C18 46 36 30 36 18 C36 8 28 0 18 0 Z" fill="' + color + '" stroke="#fff" stroke-width="2"/>'
+    + '<text x="18" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="' + text + '" font-family="Arial">' + icon + '</text>'
     + '</svg>';
   const url = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   return new kakao.maps.MarkerImage(url, new kakao.maps.Size(36,46), { offset:new kakao.maps.Point(18,46) });
@@ -241,7 +253,23 @@ function showApp(){
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("app").style.display = "block";
   document.getElementById("userName").textContent = currentUser.name + " 님";
+  loadMyVisitedKeys();
   initMap();
+}
+
+// 현재 로그인한 파트너가 저장한 방문기록 키 목록 로드
+async function loadMyVisitedKeys(){
+  try {
+    const snap = await db.ref("visits/" + currentUser.key).once("value");
+    const data = snap.val() || {};
+    myVisitedStoreKeys = {};
+    for (const recKey in data){
+      const r = data[recKey];
+      if (r && r.storeKey){
+        myVisitedStoreKeys[sanitizeKey(r.storeKey)] = true;
+      }
+    }
+  } catch(e){ console.error("방문기록 키 로드 실패:", e); }
 }
 
 /* ==================== 지도 ==================== */
@@ -352,9 +380,10 @@ function renderMarkers(){
     }
     if (kw && !(s.name||"").toLowerCase().includes(kw)) return;
 
+    const visited = !!myVisitedStoreKeys[sanitizeKey(s._key)];
     const marker = new kakao.maps.Marker({
       position: new kakao.maps.LatLng(s.lat, s.lng),
-      image: makeMarkerImage(s.grade),
+      image: makeMarkerImage(s.grade, visited),
       map: map
     });
 
@@ -388,16 +417,23 @@ async function openPanel(store){
 
   const g = gradeInfo(store.grade);
   const normalizedGrade = normalizeGrade(store.grade);
+  const isContract = (normalizedGrade === "기계약");
+
   const regBadge = store.adminType ? '<span class="badge reg">' + store.adminType + '</span>' : "";
   const gradeBadgeClass = normalizedGrade === "기계약" ? "grade-contract"
                         : normalizedGrade === "A" ? "grade-A"
                         : normalizedGrade === "B" ? "grade-B"
                         : normalizedGrade === "C" ? "grade-C" : "grade-none";
   const gradeBadge = '<span class="badge ' + gradeBadgeClass + '">' + g.label + '</span>';
-  const isOperable = store.operable === "Y" || store.operable === "가능" || store.operable === true || store.operable === "운영가능";
-  const statusBadge = isOperable
-    ? '<span class="status-ok">🟢 운영가능</span>'
-    : '<span class="status-ng">🔴 운영불가</span>';
+
+  // 기계약은 운영가능여부 숨김
+  let statusBadge = "";
+  if (!isContract){
+    const isOperable = store.operable === "Y" || store.operable === "가능" || store.operable === true || store.operable === "운영가능";
+    statusBadge = isOperable
+      ? '<span class="status-ok">🟢 운영가능</span>'
+      : '<span class="status-ng">🔴 운영불가</span>';
+  }
 
   const memoHtml = store.memo ? '<div class="memo">📝 ' + store.memo + '</div>' : "";
 
@@ -415,12 +451,8 @@ async function openPanel(store){
       }).join('') + '</div>'
     : "";
 
-  content.innerHTML =
-    '<h2>' + (store.name || "(이름없음)") + '</h2>' +
-    '<div class="addr">' + (store.address || "") + '</div>' +
-    '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + ' ' + statusBadge + '</div>' +
-    infoHtml +
-    memoHtml +
+  // 기계약이 아닐 때만 방문기록 입력폼 표시
+  const visitFormHtml = isContract ? '' : (
     '<div id="visitForm">' +
     '<h3>📋 내 방문기록 (' + currentUser.name + ')</h3>' +
     '<div class="form-row"><label>업체명</label><input type="text" value="' + (store.name||"") + '" disabled style="background:#f5f5f5;"></div>' +
@@ -431,10 +463,25 @@ async function openPanel(store){
     '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="현장 방문 메모"></textarea></div>' +
     '<button id="saveBtn" onclick="saveVisit()">💾 저장</button>' +
     '<div id="saveMsg"></div>' +
-    '</div>';
+    '</div>'
+  );
+
+  // 기계약 안내 문구 (방문기록 입력폼 대체)
+  const contractNoticeHtml = isContract
+    ? '<div style="margin-top:16px;padding:14px;background:#fff9c4;border-radius:8px;font-size:13px;color:#f57f17;text-align:center;font-weight:600;">★ 업박스 기계약 업장입니다</div>'
+    : '';
+
+  content.innerHTML =
+    '<h2>' + (store.name || "(이름없음)") + '</h2>' +
+    '<div class="addr">' + (store.address || "") + '</div>' +
+    '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + ' ' + statusBadge + '</div>' +
+    infoHtml +
+    memoHtml +
+    contractNoticeHtml +
+    visitFormHtml;
 
   panel.classList.add("open");
-  await loadMyVisit(store._key);
+  if (!isContract) await loadMyVisit(store._key);
 }
 
 function closePanel(){
@@ -479,6 +526,11 @@ async function saveVisit(){
       updatedAt: Date.now()
     };
     await db.ref("visits/" + currentUser.key + "/" + recKey).set(payload);
+
+    // 내 방문기록 키 목록 업데이트 → 해당 마커 즉시 남색으로 변경
+    myVisitedStoreKeys[sanitizeKey(selectedStore._key)] = true;
+    renderMarkers();
+
     msg.innerHTML = '<span style="color:#2e7d32;">✅ 저장 완료</span>';
   } catch(e){
     msg.innerHTML = '<span style="color:#c62828;">❌ 저장 실패: ' + e.message + '</span>';
