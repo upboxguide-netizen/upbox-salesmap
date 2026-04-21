@@ -37,6 +37,24 @@
   #searchInput { flex:1; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); outline:none; }
   #searchInput:focus { border-color:#1a8754; }
 
+  /* 검색 결과 드롭다운 */
+  #searchResults { position:absolute; top:100px; left:10px; right:10px; background:#fff; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); z-index:60; max-height:320px; overflow-y:auto; display:none; }
+  #searchResults.show { display:block; }
+  .searchItem { padding:12px 14px; border-bottom:1px solid #f0f0f0; cursor:pointer; font-size:13px; }
+  .searchItem:last-child { border-bottom:none; }
+  .searchItem:hover, .searchItem:active { background:#f5f5f5; }
+  .searchItem .s-name { font-weight:600; color:#333; margin-bottom:2px; }
+  .searchItem .s-addr { font-size:11px; color:#888; }
+  .searchItem .s-grade { display:inline-block; font-size:10px; padding:2px 6px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+  .searchItem .s-grade.g-contract { background:#FFD700; color:#333; }
+  .searchItem .s-grade.g-A { background:#E53935; color:#fff; }
+  .searchItem .s-grade.g-B { background:#FB8C00; color:#fff; }
+  .searchItem .s-grade.g-C { background:#43A047; color:#fff; }
+  .searchItem .s-grade.g-none { background:#9E9E9E; color:#fff; }
+  .searchItem .s-visited { display:inline-block; background:#1A237E; color:#fff; font-size:10px; padding:2px 6px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+  #searchLoading { padding:14px; text-align:center; color:#999; font-size:13px; }
+  #searchEmpty { padding:14px; text-align:center; color:#999; font-size:13px; }
+
   #filterBar { position:absolute; top:108px; left:10px; right:10px; z-index:50; display:flex; gap:6px; overflow-x:auto; padding:4px 0; -webkit-overflow-scrolling:touch; }
   #filterBar::-webkit-scrollbar { display:none; }
   .filterChip { flex-shrink:0; padding:6px 12px; background:#fff; border:1px solid #ddd; border-radius:16px; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,.08); }
@@ -98,7 +116,8 @@
     <button class="logout" onclick="doLogout()">로그아웃</button>
   </div>
 
-  <input id="searchInput" type="text" placeholder="🔍 업장명 검색" oninput="onSearch()">
+  <input id="searchInput" type="text" placeholder="🔍 전국 업장명 검색" oninput="onSearch()" onfocus="onSearchFocus()" autocomplete="off">
+  <div id="searchResults"></div>
 
   <div id="filterBar">
     <div class="filterChip active" data-grade="ALL" onclick="setFilter('ALL')">전체</div>
@@ -371,14 +390,11 @@ function renderMarkers(){
   markers.forEach(function(m){ m.marker.setMap(null); });
   markers = [];
 
-  const kw = currentKeyword.toLowerCase();
-
   allStoresInView.forEach(function(s){
     if (currentFilter !== 'ALL'){
       const normalized = normalizeGrade(s.grade);
       if (normalized !== currentFilter) return;
     }
-    if (kw && !(s.name||"").toLowerCase().includes(kw)) return;
 
     const visited = !!myVisitedStoreKeys[sanitizeKey(s._key)];
     const marker = new kakao.maps.Marker({
@@ -400,10 +416,128 @@ function setFilter(grade){
   renderMarkers();
 }
 
-function onSearch(){
-  currentKeyword = document.getElementById("searchInput").value.trim();
-  renderMarkers();
+/* ==================== 전역 업장 검색 ==================== */
+let searchTimer = null;
+let lastSearchKeyword = "";
+
+function onSearchFocus(){
+  // 포커스 시 기존 결과가 있으면 다시 보여주기
+  const kw = document.getElementById("searchInput").value.trim();
+  if (kw.length >= 1) onSearch();
 }
+
+function onSearch(){
+  const kw = document.getElementById("searchInput").value.trim();
+  const resultsEl = document.getElementById("searchResults");
+
+  // 빈 입력이면 드롭다운 숨김
+  if (!kw){
+    resultsEl.classList.remove("show");
+    resultsEl.innerHTML = "";
+    return;
+  }
+
+  // 디바운싱 (300ms 타이핑 멈춘 후 검색)
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function(){ doGlobalSearch(kw); }, 300);
+}
+
+async function doGlobalSearch(keyword){
+  if (keyword === lastSearchKeyword) return;
+  lastSearchKeyword = keyword;
+
+  const resultsEl = document.getElementById("searchResults");
+  resultsEl.classList.add("show");
+  resultsEl.innerHTML = '<div id="searchLoading">🔍 검색 중...</div>';
+
+  try {
+    // Firebase name 인덱스 활용 - 시작 문자열 기반 prefix 검색
+    // name >= keyword AND name < keyword + "\uf8ff" (유니코드 최대값)
+    const snap = await db.ref("stores")
+      .orderByChild("name")
+      .startAt(keyword)
+      .endAt(keyword + "\uf8ff")
+      .limitToFirst(30)
+      .once("value");
+
+    const data = snap.val() || {};
+    const list = [];
+    for (const key in data){
+      const s = data[key];
+      if (!s.lat || !s.lng) continue;
+      s._key = key;
+      list.push(s);
+    }
+
+    // 이름 기준 정렬
+    list.sort(function(a, b){ return String(a.name||"").localeCompare(String(b.name||"")); });
+
+    renderSearchResults(list, keyword);
+  } catch(e){
+    resultsEl.innerHTML = '<div id="searchEmpty">⚠️ 검색 실패: ' + e.message + '</div>';
+  }
+}
+
+function renderSearchResults(list, keyword){
+  const resultsEl = document.getElementById("searchResults");
+
+  if (list.length === 0){
+    resultsEl.innerHTML = '<div id="searchEmpty">"' + keyword + '"로 시작하는 업장을 찾을 수 없어요<br><span style="font-size:11px;color:#bbb;">(업장명 앞부분으로 검색해보세요)</span></div>';
+    return;
+  }
+
+  const html = list.map(function(s){
+    const normalizedGrade = normalizeGrade(s.grade);
+    const gradeLabel = normalizedGrade === "기계약" ? "★" : normalizedGrade;
+    const gradeClass = normalizedGrade === "기계약" ? "g-contract"
+                     : normalizedGrade === "A" ? "g-A"
+                     : normalizedGrade === "B" ? "g-B"
+                     : normalizedGrade === "C" ? "g-C" : "g-none";
+    const visited = myVisitedStoreKeys[sanitizeKey(s._key)] ? '<span class="s-visited">✓ 방문</span>' : "";
+    const safeKey = s._key.replace(/"/g, '&quot;');
+    return '<div class="searchItem" onclick="selectSearchResult(\'' + encodeURIComponent(safeKey) + '\')">'
+      + '<div class="s-name">' + (s.name || "(이름없음)") + '<span class="s-grade ' + gradeClass + '">' + gradeLabel + '</span>' + visited + '</div>'
+      + '<div class="s-addr">' + (s.address || "") + '</div>'
+      + '</div>';
+  }).join('');
+
+  resultsEl.innerHTML = html;
+
+  // 캐시에 저장 (클릭 시 사용)
+  window.__searchCache = {};
+  list.forEach(function(s){
+    window.__searchCache[s._key] = s;
+  });
+}
+
+async function selectSearchResult(encodedKey){
+  const key = decodeURIComponent(encodedKey);
+  const store = window.__searchCache && window.__searchCache[key];
+  if (!store) return;
+
+  // 검색창/드롭다운 닫기
+  document.getElementById("searchResults").classList.remove("show");
+  document.getElementById("searchInput").value = store.name || "";
+  document.getElementById("searchInput").blur();
+
+  // 지도 이동
+  const loc = new kakao.maps.LatLng(store.lat, store.lng);
+  map.setLevel(3);   // 가까이 줌
+  map.setCenter(loc);
+
+  // 약간의 딜레이 후 패널 오픈 (지도 이동 + 주변 업장 로딩 이후)
+  setTimeout(function(){ openPanel(store); }, 500);
+}
+
+// 검색창 외부 클릭 시 드롭다운 닫기
+document.addEventListener("click", function(e){
+  const input = document.getElementById("searchInput");
+  const results = document.getElementById("searchResults");
+  if (!input || !results) return;
+  if (!input.contains(e.target) && !results.contains(e.target)){
+    results.classList.remove("show");
+  }
+});
 
 function setStatus(msg){
   document.getElementById("statusBar").textContent = msg;
