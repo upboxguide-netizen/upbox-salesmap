@@ -5,15 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>업박스 영업 지도</title>
 
-<!-- Noto Sans KR 폰트 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-<!-- 카카오맵 JS SDK -->
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services"></script>
 
-<!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
@@ -47,7 +44,6 @@
   #searchInput { position:absolute; top:64px; left:10px; right:10px; width:auto; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); outline:none; z-index:50; font-family: inherit; }
   #searchInput:focus { border-color:#F2AC57; }
 
-  /* 검색 결과 드롭다운 */
   #searchResults { position:absolute; top:100px; left:10px; right:10px; background:#fff; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); z-index:60; max-height:320px; overflow-y:auto; display:none; }
   #searchResults.show { display:block; }
   .searchItem { padding:12px 14px; border-bottom:1px solid #f0f0f0; cursor:pointer; font-size:13px; }
@@ -95,7 +91,17 @@
   .memo { background:#faf6ef; padding:10px 12px; border-radius:8px; font-size:13px; color:#555; margin:10px 0; white-space:pre-wrap; border-left:3px solid #F2AC57; }
 
   #visitForm { margin-top:16px; padding-top:16px; border-top:2px solid #f0f0f0; }
-  #visitForm h3 { font-size:14px; color:#363859; margin-bottom:10px; font-weight:600; }
+  
+  /* 방문 기록 타이틀 및 날짜 배치 스타일 수정 */
+  #visitForm h3 { font-size: 14px; color: #363859; margin-bottom: 12px; font-weight: 600; line-height: 1.5; }
+  #visitForm h3 .date-info { 
+    display: block; 
+    font-size: 11px; 
+    color: #888; 
+    font-weight: 400; 
+    margin-top: 4px; 
+  }
+
   .form-row { margin-bottom:10px; }
   .form-row label { display:block; font-size:12px; color:#666; margin-bottom:4px; font-weight:500; }
   .form-row input, .form-row select, .form-row textarea { width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:13px; outline:none; font-family: inherit; }
@@ -106,7 +112,6 @@
   #saveBtn:disabled { background:#aaa; }
   #saveMsg { text-align:center; font-size:13px; margin-top:8px; min-height:18px; }
 
-  /* 저장 토스트 (화면 중앙 고정, 스크롤 영향 없음) */
   #saveToast { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(54,56,89,0.95); color:#fff; padding:16px 28px; border-radius:12px; font-size:15px; font-weight:600; z-index:10000; opacity:0; pointer-events:none; transition:opacity .25s; box-shadow:0 4px 20px rgba(0,0,0,.3); font-family: inherit; }
   #saveToast.show { opacity:1; }
   #saveToast.success { background:rgba(54,56,89,0.95); }
@@ -133,7 +138,7 @@
     <button class="logout" onclick="doLogout()">로그아웃</button>
   </div>
 
-  <input id="searchInput" type="text" placeholder="🔍 전국 업장명 검색" oninput="onSearch()" onfocus="onSearchFocus()" autocomplete="off">
+  <input id="searchInput" type="text" placeholder="🔍 업장명 검색" oninput="onSearch()" onfocus="onSearchFocus()" autocomplete="off">
   <div id="searchResults"></div>
 
   <div id="filterBar">
@@ -142,7 +147,7 @@
     <div class="filterChip" data-grade="A" onclick="setFilter('A')">A등급</div>
     <div class="filterChip" data-grade="B" onclick="setFilter('B')">B등급</div>
     <div class="filterChip" data-grade="C" onclick="setFilter('C')">C등급</div>
-    <div class="filterChip" data-grade="미지정" onclick="setFilter('미지정')">미지정</div>
+    <div class="filterChip" data-grade="미지정" onclick="setFilter('미지정')">등급미정</div>
   </div>
 
   <div id="map"></div>
@@ -158,7 +163,6 @@
   <div id="panelContent"></div>
 </div>
 
-<!-- 저장 완료/실패 토스트 (화면 중앙 고정) -->
 <div id="saveToast"></div>
 
 <script>
@@ -184,12 +188,11 @@ let currentFilter = 'ALL';
 let currentKeyword = '';
 let selectedStore = null;
 let userLocationMarker = null;
-let myVisitedStoreKeys = {};  // 내가 방문기록을 남긴 업장 키 { storeKey: true }
+let myVisitedStoreKeys = {};
 
 /* ==================== 유틸 ==================== */
 function sanitizeKey(s){ return String(s||"").replace(/[.#$\[\]\/]/g,"_"); }
 
-// 실제 Firebase에 저장된 등급 값을 표준 값으로 정규화
 function normalizeGrade(raw){
   const g = String(raw||"").trim();
   if (g === "업박스기계약업장" || g === "기계약" || g === "기계약업장") return "기계약";
@@ -202,18 +205,17 @@ function normalizeGrade(raw){
 function gradeInfo(raw){
   const g = normalizeGrade(raw);
   if (g === "기계약") return { label:"★ 기계약", color:"#F2AC57", text:"#fff", icon:"★" };
-  if (g === "A")     return { label:"A등급",     color:"#E53935", text:"#fff", icon:"A" };
-  if (g === "B")     return { label:"B등급",     color:"#FB8C00", text:"#fff", icon:"B" };
-  if (g === "C")     return { label:"C등급",     color:"#43A047", text:"#fff", icon:"C" };
-  return               { label:"미지정",         color:"#9E9E9E", text:"#fff", icon:"?" };
+  if (g === "A")      return { label:"A등급",     color:"#E53935", text:"#fff", icon:"A" };
+  if (g === "B")      return { label:"B등급",     color:"#FB8C00", text:"#fff", icon:"B" };
+  if (g === "C")      return { label:"C등급",     color:"#43A047", text:"#fff", icon:"C" };
+  return                { label:"미지정",          color:"#9E9E9E", text:"#fff", icon:"?" };
 }
 
 function makeMarkerImage(grade, visited){
-  // 방문기록 있으면 #4d4678 마커로 표시 (등급 색상 오버라이드, 아이콘은 등급 유지)
   const g = gradeInfo(grade);
   const color = visited ? "#4d4678" : g.color;
   const text = visited ? "#fff" : g.text;
-  const icon = g.icon;  // 아이콘은 항상 등급 아이콘 유지
+  const icon = g.icon;
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">'
     + '<path d="M18 0 C8 0 0 8 0 18 C0 30 18 46 18 46 C18 46 36 30 36 18 C36 8 28 0 18 0 Z" fill="' + color + '" stroke="#fff" stroke-width="2"/>'
     + '<text x="18" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="' + text + '" font-family="Arial">' + icon + '</text>'
@@ -289,7 +291,6 @@ function showApp(){
   initMap();
 }
 
-// 현재 로그인한 파트너가 저장한 방문기록 키 목록 로드
 async function loadMyVisitedKeys(){
   try {
     const snap = await db.ref("visits/" + currentUser.key).once("value");
@@ -318,7 +319,6 @@ function initMap(){
     moveTimer = setTimeout(loadStoresInView, 400);
   });
 
-  // 지도의 빈 영역 클릭 시 상세 패널 닫기
   kakao.maps.event.addListener(map, 'click', function(){
     closePanel();
   });
@@ -439,7 +439,6 @@ let searchTimer = null;
 let lastSearchKeyword = "";
 
 function onSearchFocus(){
-  // 포커스 시 기존 결과가 있으면 다시 보여주기
   const kw = document.getElementById("searchInput").value.trim();
   if (kw.length >= 1) onSearch();
 }
@@ -448,14 +447,12 @@ function onSearch(){
   const kw = document.getElementById("searchInput").value.trim();
   const resultsEl = document.getElementById("searchResults");
 
-  // 빈 입력이면 드롭다운 숨김
   if (!kw){
     resultsEl.classList.remove("show");
     resultsEl.innerHTML = "";
     return;
   }
 
-  // 디바운싱 (300ms 타이핑 멈춘 후 검색)
   clearTimeout(searchTimer);
   searchTimer = setTimeout(function(){ doGlobalSearch(kw); }, 300);
 }
@@ -469,8 +466,6 @@ async function doGlobalSearch(keyword){
   resultsEl.innerHTML = '<div id="searchLoading">🔍 검색 중...</div>';
 
   try {
-    // Firebase name 인덱스 활용 - 시작 문자열 기반 prefix 검색
-    // name >= keyword AND name < keyword + "\uf8ff" (유니코드 최대값)
     const snap = await db.ref("stores")
       .orderByChild("name")
       .startAt(keyword)
@@ -487,7 +482,6 @@ async function doGlobalSearch(keyword){
       list.push(s);
     }
 
-    // 이름 기준 정렬
     list.sort(function(a, b){ return String(a.name||"").localeCompare(String(b.name||"")); });
 
     renderSearchResults(list, keyword);
@@ -521,7 +515,6 @@ function renderSearchResults(list, keyword){
 
   resultsEl.innerHTML = html;
 
-  // 캐시에 저장 (클릭 시 사용)
   window.__searchCache = {};
   list.forEach(function(s){
     window.__searchCache[s._key] = s;
@@ -533,21 +526,17 @@ async function selectSearchResult(encodedKey){
   const store = window.__searchCache && window.__searchCache[key];
   if (!store) return;
 
-  // 검색창/드롭다운 닫기
   document.getElementById("searchResults").classList.remove("show");
   document.getElementById("searchInput").value = store.name || "";
   document.getElementById("searchInput").blur();
 
-  // 지도 이동
   const loc = new kakao.maps.LatLng(store.lat, store.lng);
-  map.setLevel(3);   // 가까이 줌
+  map.setLevel(3);
   map.setCenter(loc);
 
-  // 약간의 딜레이 후 패널 오픈 (지도 이동 + 주변 업장 로딩 이후)
   setTimeout(function(){ openPanel(store); }, 500);
 }
 
-// 검색창 외부 클릭 시 드롭다운 닫기
 document.addEventListener("click", function(e){
   const input = document.getElementById("searchInput");
   const results = document.getElementById("searchResults");
@@ -578,7 +567,6 @@ async function openPanel(store){
                         : normalizedGrade === "C" ? "grade-C" : "grade-none";
   const gradeBadge = '<span class="badge ' + gradeBadgeClass + '">' + g.label + '</span>';
 
-  // 기계약은 운영가능여부 숨김
   let statusBadge = "";
   if (!isContract){
     const isOperable = store.operable === "Y" || store.operable === "가능" || store.operable === true || store.operable === "운영가능";
@@ -589,7 +577,6 @@ async function openPanel(store){
 
   const memoHtml = store.memo ? '<div class="memo">📝 ' + store.memo + '</div>' : "";
 
-  // 추가 정보 (업종/면적/전화번호/예상배출량)
   const infoRows = [];
   if (store.bizType) infoRows.push({k:"업종", v:store.bizType});
   if (store.area) infoRows.push({k:"면적", v:store.area});
@@ -603,7 +590,6 @@ async function openPanel(store){
       }).join('') + '</div>'
     : "";
 
-  // 기계약이 아닐 때만 방문기록 입력폼 표시
   const visitFormHtml = isContract ? '' : (
     '<div id="visitForm">' +
     '<h3 id="visitFormTitle">📋 내 방문기록 (' + currentUser.name + ')</h3>' +
@@ -618,7 +604,6 @@ async function openPanel(store){
     '</div>'
   );
 
-  // 기계약 안내 문구 (방문기록 입력폼 대체)
   const contractNoticeHtml = isContract
     ? '<div style="margin-top:16px;padding:14px;background:#F2AC57;border-radius:8px;font-size:13px;color:#fff;text-align:center;font-weight:600;">★ 업박스 기계약 업장입니다</div>'
     : '';
@@ -648,7 +633,6 @@ async function loadMyVisit(storeKey){
     const v = snap.val();
     if (!v) return;
 
-    // 새 구조(current)가 있으면 그것을 우선, 없으면 구버전 평탄 구조 사용
     const data = v.current || v;
 
     if (data.currentStoreName !== undefined) document.getElementById("v_storeName").value = data.currentStoreName;
@@ -658,7 +642,6 @@ async function loadMyVisit(storeKey){
     if (data.vinyl !== undefined) document.getElementById("v_vinyl").value = data.vinyl;
     if (data.note !== undefined) document.getElementById("v_note").value = data.note;
 
-    // 최초/마지막 방문일자 표시
     const firstMs = v.firstVisitAt || v.updatedAt;
     const lastMs = v.lastUpdatedAt || v.updatedAt;
     if (firstMs) updateVisitTitleDates(firstMs, lastMs);
@@ -677,7 +660,6 @@ async function saveVisit(){
     const recKey = "REC_" + currentUser.key + "_" + sanitizeKey(selectedStore._key);
     const now = Date.now();
 
-    // 기존 레코드 조회 (최초 방문일자 보존 + 이력 누적용)
     const existSnap = await db.ref("visits/" + currentUser.key + "/" + recKey).once("value");
     const existing = existSnap.val() || {};
 
@@ -691,10 +673,8 @@ async function saveVisit(){
       updatedAt: now
     };
 
-    // 기존 이력 배열 유지 + 이번 업데이트 추가
     const history = Array.isArray(existing.history) ? existing.history.slice() : [];
 
-    // 기존 레코드가 구버전(평탄 구조)이면 마이그레이션
     if (existing.updatedAt && !existing.firstVisitAt && !existing.current){
       history.push({
         currentStoreName: existing.currentStoreName || selectedStore.name || "",
@@ -707,7 +687,6 @@ async function saveVisit(){
       });
     }
 
-    // 이번 저장을 이력에 추가
     history.push(currentData);
 
     const payload = {
@@ -719,7 +698,6 @@ async function saveVisit(){
       lastUpdatedAt: now,
       current: currentData,
       history: history,
-      // 하위호환: 기존 방식의 필드들도 유지
       currentStoreName: currentData.currentStoreName,
       amount: currentData.amount,
       price: currentData.price,
@@ -731,11 +709,9 @@ async function saveVisit(){
 
     await db.ref("visits/" + currentUser.key + "/" + recKey).set(payload);
 
-    // 내 방문기록 키 목록 업데이트 → 해당 마커 즉시 방문 색상으로 변경
     myVisitedStoreKeys[sanitizeKey(selectedStore._key)] = true;
     renderMarkers();
 
-    // 최초/마지막 방문일자 즉시 갱신
     updateVisitTitleDates(payload.firstVisitAt, payload.lastUpdatedAt);
 
     msg.innerHTML = '<span style="color:#363859;font-weight:600;">✅ 저장 완료</span>';
@@ -749,20 +725,18 @@ async function saveVisit(){
   }
 }
 
-// 화면 중앙에 토스트 메시지 표시 (1.8초 후 자동 사라짐)
 function showToast(msg, type){
   const toast = document.getElementById("saveToast");
   if (!toast) return;
   toast.className = "";
   toast.classList.add(type || "success");
   toast.textContent = msg;
-  // 강제 reflow 후 show 클래스 추가 (애니메이션 트리거)
   void toast.offsetWidth;
   toast.classList.add("show");
   setTimeout(function(){ toast.classList.remove("show"); }, 1800);
 }
 
-// 방문일자 제목 갱신 공통 함수
+// 방문일자 제목 갱신 (줄바꿈 레이아웃 반영)
 function updateVisitTitleDates(firstMs, lastMs){
   const titleEl = document.getElementById("visitFormTitle");
   if (!titleEl) return;
@@ -772,11 +746,14 @@ function updateVisitTitleDates(firstMs, lastMs){
   };
   const firstStr = firstMs ? fmt(firstMs) : "-";
   const lastStr = lastMs ? fmt(lastMs) : "-";
-  const isSame = firstMs && lastMs && firstStr === lastStr;
-  const dateInfo = isSame
+  
+  const dateInfo = (firstStr === lastStr)
     ? '최초 방문: ' + firstStr
     : '최초 방문: ' + firstStr + ' | 마지막 수정: ' + lastStr;
-  titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ') <span style="color:#999;font-weight:400;font-size:12px;">| ' + dateInfo + '</span>';
+
+  // 이름을 제목으로 쓰고 날짜 정보는 span(date-info)으로 감싸서 block 속성으로 아래에 배치
+  titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ') ' + 
+                      '<span class="date-info">' + dateInfo + '</span>';
 }
 
 /* ==================== 초기 실행 ==================== */
