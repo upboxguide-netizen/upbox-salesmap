@@ -96,7 +96,8 @@
   .memo { background:#faf6ef; padding:10px 12px; border-radius:8px; font-size:13px; color:#555; margin:10px 0; white-space:pre-wrap; border-left:3px solid #F2AC57; }
 
   #visitForm { margin-top:16px; padding-top:16px; border-top:2px solid #f0f0f0; }
-  #visitForm h3 { font-size:14px; color:#363859; margin-bottom:10px; font-weight:600; }
+  #visitForm h3 { font-size:14px; color:#363859; margin-bottom:10px; font-weight:600; line-height:1.5; }
+  #visitForm h3 .visit-date-info { display:block; font-size:11px; color:#888; font-weight:400; margin-top:4px; }
   .form-row { margin-bottom:10px; }
   .form-row label { display:block; font-size:12px; color:#666; margin-bottom:4px; font-weight:500; }
   .form-row input, .form-row select, .form-row textarea { width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-size:13px; outline:none; font-family: inherit; }
@@ -107,10 +108,10 @@
   #saveBtn:disabled { background:#aaa; }
   #saveMsg { text-align:center; font-size:13px; margin-top:8px; min-height:18px; }
 
-  /* 길찾기 버튼 */
-  #navBtn { width:100%; padding:12px; background:#363859; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-top:6px; font-family: inherit; display:flex; align-items:center; justify-content:center; gap:6px; }
-  #navBtn:active { background:#262840; }
-  #navBtn:disabled { background:#aaa; cursor:not-allowed; }
+  /* 길찾기 버튼 (아웃라인 스타일) */
+  #navBtn { width:100%; padding:12px; background:#fff; color:#363859; border:1.5px solid #363859; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-top:10px; font-family: inherit; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .15s; }
+  #navBtn:active { background:#363859; color:#fff; }
+  #navBtn:disabled { border-color:#aaa; color:#aaa; cursor:not-allowed; }
 
   /* 저장 토스트 (화면 중앙 고정, 스크롤 영향 없음) */
   #saveToast { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(54,56,89,0.95); color:#fff; padding:16px 28px; border-radius:12px; font-size:15px; font-weight:600; z-index:10000; opacity:0; pointer-events:none; transition:opacity .25s; box-shadow:0 4px 20px rgba(0,0,0,.3); font-family: inherit; }
@@ -671,7 +672,7 @@ function openKakaoNavigation(){
     return;
   }
 
-  showToast("🧭 현재 위치 확인 중...", "success");
+  showToast("현재 위치 확인 중...", "success");
 
   if (!navigator.geolocation){
     // 위치 서비스 없으면 도착지만 표시
@@ -841,7 +842,8 @@ function updateVisitTitleDates(firstMs, lastMs){
   const dateInfo = isSame
     ? '최초 방문: ' + firstStr
     : '최초 방문: ' + firstStr + ' | 마지막 수정: ' + lastStr;
-  titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ') <span style="color:#999;font-weight:400;font-size:12px;">| ' + dateInfo + '</span>';
+  // 날짜 정보는 .visit-date-info 클래스로 줄바꿈되어 아래 행에 표시됨
+  titleEl.innerHTML = '📋 내 방문기록 (' + currentUser.name + ')<span class="visit-date-info">' + dateInfo + '</span>';
 }
 
 /* ==================== 초기 실행 ==================== */
