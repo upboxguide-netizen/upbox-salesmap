@@ -70,7 +70,6 @@
   .filterChip { flex-shrink:0; padding:6px 12px; background:#fff; border:1px solid #ddd; border-radius:16px; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,.08); font-family: inherit; font-weight:500; }
   .filterChip.active { background:#363859; color:#fff; border-color:#363859; }
   .filterChip[data-grade="VISITED"].active { background:#4d4678; border-color:#4d4678; }
-  .filterChip[data-grade="VISITED"].active { background:#4d4678; border-color:#4d4678; }
 
   #map { width:100%; height:100%; }
 
@@ -108,6 +107,11 @@
   #saveBtn:disabled { background:#aaa; }
   #saveMsg { text-align:center; font-size:13px; margin-top:8px; min-height:18px; }
 
+  /* 길찾기 버튼 */
+  #navBtn { width:100%; padding:12px; background:#363859; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-top:6px; font-family: inherit; display:flex; align-items:center; justify-content:center; gap:6px; }
+  #navBtn:active { background:#262840; }
+  #navBtn:disabled { background:#aaa; cursor:not-allowed; }
+
   /* 저장 토스트 (화면 중앙 고정, 스크롤 영향 없음) */
   #saveToast { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(54,56,89,0.95); color:#fff; padding:16px 28px; border-radius:12px; font-size:15px; font-weight:600; z-index:10000; opacity:0; pointer-events:none; transition:opacity .25s; box-shadow:0 4px 20px rgba(0,0,0,.3); font-family: inherit; }
   #saveToast.show { opacity:1; }
@@ -138,7 +142,7 @@
   <input id="searchInput" type="text" placeholder="🔍 전국 업장명 검색" oninput="onSearch()" onfocus="onSearchFocus()" autocomplete="off">
   <div id="searchResults"></div>
 
-<div id="filterBar">
+  <div id="filterBar">
     <div class="filterChip active" data-grade="ALL" onclick="setFilter('ALL')">전체</div>
     <div class="filterChip" data-grade="VISITED" onclick="setFilter('VISITED')">방문완료</div>
     <div class="filterChip" data-grade="A" onclick="setFilter('A')">A등급</div>
@@ -415,8 +419,6 @@ function renderMarkers(){
     if (currentFilter === 'VISITED'){
       // 방문완료 필터: 내가 방문기록 남긴 업장만
       if (!myVisitedStoreKeys[sanitizeKey(s._key)]) return;
-    } else if (currentFilter === 'VISITED'){
-      if (!myVisitedStoreKeys[sanitizeKey(s._key)]) return;
     } else if (currentFilter !== 'ALL'){
       const normalized = normalizeGrade(s.grade);
       if (normalized !== currentFilter) return;
@@ -478,7 +480,6 @@ async function doGlobalSearch(keyword){
 
   try {
     // Firebase name 인덱스 활용 - 시작 문자열 기반 prefix 검색
-    // name >= keyword AND name < keyword + "\uf8ff" (유니코드 최대값)
     const snap = await db.ref("stores")
       .orderByChild("name")
       .startAt(keyword)
@@ -548,10 +549,10 @@ async function selectSearchResult(encodedKey){
 
   // 지도 이동
   const loc = new kakao.maps.LatLng(store.lat, store.lng);
-  map.setLevel(3);   // 가까이 줌
+  map.setLevel(3);
   map.setCenter(loc);
 
-  // 약간의 딜레이 후 패널 오픈 (지도 이동 + 주변 업장 로딩 이후)
+  // 약간의 딜레이 후 패널 오픈
   setTimeout(function(){ openPanel(store); }, 500);
 }
 
@@ -616,11 +617,12 @@ async function openPanel(store){
     '<div id="visitForm">' +
     '<h3 id="visitFormTitle">📋 내 방문기록 (' + currentUser.name + ')</h3>' +
     '<div class="form-row"><label>현재 업체명</label><input id="v_storeName" type="text" value="' + (store.name||"") + '" placeholder="업체명"></div>' +
+    '<div class="form-row"><label>담당자 연락처</label><input id="v_contact" type="tel" placeholder="예: 010-0000-0000"></div>' +
     '<div class="form-row"><label>월 예상배출량 (L)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
     '<div class="form-row"><label>현재 단가 (원/L)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
     '<div class="form-row"><label>현재 주 수거횟수</label><input id="v_freq" type="number" placeholder="예: 3"></div>' +
     '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
-    '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="현장 방문 메모"></textarea></div>' +
+    '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="예: 상담내용, 기타 폐기물 제안사항 등 기재"></textarea></div>' +
     '<button id="saveBtn" onclick="saveVisit()">💾 저장</button>' +
     '<div id="saveMsg"></div>' +
     '</div>'
@@ -631,12 +633,16 @@ async function openPanel(store){
     ? '<div style="margin-top:16px;padding:14px;background:#F2AC57;border-radius:8px;font-size:13px;color:#fff;text-align:center;font-weight:600;">★ 업박스 기계약 업장입니다</div>'
     : '';
 
+  // 길찾기 버튼 (모든 업장 공통)
+  const navBtnHtml = '<button id="navBtn" onclick="openKakaoNavigation()">🧭 카카오맵 길찾기</button>';
+
   content.innerHTML =
     '<h2>' + (store.name || "(이름없음)") + '</h2>' +
     '<div class="addr">' + (store.address || "") + '</div>' +
     '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + ' ' + statusBadge + '</div>' +
     infoHtml +
     memoHtml +
+    navBtnHtml +
     contractNoticeHtml +
     visitFormHtml;
 
@@ -647,6 +653,51 @@ async function openPanel(store){
 function closePanel(){
   document.getElementById("storePanel").classList.remove("open");
   selectedStore = null;
+}
+
+/* ==================== 카카오맵 길찾기 연결 ==================== */
+// 선택된 업장으로 카카오맵 길찾기 열기
+// - 웹 URL 방식 사용 (PC/모바일 자동 분기, 앱 설치 시 자동 앱 실행)
+// - 현재 위치를 출발지로, 선택 업장을 도착지로 설정
+function openKakaoNavigation(){
+  if (!selectedStore) return;
+
+  const destName = encodeURIComponent(selectedStore.name || "도착지");
+  const destLat = selectedStore.lat;
+  const destLng = selectedStore.lng;
+
+  if (!destLat || !destLng){
+    showToast("⚠️ 업장 위치 정보가 없습니다", "error");
+    return;
+  }
+
+  showToast("🧭 현재 위치 확인 중...", "success");
+
+  if (!navigator.geolocation){
+    // 위치 서비스 없으면 도착지만 표시
+    const url = "https://map.kakao.com/link/to/" + destName + "," + destLat + "," + destLng;
+    window.open(url, "_blank");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos){
+      const fromLat = pos.coords.latitude;
+      const fromLng = pos.coords.longitude;
+      const fromName = encodeURIComponent("현재 위치");
+      // 카카오맵 길찾기 웹 URL: to/도착지,위도,경도/from/출발지,위도,경도
+      const url = "https://map.kakao.com/link/to/" + destName + "," + destLat + "," + destLng
+                + "/from/" + fromName + "," + fromLat + "," + fromLng;
+      window.open(url, "_blank");
+    },
+    function(err){
+      // 위치 권한 거부/실패 시: 출발지 없이 도착지만 지정
+      const url = "https://map.kakao.com/link/to/" + destName + "," + destLat + "," + destLng;
+      window.open(url, "_blank");
+      showToast("⚠️ 위치 권한이 없어 도착지만 표시됩니다", "error");
+    },
+    { enableHighAccuracy:true, timeout:5000 }
+  );
 }
 
 async function loadMyVisit(storeKey){
@@ -660,6 +711,10 @@ async function loadMyVisit(storeKey){
     const data = v.current || v;
 
     if (data.currentStoreName !== undefined) document.getElementById("v_storeName").value = data.currentStoreName;
+    if (data.contact !== undefined){
+      const el = document.getElementById("v_contact");
+      if (el) el.value = data.contact;
+    }
     if (data.amount !== undefined) document.getElementById("v_amount").value = data.amount;
     if (data.price !== undefined) document.getElementById("v_price").value = data.price;
     if (data.freq !== undefined) document.getElementById("v_freq").value = data.freq;
@@ -691,6 +746,7 @@ async function saveVisit(){
 
     const currentData = {
       currentStoreName: document.getElementById("v_storeName").value,
+      contact: (document.getElementById("v_contact") || {}).value || "",
       amount: document.getElementById("v_amount").value,
       price: document.getElementById("v_price").value,
       freq: document.getElementById("v_freq").value,
@@ -706,6 +762,7 @@ async function saveVisit(){
     if (existing.updatedAt && !existing.firstVisitAt && !existing.current){
       history.push({
         currentStoreName: existing.currentStoreName || selectedStore.name || "",
+        contact: existing.contact || "",
         amount: existing.amount || "",
         price: existing.price || "",
         freq: existing.freq || "",
@@ -729,6 +786,7 @@ async function saveVisit(){
       history: history,
       // 하위호환: 기존 방식의 필드들도 유지
       currentStoreName: currentData.currentStoreName,
+      contact: currentData.contact,
       amount: currentData.amount,
       price: currentData.price,
       freq: currentData.freq,
@@ -764,7 +822,6 @@ function showToast(msg, type){
   toast.className = "";
   toast.classList.add(type || "success");
   toast.textContent = msg;
-  // 강제 reflow 후 show 클래스 추가 (애니메이션 트리거)
   void toast.offsetWidth;
   toast.classList.add("show");
   setTimeout(function(){ toast.classList.remove("show"); }, 1800);
