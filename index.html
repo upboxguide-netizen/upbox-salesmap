@@ -143,7 +143,7 @@
 
   <div id="filterBar">
     <div class="filterChip active" data-grade="ALL" onclick="setFilter('ALL')">전체</div>
-    <div class="filterChip" data-grade="기계약" onclick="setFilter('기계약')">★ 기계약</div>
+    <div class="filterChip" data-grade="기계약" onclick="setFilter('기계약')">기계약</div>
     <div class="filterChip" data-grade="A" onclick="setFilter('A')">A등급</div>
     <div class="filterChip" data-grade="B" onclick="setFilter('B')">B등급</div>
     <div class="filterChip" data-grade="C" onclick="setFilter('C')">C등급</div>
@@ -204,7 +204,7 @@ function normalizeGrade(raw){
 
 function gradeInfo(raw){
   const g = normalizeGrade(raw);
-  if (g === "기계약") return { label:"★ 기계약", color:"#F2AC57", text:"#fff", icon:"★" };
+  if (g === "기계약") return { label:"기계약", color:"#F2AC57", text:"#fff", icon:"★" };
   if (g === "A")      return { label:"A등급",     color:"#E53935", text:"#fff", icon:"A" };
   if (g === "B")      return { label:"B등급",     color:"#FB8C00", text:"#fff", icon:"B" };
   if (g === "C")      return { label:"C등급",     color:"#43A047", text:"#fff", icon:"C" };
