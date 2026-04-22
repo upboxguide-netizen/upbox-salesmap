@@ -617,12 +617,13 @@ async function openPanel(store){
   const visitFormHtml = isContract ? '' : (
     '<div id="visitForm">' +
     '<h3 id="visitFormTitle">📋 내 방문기록 (' + currentUser.name + ')</h3>' +
-    '<div class="form-row"><label>현재 업체명</label><input id="v_storeName" type="text" value="' + (store.name||"") + '" placeholder="업체명"></div>' +
+    '<div class="form-row"><label>현재 업체명</label><input id="v_storeName" type="text" placeholder="예: ㅇㅇ환경"></div>' +
     '<div class="form-row"><label>담당자 연락처</label><input id="v_contact" type="tel" placeholder="예: 010-0000-0000"></div>' +
     '<div class="form-row"><label>월 예상배출량 (L)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
     '<div class="form-row"><label>현재 단가 (원/L)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
     '<div class="form-row"><label>현재 주 수거횟수</label><input id="v_freq" type="number" placeholder="예: 3"></div>' +
     '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
+    '<div class="form-row"><label>5톤 차량 진입 가능여부</label><select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select></div>' +
     '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="예: 상담내용, 기타 폐기물 제안사항 등 기재"></textarea></div>' +
     '<button id="saveBtn" onclick="saveVisit()">💾 저장</button>' +
     '<div id="saveMsg"></div>' +
@@ -720,6 +721,10 @@ async function loadMyVisit(storeKey){
     if (data.price !== undefined) document.getElementById("v_price").value = data.price;
     if (data.freq !== undefined) document.getElementById("v_freq").value = data.freq;
     if (data.vinyl !== undefined) document.getElementById("v_vinyl").value = data.vinyl;
+    if (data.truck !== undefined){
+      const el = document.getElementById("v_truck");
+      if (el) el.value = data.truck;
+    }
     if (data.note !== undefined) document.getElementById("v_note").value = data.note;
 
     // 최초/마지막 방문일자 표시
@@ -752,6 +757,7 @@ async function saveVisit(){
       price: document.getElementById("v_price").value,
       freq: document.getElementById("v_freq").value,
       vinyl: document.getElementById("v_vinyl").value,
+      truck: (document.getElementById("v_truck") || {}).value || "",
       note: document.getElementById("v_note").value,
       updatedAt: now
     };
@@ -768,6 +774,7 @@ async function saveVisit(){
         price: existing.price || "",
         freq: existing.freq || "",
         vinyl: existing.vinyl || "",
+        truck: existing.truck || "",
         note: existing.note || "",
         updatedAt: existing.updatedAt
       });
@@ -792,6 +799,7 @@ async function saveVisit(){
       price: currentData.price,
       freq: currentData.freq,
       vinyl: currentData.vinyl,
+      truck: currentData.truck,
       note: currentData.note,
       updatedAt: now
     };
