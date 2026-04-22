@@ -414,6 +414,8 @@ function renderMarkers(){
     if (currentFilter === 'VISITED'){
       // 방문완료 필터: 내가 방문기록 남긴 업장만
       if (!myVisitedStoreKeys[sanitizeKey(s._key)]) return;
+    } else if (currentFilter === 'VISITED'){
+      if (!myVisitedStoreKeys[sanitizeKey(s._key)]) return;
     } else if (currentFilter !== 'ALL'){
       const normalized = normalizeGrade(s.grade);
       if (normalized !== currentFilter) return;
