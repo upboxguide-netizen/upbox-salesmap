@@ -205,6 +205,7 @@ let selectedStore = null;
 let userLocationMarker = null;
 let myVisitedStoreKeys = {};   // 내가 방문기록 남긴 업장 키 { storeKey: true }
 let myVisitedStoreData = {};   // 내 방문기록 상세 { storeKey: { contact, note, ... } } — 유효리드 판별용
+let otherLastContactByStore = {};  // 타 파트너 최근 접촉일자 맵 { sanitizedStoreKey: timestampMs }
 
 /* ==================== 업장 추가 링크 ==================== */
 // 지도에 없는 업장 신규 등록 링크 (Walla 폼)
@@ -366,7 +367,52 @@ function showApp(){
   document.getElementById("app").style.display = "block";
   document.getElementById("userName").textContent = currentUser.name + " 님";
   loadMyVisitedKeys();
+  loadOtherPartnersLastContact();
   initMap();
+}
+
+// 타 파트너(현재 로그인 파트너 제외)의 업장별 최근 접촉일자를 { sanitizedStoreKey: timestampMs } 로 캐싱
+// - 파트너 개인정보/접촉 내용은 절대 저장하지 않음, 오직 "최근 접촉 시각(ms)" 만 저장
+// - visits/ 전체 한 번 스캔 (파트너 10명 내외 규모에서 비용 낮음)
+async function loadOtherPartnersLastContact(){
+  try {
+    const snap = await db.ref("visits").once("value");
+    const all = snap.val() || {};
+    otherLastContactByStore = {};
+
+    for (const partnerKey in all){
+      // 본인 방문기록은 건너뜀
+      if (partnerKey === currentUser.key) continue;
+
+      const records = all[partnerKey] || {};
+      for (const recKey in records){
+        const r = records[recKey];
+        if (!r || !r.storeKey) continue;
+
+        // 해당 업장에 대한 해당 파트너의 최근 접촉 시각 구하기
+        // 우선순위: lastUpdatedAt → current.updatedAt → updatedAt(구버전) → firstVisitAt
+        let ts = null;
+        if (r.lastUpdatedAt) ts = Number(r.lastUpdatedAt);
+        else if (r.current && r.current.updatedAt) ts = Number(r.current.updatedAt);
+        else if (r.updatedAt) ts = Number(r.updatedAt);
+        else if (r.firstVisitAt) ts = Number(r.firstVisitAt);
+        if (!ts || isNaN(ts)) continue;
+
+        const sk = sanitizeKey(r.storeKey);
+        // 동일 업장에 여러 타 파트너 기록이 있으면 가장 최근(큰 timestamp)만 유지
+        if (!otherLastContactByStore[sk] || ts > otherLastContactByStore[sk]){
+          otherLastContactByStore[sk] = ts;
+        }
+      }
+    }
+  } catch(e){ console.error("타 파트너 접촉일자 로드 실패:", e); }
+}
+
+// timestampMs → "yyyy-mm-dd" 포맷 (업장 패널/방문일자 표시 공통 포맷)
+function formatDateYmd(ms){
+  if (!ms) return "";
+  const d = new Date(ms);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 }
 
 // 현재 로그인한 파트너가 저장한 방문기록 로드 (키 + 상세 데이터)
@@ -381,14 +427,19 @@ async function loadMyVisitedKeys(){
       if (r && r.storeKey){
         const sk = sanitizeKey(r.storeKey);
         myVisitedStoreKeys[sk] = true;
-        // 상태 판별용 상세 데이터 캐싱
+        // 상태 판별용 전체 필드 캐싱 (영업정보 전반을 LEAD 판정에 활용)
         // 새 구조(current)가 있으면 오직 current 만 사용 (구 평탄 필드 무시 → 삭제된 값이 남아있는 버그 방지)
-        // current가 없을 때만 구 평탄 구조 폴백
         const d = r.current ? r.current : r;
         myVisitedStoreData[sk] = {
           contact: d.contact || "",
           note: d.note || "",
-          outcome: d.outcome || ""   // '성사' | '실패' | ''
+          outcome: d.outcome || "",      // '성사' | '실패' | ''
+          amount: d.amount || "",        // 월예상배출량
+          price: d.price || "",          // 현재단가
+          freq: d.freq || "",            // 주수거횟수
+          bins: d.bins || "",            // 통갯수
+          vinyl: d.vinyl || "",          // 비닐사용여부
+          truck: d.truck || ""           // 5톤차량진입
         };
       }
     }
@@ -396,13 +447,21 @@ async function loadMyVisitedKeys(){
 }
 
 // 방문 업장의 영업 상태 판별
-// 우선순위: 최종불발(FAIL) > 계약성사(SUCCESS) > 유효리드(LEAD) > 단순방문(VISITED) > null
-// 공백 문자열(whitespace only)은 없는 것으로 간주하여, 과거 입력이 삭제된 경우 자동 하향 조정됨
+// 우선순위: 최종불발(FAIL) > 계약성사(SUCCESS) > 유효리드(LEAD) > 단순방문(VISITED) > null(미방문처럼)
+//
+// 판정 규칙:
+// - outcome이 "실패" → FAIL
+// - outcome이 "성사" → SUCCESS
+// - outcome 빈값 + (연락처 OR 특이사항) 있음 → LEAD
+// - outcome 빈값 + 연락처/특이사항 없음 + (월배출량/단가/주수거/통갯수/비닐/차량) 중 하나 이상 → VISITED
+// - 위 모두 해당 없음 (방문기록은 저장되었으나 모든 필드 비어있음) → null (재방문 대상, 회색핀)
+//
+// 공백 문자열은 없는 것으로 간주 → 과거 입력 삭제 시 자동 하향 조정됨
 function getVisitStatus(storeKey){
   const sk = sanitizeKey(storeKey);
   if (!myVisitedStoreKeys[sk]) return null;
   const d = myVisitedStoreData[sk];
-  if (!d) return 'VISITED';
+  if (!d) return null;
 
   const outcome = String(d.outcome||"").trim();
   if (outcome === "실패") return 'FAIL';
@@ -412,7 +471,13 @@ function getVisitStatus(storeKey){
   const hasNote = String(d.note||"").trim().length > 0;
   if (hasContact || hasNote) return 'LEAD';
 
-  return 'VISITED';
+  // 연락처·특이사항은 없지만 다른 영업정보(관찰값)가 있으면 단순방문
+  const obsFields = [d.amount, d.price, d.freq, d.bins, d.vinyl, d.truck];
+  const hasObservation = obsFields.some(function(v){ return String(v||"").trim().length > 0; });
+  if (hasObservation) return 'VISITED';
+
+  // 모든 필드 비어있음 → 재방문 대상 (회색핀)
+  return null;
 }
 
 /* ==================== 지도 ==================== */
@@ -802,10 +867,19 @@ async function openPanel(store){
   // 길찾기 버튼 (모든 업장 공통)
   const navBtnHtml = '<button id="navBtn" onclick="openKakaoNavigation()">카카오맵 길찾기</button>';
 
+  // 타 파트너 마지막 접촉일자 (본인 제외, 가장 최근 1건의 날짜만)
+  // - 파트너명/접촉내용은 절대 노출하지 않음
+  // - 기록이 없으면 섹션 숨김
+  const otherTs = otherLastContactByStore[sanitizeKey(store._key)];
+  const otherContactHtml = otherTs
+    ? '<div style="font-size:12px;color:#666;margin-bottom:10px;">타파트너 마지막접촉일자: ' + formatDateYmd(otherTs) + '</div>'
+    : '';
+
   content.innerHTML =
     '<h2>' + (store.name || "(이름없음)") + '</h2>' +
     '<div class="addr">' + (store.address || "") + '</div>' +
     '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + '</div>' +
+    otherContactHtml +
     (planBadges ? '<div style="margin-bottom:10px;">' + planBadges + '</div>' : '') +
     infoHtml +
     memoHtml +
@@ -985,13 +1059,20 @@ async function saveVisit(){
 
     await db.ref("visits/" + currentUser.key + "/" + recKey).set(payload);
 
-    // 내 방문기록 키/캐시 갱신 → 해당 마커 상태 색상 즉시 반영 (outcome, contact, note 변화 포함)
+    // 내 방문기록 키/캐시 갱신 → 해당 마커 상태 색상 즉시 반영
+    // 모든 영업정보 필드를 캐시에 담아야 getVisitStatus 판정이 정확함
     const sk = sanitizeKey(selectedStore._key);
     myVisitedStoreKeys[sk] = true;
     myVisitedStoreData[sk] = {
       contact: currentData.contact || "",
       note: currentData.note || "",
-      outcome: currentData.outcome || ""
+      outcome: currentData.outcome || "",
+      amount: currentData.amount || "",
+      price: currentData.price || "",
+      freq: currentData.freq || "",
+      bins: currentData.bins || "",
+      vinyl: currentData.vinyl || "",
+      truck: currentData.truck || ""
     };
     renderMarkers();
 
@@ -1025,12 +1106,8 @@ function showToast(msg, type){
 function updateVisitTitleDates(firstMs, lastMs){
   const titleEl = document.getElementById("visitFormTitle");
   if (!titleEl) return;
-  const fmt = function(ms){
-    const d = new Date(ms);
-    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-  };
-  const firstStr = firstMs ? fmt(firstMs) : "-";
-  const lastStr = lastMs ? fmt(lastMs) : "-";
+  const firstStr = firstMs ? formatDateYmd(firstMs) : "-";
+  const lastStr = lastMs ? formatDateYmd(lastMs) : "-";
   const isSame = firstMs && lastMs && firstStr === lastStr;
   const dateInfo = isSame
     ? '최초 방문: ' + firstStr
