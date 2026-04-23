@@ -70,10 +70,14 @@
   .filterChip { flex-shrink:0; padding:6px 12px; background:#fff; border:1px solid #ddd; border-radius:16px; font-size:12px; cursor:pointer; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,.08); font-family: inherit; font-weight:500; }
   .filterChip.active { background:#363859; color:#fff; border-color:#363859; }
   .filterChip[data-grade="VISITED"].active { background:#4d4678; border-color:#4d4678; }
+  .filterChip[data-grade="LEAD"].active { background:#43A047; border-color:#43A047; }
 
   #map { width:100%; height:100%; }
 
+  /* 우측 하단 플로팅 버튼 (위치/업장추가) */
   #myLocBtn { position:absolute; right:14px; bottom:120px; width:44px; height:44px; background:#fff; border:none; border-radius:50%; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:20px; cursor:pointer; z-index:50; }
+  #addStoreBtn { position:absolute; right:14px; bottom:172px; width:44px; height:44px; background:#F2AC57; border:none; border-radius:50%; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:22px; color:#fff; cursor:pointer; z-index:50; display:flex; align-items:center; justify-content:center; font-weight:700; font-family: inherit; }
+  #addStoreBtn:active { background:#e09a46; }
 
   #statusBar { position:absolute; bottom:0; left:0; right:0; background:rgba(54,56,89,.95); color:#fff; padding:8px 14px; font-size:12px; text-align:center; z-index:50; }
 
@@ -93,6 +97,10 @@
   .badge.grade-none { background:#f5f5f5; color:#757575; }
   .status-ok { color:#2e7d32; font-weight:600; }
   .status-ng { color:#c62828; font-weight:600; }
+  /* 베이직/플러스 상태 배지 */
+  .plan-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; margin-right:6px; }
+  .plan-badge.on { background:#e8f5e9; color:#2e7d32; border:1px solid #81c784; }
+  .plan-badge.off { background:#f5f5f5; color:#9e9e9e; border:1px solid #ddd; }
   .memo { background:#faf6ef; padding:10px 12px; border-radius:8px; font-size:13px; color:#555; margin:10px 0; white-space:pre-wrap; border-left:3px solid #F2AC57; }
 
   #visitForm { margin-top:16px; padding-top:16px; border-top:2px solid #f0f0f0; }
@@ -146,15 +154,12 @@
   <div id="filterBar">
     <div class="filterChip active" data-grade="ALL" onclick="setFilter('ALL')">전체</div>
     <div class="filterChip" data-grade="VISITED" onclick="setFilter('VISITED')">방문완료</div>
-    <div class="filterChip" data-grade="A" onclick="setFilter('A')">A등급</div>
-    <div class="filterChip" data-grade="B" onclick="setFilter('B')">B등급</div>
-    <div class="filterChip" data-grade="C" onclick="setFilter('C')">C등급</div>
-    <div class="filterChip" data-grade="미지정" onclick="setFilter('미지정')">등급미정</div>
-    <div class="filterChip" data-grade="기계약" onclick="setFilter('기계약')">기계약</div>
+    <div class="filterChip" data-grade="LEAD" onclick="setFilter('LEAD')">유효리드</div>
   </div>
 
   <div id="map"></div>
 
+  <button id="addStoreBtn" onclick="openAddStoreLink()" title="지도에 없는 업장 추가">＋</button>
   <button id="myLocBtn" onclick="moveToMyLocation()" title="현재 위치">📍</button>
 
   <div id="statusBar">로딩 중...</div>
@@ -192,7 +197,16 @@ let currentFilter = 'ALL';
 let currentKeyword = '';
 let selectedStore = null;
 let userLocationMarker = null;
-let myVisitedStoreKeys = {};  // 내가 방문기록을 남긴 업장 키 { storeKey: true }
+let myVisitedStoreKeys = {};   // 내가 방문기록 남긴 업장 키 { storeKey: true }
+let myVisitedStoreData = {};   // 내 방문기록 상세 { storeKey: { contact, note, ... } } — 유효리드 판별용
+
+/* ==================== 업장 추가 링크 ==================== */
+// 지도에 없는 업장 신규 등록 링크 (추후 실제 폼 URL로 교체 가능)
+const ADD_STORE_URL = "https://docs.google.com/spreadsheets/d/1j0TrBtrekSyoHpJcNqDOzsFE7A9dNZ3O7zQVNjtqS9Y/edit";
+
+function openAddStoreLink(){
+  window.open(ADD_STORE_URL, "_blank");
+}
 
 /* ==================== 유틸 ==================== */
 function sanitizeKey(s){ return String(s||"").replace(/[.#$\[\]\/]/g,"_"); }
@@ -216,6 +230,14 @@ function gradeInfo(raw){
   return               { label:"미지정",         color:"#9E9E9E", text:"#fff", icon:"?" };
 }
 
+// 베이직/플러스 ON 여부 판정 (다양한 입력값 허용)
+function isOnValue(v){
+  if (v === true) return true;
+  const s = String(v||"").trim().toUpperCase();
+  if (!s) return false;
+  return ["ON", "Y", "YES", "O", "가능", "사용", "1", "TRUE"].indexOf(s) !== -1;
+}
+
 function makeMarkerImage(grade, visited){
   // 방문기록 있으면 #4d4678 마커로 표시 (등급 색상 오버라이드, 아이콘은 등급 유지)
   const g = gradeInfo(grade);
@@ -235,6 +257,37 @@ function haversine(lat1,lng1,lat2,lng2){
   const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
   const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.sqrt(a));
+}
+
+/* ==================== 문자열 유사도 (기계약 중복 판정용) ==================== */
+// 업장명 정규화: 공백/특수문자 제거, 소문자 변환
+function normalizeName(s){
+  return String(s||"").toLowerCase().replace(/[\s\(\)\[\]\-\_\.\,·・&]+/g, "");
+}
+
+// 2-gram(bigram) 기반 Dice 유사도 (한글/영문 친화적)
+function nameSimilarity(a, b){
+  const na = normalizeName(a), nb = normalizeName(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  if (na.length < 2 || nb.length < 2){
+    // 너무 짧으면 포함관계로 판정
+    return (na.indexOf(nb) !== -1 || nb.indexOf(na) !== -1) ? 1 : 0;
+  }
+  const bigrams = function(s){
+    const arr = [];
+    for (let i=0; i<s.length-1; i++) arr.push(s.slice(i, i+2));
+    return arr;
+  };
+  const A = bigrams(na), B = bigrams(nb);
+  const mapB = {};
+  B.forEach(function(g){ mapB[g] = (mapB[g]||0) + 1; });
+  let match = 0;
+  for (let i=0; i<A.length; i++){
+    const g = A[i];
+    if (mapB[g] && mapB[g] > 0){ match++; mapB[g]--; }
+  }
+  return (2 * match) / (A.length + B.length);
 }
 
 /* ==================== 로그인 ==================== */
@@ -297,19 +350,39 @@ function showApp(){
   initMap();
 }
 
-// 현재 로그인한 파트너가 저장한 방문기록 키 목록 로드
+// 현재 로그인한 파트너가 저장한 방문기록 로드 (키 + 상세 데이터)
 async function loadMyVisitedKeys(){
   try {
     const snap = await db.ref("visits/" + currentUser.key).once("value");
     const data = snap.val() || {};
     myVisitedStoreKeys = {};
+    myVisitedStoreData = {};
     for (const recKey in data){
       const r = data[recKey];
       if (r && r.storeKey){
-        myVisitedStoreKeys[sanitizeKey(r.storeKey)] = true;
+        const sk = sanitizeKey(r.storeKey);
+        myVisitedStoreKeys[sk] = true;
+        // 유효리드 판별용 상세 데이터 캐싱 (current 우선, 없으면 평탄 구조)
+        const d = r.current || r;
+        myVisitedStoreData[sk] = {
+          contact: d.contact || "",
+          note: d.note || ""
+        };
       }
     }
   } catch(e){ console.error("방문기록 키 로드 실패:", e); }
+}
+
+// 해당 업장이 유효리드인지 판정
+// 기준: 방문기록이 있고 + (담당자 연락처 OR 기타 특이사항) 중 하나 이상 기재
+function isValidLead(storeKey){
+  const sk = sanitizeKey(storeKey);
+  if (!myVisitedStoreKeys[sk]) return false;
+  const d = myVisitedStoreData[sk];
+  if (!d) return false;
+  const hasContact = String(d.contact||"").trim().length > 0;
+  const hasNote = String(d.note||"").trim().length > 0;
+  return hasContact || hasNote;
 }
 
 /* ==================== 지도 ==================== */
@@ -404,12 +477,42 @@ async function loadStoresInView(){
       list.push(s);
     }
 
-    allStoresInView = list;
+    // ① 기계약 중복 노출 방지: 좌표 동일(≈±5m) + 이름 유사도 70%↑ → 비기계약만 제거
+    const filtered = dedupeAgainstContracts(list);
+
+    allStoresInView = filtered;
     renderMarkers();
-    setStatus("✅ " + list.length + "개 업장 표시됨");
+    setStatus("✅ " + filtered.length + "개 업장 표시됨");
   } catch(e){
     setStatus("⚠️ 로딩 실패: " + e.message);
   }
+}
+
+// 같은 위경도에 기계약/비기계약이 공존하면 이름 유사도 70% 이상일 때 비기계약 제거
+function dedupeAgainstContracts(list){
+  const LAT_EPS = 0.00005;  // 약 5m 허용
+  const LNG_EPS = 0.00006;
+  const SIM_THRESHOLD = 0.7;
+
+  const contracts = list.filter(function(s){ return normalizeGrade(s.grade) === "기계약"; });
+  if (contracts.length === 0) return list;
+
+  const removeKeys = {};
+  for (let i=0; i<list.length; i++){
+    const s = list[i];
+    if (normalizeGrade(s.grade) === "기계약") continue;
+    for (let j=0; j<contracts.length; j++){
+      const c = contracts[j];
+      if (Math.abs(s.lat - c.lat) > LAT_EPS) continue;
+      if (Math.abs(s.lng - c.lng) > LNG_EPS) continue;
+      const sim = nameSimilarity(s.name, c.name);
+      if (sim >= SIM_THRESHOLD){
+        removeKeys[s._key] = true;
+        break;
+      }
+    }
+  }
+  return list.filter(function(s){ return !removeKeys[s._key]; });
 }
 
 function renderMarkers(){
@@ -420,10 +523,11 @@ function renderMarkers(){
     if (currentFilter === 'VISITED'){
       // 방문완료 필터: 내가 방문기록 남긴 업장만
       if (!myVisitedStoreKeys[sanitizeKey(s._key)]) return;
-    } else if (currentFilter !== 'ALL'){
-      const normalized = normalizeGrade(s.grade);
-      if (normalized !== currentFilter) return;
+    } else if (currentFilter === 'LEAD'){
+      // 유효리드 필터: 방문기록 + (연락처 OR 특이사항) 기재
+      if (!isValidLead(s._key)) return;
     }
+    // 'ALL' 이면 모두 통과
 
     const visited = !!myVisitedStoreKeys[sanitizeKey(s._key)];
     const marker = new kakao.maps.Marker({
@@ -588,13 +692,16 @@ async function openPanel(store){
                         : normalizedGrade === "C" ? "grade-C" : "grade-none";
   const gradeBadge = '<span class="badge ' + gradeBadgeClass + '">' + g.label + '</span>';
 
-  // 기계약은 운영가능여부 숨김
-  let statusBadge = "";
+  // ① 운영가능 → 베이직/플러스 결과 표시 (기계약은 숨김)
+  let planBadges = "";
   if (!isContract){
-    const isOperable = store.operable === "Y" || store.operable === "가능" || store.operable === true || store.operable === "운영가능";
-    statusBadge = isOperable
-      ? '<span class="status-ok">🟢 운영가능</span>'
-      : '<span class="status-ng">🔴 운영불가</span>';
+    const basicOn = isOnValue(store.basic);
+    const plusOn = isOnValue(store.plus);
+    const basicClass = basicOn ? "plan-badge on" : "plan-badge off";
+    const plusClass = plusOn ? "plan-badge on" : "plan-badge off";
+    planBadges =
+      '<span class="' + basicClass + '">베이직 ' + (basicOn ? "ON" : "OFF") + '</span>' +
+      '<span class="' + plusClass + '">플러스 ' + (plusOn ? "ON" : "OFF") + '</span>';
   }
 
   const memoHtml = store.memo ? '<div class="memo">📝 ' + store.memo + '</div>' : "";
@@ -622,6 +729,7 @@ async function openPanel(store){
     '<div class="form-row"><label>월 예상배출량 (L)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
     '<div class="form-row"><label>현재 단가 (원/L)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
     '<div class="form-row"><label>현재 주 수거횟수</label><input id="v_freq" type="number" placeholder="예: 3"></div>' +
+    '<div class="form-row"><label>현재 통 갯수</label><input id="v_bins" type="number" placeholder="예: 4"></div>' +
     '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
     '<div class="form-row"><label>5톤 차량 진입 가능여부</label><select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select></div>' +
     '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="예: 상담내용, 기타 폐기물 제안사항 등 기재"></textarea></div>' +
@@ -641,7 +749,8 @@ async function openPanel(store){
   content.innerHTML =
     '<h2>' + (store.name || "(이름없음)") + '</h2>' +
     '<div class="addr">' + (store.address || "") + '</div>' +
-    '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + ' ' + statusBadge + '</div>' +
+    '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + '</div>' +
+    (planBadges ? '<div style="margin-bottom:10px;">' + planBadges + '</div>' : '') +
     infoHtml +
     memoHtml +
     navBtnHtml +
@@ -720,6 +829,10 @@ async function loadMyVisit(storeKey){
     if (data.amount !== undefined) document.getElementById("v_amount").value = data.amount;
     if (data.price !== undefined) document.getElementById("v_price").value = data.price;
     if (data.freq !== undefined) document.getElementById("v_freq").value = data.freq;
+    if (data.bins !== undefined){
+      const el = document.getElementById("v_bins");
+      if (el) el.value = data.bins;
+    }
     if (data.vinyl !== undefined) document.getElementById("v_vinyl").value = data.vinyl;
     if (data.truck !== undefined){
       const el = document.getElementById("v_truck");
@@ -756,6 +869,7 @@ async function saveVisit(){
       amount: document.getElementById("v_amount").value,
       price: document.getElementById("v_price").value,
       freq: document.getElementById("v_freq").value,
+      bins: (document.getElementById("v_bins") || {}).value || "",
       vinyl: document.getElementById("v_vinyl").value,
       truck: (document.getElementById("v_truck") || {}).value || "",
       note: document.getElementById("v_note").value,
@@ -773,6 +887,7 @@ async function saveVisit(){
         amount: existing.amount || "",
         price: existing.price || "",
         freq: existing.freq || "",
+        bins: existing.bins || "",
         vinyl: existing.vinyl || "",
         truck: existing.truck || "",
         note: existing.note || "",
@@ -798,6 +913,7 @@ async function saveVisit(){
       amount: currentData.amount,
       price: currentData.price,
       freq: currentData.freq,
+      bins: currentData.bins,
       vinyl: currentData.vinyl,
       truck: currentData.truck,
       note: currentData.note,
@@ -806,8 +922,13 @@ async function saveVisit(){
 
     await db.ref("visits/" + currentUser.key + "/" + recKey).set(payload);
 
-    // 내 방문기록 키 목록 업데이트 → 해당 마커 즉시 방문 색상으로 변경
-    myVisitedStoreKeys[sanitizeKey(selectedStore._key)] = true;
+    // 내 방문기록 키/캐시 갱신 → 해당 마커 즉시 방문 색상 + 유효리드 필터 즉시 반영
+    const sk = sanitizeKey(selectedStore._key);
+    myVisitedStoreKeys[sk] = true;
+    myVisitedStoreData[sk] = {
+      contact: currentData.contact || "",
+      note: currentData.note || ""
+    };
     renderMarkers();
 
     // 최초/마지막 방문일자 즉시 갱신
