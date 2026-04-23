@@ -71,13 +71,15 @@
   .filterChip.active { background:#363859; color:#fff; border-color:#363859; }
   .filterChip[data-grade="VISITED"].active { background:#4d4678; border-color:#4d4678; }
   .filterChip[data-grade="LEAD"].active { background:#43A047; border-color:#43A047; }
+  .filterChip[data-grade="SUCCESS"].active { background:#F5B800; border-color:#F5B800; color:#fff; }
+  .filterChip[data-grade="FAIL"].active { background:#E53935; border-color:#E53935; }
   .filterChip[data-grade="기계약"].active { background:#F2AC57; border-color:#F2AC57; }
 
   #map { width:100%; height:100%; }
 
   /* 우측 하단 플로팅 버튼 (위치/업장추가) */
   #myLocBtn { position:absolute; right:14px; bottom:120px; width:44px; height:44px; background:#fff; border:none; border-radius:50%; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:20px; cursor:pointer; z-index:50; }
-  #addStoreBtn { position:absolute; right:14px; bottom:172px; width:44px; height:44px; background:#F2AC57; border:none; border-radius:50%; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:22px; color:#fff; cursor:pointer; z-index:50; display:flex; align-items:center; justify-content:center; font-weight:700; font-family: inherit; }
+  #addStoreBtn { position:absolute; right:14px; bottom:68px; height:44px; padding:0 16px; background:#F2AC57; border:none; border-radius:22px; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:13px; color:#fff; cursor:pointer; z-index:50; font-weight:700; font-family: inherit; white-space:nowrap; }
   #addStoreBtn:active { background:#e09a46; }
 
   #statusBar { position:absolute; bottom:0; left:0; right:0; background:rgba(54,56,89,.95); color:#fff; padding:8px 14px; font-size:12px; text-align:center; z-index:50; }
@@ -154,15 +156,17 @@
 
   <div id="filterBar">
     <div class="filterChip active" data-grade="ALL" onclick="setFilter('ALL')">전체</div>
-    <div class="filterChip" data-grade="VISITED" onclick="setFilter('VISITED')">방문완료</div>
+    <div class="filterChip" data-grade="VISITED" onclick="setFilter('VISITED')">단순방문</div>
     <div class="filterChip" data-grade="LEAD" onclick="setFilter('LEAD')">유효리드</div>
+    <div class="filterChip" data-grade="SUCCESS" onclick="setFilter('SUCCESS')">계약성사</div>
+    <div class="filterChip" data-grade="FAIL" onclick="setFilter('FAIL')">최종불발</div>
     <div class="filterChip" data-grade="기계약" onclick="setFilter('기계약')">기계약</div>
   </div>
 
   <div id="map"></div>
 
-  <button id="addStoreBtn" onclick="openAddStoreLink()" title="지도에 없는 업장 추가">＋</button>
   <button id="myLocBtn" onclick="moveToMyLocation()" title="현재 위치">📍</button>
+  <button id="addStoreBtn" onclick="openAddStoreLink()" title="지도에 없는 업장 추가">＋ 업장추가</button>
 
   <div id="statusBar">로딩 중...</div>
 </div>
@@ -223,13 +227,16 @@ function normalizeGrade(raw){
   return "미지정";
 }
 
+// 등급 정보
+// 색상 규칙: A/B/C/미지정 모두 회색 기본. 기계약만 주황.
+// (단순방문/유효리드/계약성사/최종불발 색상은 makeMarkerImage 에서 우선 적용)
 function gradeInfo(raw){
   const g = normalizeGrade(raw);
   if (g === "기계약") return { label:"★ 기계약", color:"#F2AC57", text:"#fff", icon:"★" };
-  if (g === "A")     return { label:"A등급",     color:"#E53935", text:"#fff", icon:"A" };
-  if (g === "B")     return { label:"B등급",     color:"#FB8C00", text:"#fff", icon:"B" };
-  if (g === "C")     return { label:"C등급",     color:"#43A047", text:"#fff", icon:"C" };
-  return               { label:"미지정",         color:"#9E9E9E", text:"#fff", icon:"?" };
+  if (g === "A")     return { label:"A등급",     color:"#9E9E9E", text:"#fff", icon:"A" };
+  if (g === "B")     return { label:"B등급",     color:"#9E9E9E", text:"#fff", icon:"B" };
+  if (g === "C")     return { label:"C등급",     color:"#9E9E9E", text:"#fff", icon:"C" };
+  return               { label:"미지정",         color:"#9E9E9E", text:"#fff", icon:"-" };
 }
 
 // 베이직/플러스 ON 여부 판정 (다양한 입력값 허용)
@@ -240,20 +247,22 @@ function isOnValue(v){
   return ["ON", "Y", "YES", "O", "가능", "사용", "1", "TRUE"].indexOf(s) !== -1;
 }
 
-function makeMarkerImage(grade, visited, lead){
-  // 우선순위: 기계약(주황) > 유효리드(녹색) > 방문완료(보라) > 등급색
-  // - 기계약은 원본 등급 색상 유지 (grade=기계약 → F2AC57)
-  // - 유효리드면 녹색 #43A047
-  // - 방문완료(연락처/특이사항 없음)이면 보라 #4d4678
-  // - 그 외는 등급색
+// status: 'FAIL' | 'SUCCESS' | 'LEAD' | 'VISITED' | null
+// 우선순위: 기계약(주황 별) > 최종불발(빨강) > 계약성사(진노랑) > 유효리드(녹색) > 단순방문(보라) > 미방문(회색)
+function makeMarkerImage(grade, status){
   const g = gradeInfo(grade);
   let color = g.color;
   let text = g.text;
+  const icon = g.icon;
+
   if (normalizeGrade(grade) !== "기계약"){
-    if (lead){ color = "#43A047"; text = "#fff"; }
-    else if (visited){ color = "#4d4678"; text = "#fff"; }
+    if (status === 'FAIL'){ color = "#E53935"; text = "#fff"; }
+    else if (status === 'SUCCESS'){ color = "#F5B800"; text = "#fff"; }
+    else if (status === 'LEAD'){ color = "#43A047"; text = "#fff"; }
+    else if (status === 'VISITED'){ color = "#4d4678"; text = "#fff"; }
+    // 미방문 상태는 등급색(회색 또는 미지정 회색) 그대로 유지
   }
-  const icon = g.icon;  // 아이콘은 항상 등급 아이콘 유지
+
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">'
     + '<path d="M18 0 C8 0 0 8 0 18 C0 30 18 46 18 46 C18 46 36 30 36 18 C36 8 28 0 18 0 Z" fill="' + color + '" stroke="#fff" stroke-width="2"/>'
     + '<text x="18" y="24" text-anchor="middle" font-size="16" font-weight="bold" fill="' + text + '" font-family="Arial">' + icon + '</text>'
@@ -372,27 +381,38 @@ async function loadMyVisitedKeys(){
       if (r && r.storeKey){
         const sk = sanitizeKey(r.storeKey);
         myVisitedStoreKeys[sk] = true;
-        // 유효리드 판별용 상세 데이터 캐싱 (current 우선, 없으면 평탄 구조)
-        const d = r.current || r;
+        // 상태 판별용 상세 데이터 캐싱
+        // 새 구조(current)가 있으면 오직 current 만 사용 (구 평탄 필드 무시 → 삭제된 값이 남아있는 버그 방지)
+        // current가 없을 때만 구 평탄 구조 폴백
+        const d = r.current ? r.current : r;
         myVisitedStoreData[sk] = {
           contact: d.contact || "",
-          note: d.note || ""
+          note: d.note || "",
+          outcome: d.outcome || ""   // '성사' | '실패' | ''
         };
       }
     }
   } catch(e){ console.error("방문기록 키 로드 실패:", e); }
 }
 
-// 해당 업장이 유효리드인지 판정
-// 기준: 방문기록이 있고 + (담당자 연락처 OR 기타 특이사항) 중 하나 이상 기재
-function isValidLead(storeKey){
+// 방문 업장의 영업 상태 판별
+// 우선순위: 최종불발(FAIL) > 계약성사(SUCCESS) > 유효리드(LEAD) > 단순방문(VISITED) > null
+// 공백 문자열(whitespace only)은 없는 것으로 간주하여, 과거 입력이 삭제된 경우 자동 하향 조정됨
+function getVisitStatus(storeKey){
   const sk = sanitizeKey(storeKey);
-  if (!myVisitedStoreKeys[sk]) return false;
+  if (!myVisitedStoreKeys[sk]) return null;
   const d = myVisitedStoreData[sk];
-  if (!d) return false;
+  if (!d) return 'VISITED';
+
+  const outcome = String(d.outcome||"").trim();
+  if (outcome === "실패") return 'FAIL';
+  if (outcome === "성사") return 'SUCCESS';
+
   const hasContact = String(d.contact||"").trim().length > 0;
   const hasNote = String(d.note||"").trim().length > 0;
-  return hasContact || hasNote;
+  if (hasContact || hasNote) return 'LEAD';
+
+  return 'VISITED';
 }
 
 /* ==================== 지도 ==================== */
@@ -530,25 +550,27 @@ function renderMarkers(){
   markers = [];
 
   allStoresInView.forEach(function(s){
-    const sk = sanitizeKey(s._key);
-    const visited = !!myVisitedStoreKeys[sk];
-    const lead = visited && isValidLead(s._key);
+    const status = getVisitStatus(s._key);  // 'FAIL' | 'SUCCESS' | 'LEAD' | 'VISITED' | null
+    const isContract = normalizeGrade(s.grade) === '기계약';
 
+    // 필터 적용
     if (currentFilter === 'VISITED'){
-      // 방문완료 필터: 내가 방문기록 남긴 업장만
-      if (!visited) return;
+      // 단순방문: 방문기록은 있되 연락처/특이사항 없고 영업결과도 미선택
+      if (status !== 'VISITED') return;
     } else if (currentFilter === 'LEAD'){
-      // 유효리드 필터: 방문기록 + (연락처 OR 특이사항) 기재
-      if (!lead) return;
+      if (status !== 'LEAD') return;
+    } else if (currentFilter === 'SUCCESS'){
+      if (status !== 'SUCCESS') return;
+    } else if (currentFilter === 'FAIL'){
+      if (status !== 'FAIL') return;
     } else if (currentFilter === '기계약'){
-      // 기계약 필터
-      if (normalizeGrade(s.grade) !== '기계약') return;
+      if (!isContract) return;
     }
     // 'ALL' 이면 모두 통과
 
     const marker = new kakao.maps.Marker({
       position: new kakao.maps.LatLng(s.lat, s.lng),
-      image: makeMarkerImage(s.grade, visited, lead),
+      image: makeMarkerImage(s.grade, status),
       map: map
     });
 
@@ -639,15 +661,24 @@ function renderSearchResults(list, keyword){
 
   const html = list.map(function(s){
     const normalizedGrade = normalizeGrade(s.grade);
-    const gradeLabel = normalizedGrade === "기계약" ? "★" : normalizedGrade;
-    const gradeClass = normalizedGrade === "기계약" ? "g-contract"
-                     : normalizedGrade === "A" ? "g-A"
-                     : normalizedGrade === "B" ? "g-B"
-                     : normalizedGrade === "C" ? "g-C" : "g-none";
-    const visited = myVisitedStoreKeys[sanitizeKey(s._key)] ? '<span class="s-visited">✓ 방문</span>' : "";
+    const isContract = normalizedGrade === "기계약";
+    const status = getVisitStatus(s._key);
+
+    let badge = "";
+    if (isContract){
+      badge = '<span class="s-grade g-contract">★ 기계약</span>';
+    } else if (status === 'FAIL'){
+      badge = '<span class="s-visited" style="background:#E53935;">최종불발</span>';
+    } else if (status === 'SUCCESS'){
+      badge = '<span class="s-visited" style="background:#F5B800;">계약성사</span>';
+    } else if (status === 'LEAD'){
+      badge = '<span class="s-visited" style="background:#43A047;">유효리드</span>';
+    } else if (status === 'VISITED'){
+      badge = '<span class="s-visited">단순방문</span>';
+    }
     const safeKey = s._key.replace(/"/g, '&quot;');
     return '<div class="searchItem" onclick="selectSearchResult(\'' + encodeURIComponent(safeKey) + '\')">'
-      + '<div class="s-name">' + (s.name || "(이름없음)") + '<span class="s-grade ' + gradeClass + '">' + gradeLabel + '</span>' + visited + '</div>'
+      + '<div class="s-name">' + (s.name || "(이름없음)") + ' ' + badge + '</div>'
       + '<div class="s-addr">' + (s.address || "") + '</div>'
       + '</div>';
   }).join('');
@@ -757,6 +788,7 @@ async function openPanel(store){
     '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
     '<div class="form-row"><label>5톤 차량 진입 가능여부</label><select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select></div>' +
     '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="예: 상담내용, 기타 폐기물 제안사항 등 기재"></textarea></div>' +
+    '<div class="form-row"><label>최종영업결과</label><select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option></select></div>' +
     '<button id="saveBtn" onclick="saveVisit()">💾 저장</button>' +
     '<div id="saveMsg"></div>' +
     '</div>'
@@ -863,6 +895,10 @@ async function loadMyVisit(storeKey){
       if (el) el.value = data.truck;
     }
     if (data.note !== undefined) document.getElementById("v_note").value = data.note;
+    if (data.outcome !== undefined){
+      const el = document.getElementById("v_outcome");
+      if (el) el.value = data.outcome;
+    }
 
     // 최초/마지막 방문일자 표시
     const firstMs = v.firstVisitAt || v.updatedAt;
@@ -897,6 +933,7 @@ async function saveVisit(){
       vinyl: document.getElementById("v_vinyl").value,
       truck: (document.getElementById("v_truck") || {}).value || "",
       note: document.getElementById("v_note").value,
+      outcome: (document.getElementById("v_outcome") || {}).value || "",
       updatedAt: now
     };
 
@@ -915,6 +952,7 @@ async function saveVisit(){
         vinyl: existing.vinyl || "",
         truck: existing.truck || "",
         note: existing.note || "",
+        outcome: existing.outcome || "",
         updatedAt: existing.updatedAt
       });
     }
@@ -941,17 +979,19 @@ async function saveVisit(){
       vinyl: currentData.vinyl,
       truck: currentData.truck,
       note: currentData.note,
+      outcome: currentData.outcome,
       updatedAt: now
     };
 
     await db.ref("visits/" + currentUser.key + "/" + recKey).set(payload);
 
-    // 내 방문기록 키/캐시 갱신 → 해당 마커 즉시 방문 색상 + 유효리드 필터 즉시 반영
+    // 내 방문기록 키/캐시 갱신 → 해당 마커 상태 색상 즉시 반영 (outcome, contact, note 변화 포함)
     const sk = sanitizeKey(selectedStore._key);
     myVisitedStoreKeys[sk] = true;
     myVisitedStoreData[sk] = {
       contact: currentData.contact || "",
-      note: currentData.note || ""
+      note: currentData.note || "",
+      outcome: currentData.outcome || ""
     };
     renderMarkers();
 
