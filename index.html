@@ -71,6 +71,7 @@
   .filterChip.active { background:#363859; color:#fff; border-color:#363859; }
   .filterChip[data-grade="VISITED"].active { background:#4d4678; border-color:#4d4678; }
   .filterChip[data-grade="LEAD"].active { background:#43A047; border-color:#43A047; }
+  .filterChip[data-grade="기계약"].active { background:#F2AC57; border-color:#F2AC57; }
 
   #map { width:100%; height:100%; }
 
@@ -155,6 +156,7 @@
     <div class="filterChip active" data-grade="ALL" onclick="setFilter('ALL')">전체</div>
     <div class="filterChip" data-grade="VISITED" onclick="setFilter('VISITED')">방문완료</div>
     <div class="filterChip" data-grade="LEAD" onclick="setFilter('LEAD')">유효리드</div>
+    <div class="filterChip" data-grade="기계약" onclick="setFilter('기계약')">기계약</div>
   </div>
 
   <div id="map"></div>
@@ -201,8 +203,8 @@ let myVisitedStoreKeys = {};   // 내가 방문기록 남긴 업장 키 { storeK
 let myVisitedStoreData = {};   // 내 방문기록 상세 { storeKey: { contact, note, ... } } — 유효리드 판별용
 
 /* ==================== 업장 추가 링크 ==================== */
-// 지도에 없는 업장 신규 등록 링크 (추후 실제 폼 URL로 교체 가능)
-const ADD_STORE_URL = "https://docs.google.com/spreadsheets/d/1j0TrBtrekSyoHpJcNqDOzsFE7A9dNZ3O7zQVNjtqS9Y/edit";
+// 지도에 없는 업장 신규 등록 링크 (Walla 폼)
+const ADD_STORE_URL = "https://walla.my/v/GEQSSOWtFYHulcSoAKC3";
 
 function openAddStoreLink(){
   window.open(ADD_STORE_URL, "_blank");
@@ -238,11 +240,19 @@ function isOnValue(v){
   return ["ON", "Y", "YES", "O", "가능", "사용", "1", "TRUE"].indexOf(s) !== -1;
 }
 
-function makeMarkerImage(grade, visited){
-  // 방문기록 있으면 #4d4678 마커로 표시 (등급 색상 오버라이드, 아이콘은 등급 유지)
+function makeMarkerImage(grade, visited, lead){
+  // 우선순위: 기계약(주황) > 유효리드(녹색) > 방문완료(보라) > 등급색
+  // - 기계약은 원본 등급 색상 유지 (grade=기계약 → F2AC57)
+  // - 유효리드면 녹색 #43A047
+  // - 방문완료(연락처/특이사항 없음)이면 보라 #4d4678
+  // - 그 외는 등급색
   const g = gradeInfo(grade);
-  const color = visited ? "#4d4678" : g.color;
-  const text = visited ? "#fff" : g.text;
+  let color = g.color;
+  let text = g.text;
+  if (normalizeGrade(grade) !== "기계약"){
+    if (lead){ color = "#43A047"; text = "#fff"; }
+    else if (visited){ color = "#4d4678"; text = "#fff"; }
+  }
   const icon = g.icon;  // 아이콘은 항상 등급 아이콘 유지
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">'
     + '<path d="M18 0 C8 0 0 8 0 18 C0 30 18 46 18 46 C18 46 36 30 36 18 C36 8 28 0 18 0 Z" fill="' + color + '" stroke="#fff" stroke-width="2"/>'
@@ -520,19 +530,25 @@ function renderMarkers(){
   markers = [];
 
   allStoresInView.forEach(function(s){
+    const sk = sanitizeKey(s._key);
+    const visited = !!myVisitedStoreKeys[sk];
+    const lead = visited && isValidLead(s._key);
+
     if (currentFilter === 'VISITED'){
       // 방문완료 필터: 내가 방문기록 남긴 업장만
-      if (!myVisitedStoreKeys[sanitizeKey(s._key)]) return;
+      if (!visited) return;
     } else if (currentFilter === 'LEAD'){
       // 유효리드 필터: 방문기록 + (연락처 OR 특이사항) 기재
-      if (!isValidLead(s._key)) return;
+      if (!lead) return;
+    } else if (currentFilter === '기계약'){
+      // 기계약 필터
+      if (normalizeGrade(s.grade) !== '기계약') return;
     }
     // 'ALL' 이면 모두 통과
 
-    const visited = !!myVisitedStoreKeys[sanitizeKey(s._key)];
     const marker = new kakao.maps.Marker({
       position: new kakao.maps.LatLng(s.lat, s.lng),
-      image: makeMarkerImage(s.grade, visited),
+      image: makeMarkerImage(s.grade, visited, lead),
       map: map
     });
 
@@ -601,10 +617,13 @@ async function doGlobalSearch(keyword){
       list.push(s);
     }
 
-    // 이름 기준 정렬
-    list.sort(function(a, b){ return String(a.name||"").localeCompare(String(b.name||"")); });
+    // 검색 결과에도 기계약 중복 제거 적용 (좌표±5m + 이름 유사도 70%↑)
+    const dedupedList = dedupeAgainstContracts(list);
 
-    renderSearchResults(list, keyword);
+    // 이름 기준 정렬
+    dedupedList.sort(function(a, b){ return String(a.name||"").localeCompare(String(b.name||"")); });
+
+    renderSearchResults(dedupedList, keyword);
   } catch(e){
     resultsEl.innerHTML = '<div id="searchEmpty">⚠️ 검색 실패: ' + e.message + '</div>';
   }
@@ -693,15 +712,20 @@ async function openPanel(store){
   const gradeBadge = '<span class="badge ' + gradeBadgeClass + '">' + g.label + '</span>';
 
   // ① 운영가능 → 베이직/플러스 결과 표시 (기계약은 숨김)
+  // basic/plus 필드가 Firebase에 아직 없는 경우도 OFF로 표시됨
   let planBadges = "";
   if (!isContract){
+    const hasBasic = store.basic !== undefined && store.basic !== null && String(store.basic).trim() !== "";
+    const hasPlus = store.plus !== undefined && store.plus !== null && String(store.plus).trim() !== "";
     const basicOn = isOnValue(store.basic);
     const plusOn = isOnValue(store.plus);
     const basicClass = basicOn ? "plan-badge on" : "plan-badge off";
     const plusClass = plusOn ? "plan-badge on" : "plan-badge off";
+    const basicLabel = hasBasic ? (basicOn ? "ON" : "OFF") : "-";
+    const plusLabel = hasPlus ? (plusOn ? "ON" : "OFF") : "-";
     planBadges =
-      '<span class="' + basicClass + '">베이직 ' + (basicOn ? "ON" : "OFF") + '</span>' +
-      '<span class="' + plusClass + '">플러스 ' + (plusOn ? "ON" : "OFF") + '</span>';
+      '<span class="' + basicClass + '">베이직 ' + basicLabel + '</span>' +
+      '<span class="' + plusClass + '">플러스 ' + plusLabel + '</span>';
   }
 
   const memoHtml = store.memo ? '<div class="memo">📝 ' + store.memo + '</div>' : "";
