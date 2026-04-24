@@ -47,7 +47,6 @@
   #searchInput { position:absolute; top:64px; left:10px; right:10px; width:auto; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.08); outline:none; z-index:50; font-family: inherit; }
   #searchInput:focus { border-color:#F2AC57; }
 
-  /* 검색 결과 드롭다운 */
   #searchResults { position:absolute; top:100px; left:10px; right:10px; background:#fff; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); z-index:60; max-height:320px; overflow-y:auto; display:none; }
   #searchResults.show { display:block; }
   .searchItem { padding:12px 14px; border-bottom:1px solid #f0f0f0; cursor:pointer; font-size:13px; }
@@ -77,7 +76,6 @@
 
   #map { width:100%; height:100%; }
 
-  /* 우측 하단 플로팅 버튼 (위치/업장추가) */
   #myLocBtn { position:absolute; right:14px; bottom:120px; width:44px; height:44px; background:#fff; border:none; border-radius:50%; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:20px; cursor:pointer; z-index:50; }
   #addStoreBtn { position:absolute; right:14px; bottom:68px; height:44px; padding:0 16px; background:#F2AC57; border:none; border-radius:22px; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:13px; color:#fff; cursor:pointer; z-index:50; font-weight:700; font-family: inherit; white-space:nowrap; }
   #addStoreBtn:active { background:#e09a46; }
@@ -100,7 +98,6 @@
   .badge.grade-none { background:#f5f5f5; color:#757575; }
   .status-ok { color:#2e7d32; font-weight:600; }
   .status-ng { color:#c62828; font-weight:600; }
-  /* 베이직/플러스 상태 배지 */
   .plan-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; margin-right:6px; }
   .plan-badge.on { background:#e8f5e9; color:#2e7d32; border:1px solid #81c784; }
   .plan-badge.off { background:#f5f5f5; color:#9e9e9e; border:1px solid #ddd; }
@@ -119,7 +116,6 @@
   #saveBtn:disabled { background:#aaa; }
   #saveMsg { text-align:center; font-size:13px; margin-top:8px; min-height:18px; }
 
-  /* 길찾기 버튼 (아웃라인 스타일) */
   #navBtn { width:100%; padding:12px; background:#fff; color:#363859; border:1.5px solid #363859; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-top:10px; font-family: inherit; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .15s; }
   #navBtn:active { background:#363859; color:#fff; }
   #navBtn:disabled { border-color:#aaa; color:#aaa; cursor:not-allowed; }
@@ -129,7 +125,6 @@
   .priceGuideBtn:active { background:#262840; }
   .priceGuideBtn:disabled { background:#bbb; cursor:not-allowed; }
 
-  /* 저장 토스트 (화면 중앙 고정, 스크롤 영향 없음) */
   #saveToast { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(54,56,89,0.95); color:#fff; padding:16px 28px; border-radius:12px; font-size:15px; font-weight:600; z-index:10000; opacity:0; pointer-events:none; transition:opacity .25s; box-shadow:0 4px 20px rgba(0,0,0,.3); font-family: inherit; }
   #saveToast.show { opacity:1; }
   #saveToast.success { background:rgba(54,56,89,0.95); }
@@ -203,7 +198,6 @@
   <div id="panelContent"></div>
 </div>
 
-<!-- 저장 완료/실패 토스트 (화면 중앙 고정) -->
 <div id="saveToast"></div>
 
 <script>
@@ -229,19 +223,18 @@ let currentFilter = 'ALL';
 let currentKeyword = '';
 let selectedStore = null;
 let userLocationMarker = null;
-let currentUserLocation = null;  // 현재 위치 {lat, lng} - 기계약 3km 필터용
+let currentUserLocation = null;
 let myVisitedStoreKeys = {};
 let myVisitedStoreData = {};
 let otherLastContactByStore = {};
 
-/* 기계약 업장 노출 반경 (km) - 현재 위치 기준으로 이 거리 이내만 표시 */
+/* 기계약 업장 노출 반경 (km) */
 const CONTRACT_RADIUS_KM = 3;
 
-/* ==================== 로드뷰 상태 ==================== */
-// 각 업장 패널마다 로드뷰 인스턴스를 새로 만들지 않고 재사용
+/* 로드뷰 상태 */
 let rvInstance = null;
 let rvClientInstance = null;
-let currentRvState = 'collapsed';  // collapsed | loading | active | nodata
+let currentRvState = 'collapsed';
 
 /* ==================== 업장 추가 링크 ==================== */
 const ADD_STORE_URL = "https://walla.my/v/GEQSSOWtFYHulcSoAKC3";
@@ -473,12 +466,13 @@ async function loadMyVisitedKeys(){
         myVisitedStoreKeys[sk] = true;
         const d = r.current ? r.current : r;
         myVisitedStoreData[sk] = {
+          currentStoreName: d.currentStoreName || "",
           contact: d.contact || "",
           note: d.note || "",
           outcome: d.outcome || "",
           amount: d.amount || "",
           price: d.price || "",
-          suggestedPrice: d.suggestedPrice || "",  // 제안 단가 (영업자가 업체에 제안한 단가)
+          suggestedPrice: d.suggestedPrice || "",
           freq: d.freq || "",
           bins: d.bins || "",
           vinyl: d.vinyl || "",
@@ -489,6 +483,16 @@ async function loadMyVisitedKeys(){
   } catch(e){ console.error("방문기록 키 로드 실패:", e); }
 }
 
+// 방문 업장의 영업 상태 판별 (v44)
+// 우선순위: FAIL > SUCCESS > LEAD > VISITED > null
+//
+// 판정 규칙:
+// - outcome "실패" → FAIL
+// - outcome "성사" → SUCCESS
+// - outcome 빈값 + 유효리드 8개 필드 모두 채워짐 → LEAD
+//   필드: currentStoreName, contact, amount, suggestedPrice, bins, vinyl, truck, note
+// - outcome 빈값 + 8개 중 일부 OR 관찰값(price/freq) 중 하나 이상 → VISITED
+// - 모든 필드 비어있음 → null (재방문 대상, 회색핀)
 function getVisitStatus(storeKey){
   const sk = sanitizeKey(storeKey);
   if (!myVisitedStoreKeys[sk]) return null;
@@ -499,16 +503,24 @@ function getVisitStatus(storeKey){
   if (outcome === "실패") return 'FAIL';
   if (outcome === "성사") return 'SUCCESS';
 
-  // 유효리드 판정: 연락처 OR 특이사항 OR 제안 단가 (영업자가 실제 제안한 증거)
-  const hasContact = String(d.contact||"").trim().length > 0;
-  const hasNote = String(d.note||"").trim().length > 0;
-  const hasSuggestedPrice = String(d.suggestedPrice||"").trim().length > 0;
-  if (hasContact || hasNote || hasSuggestedPrice) return 'LEAD';
+  const leadFields = [
+    d.currentStoreName,
+    d.contact,
+    d.amount,
+    d.suggestedPrice,
+    d.bins,
+    d.vinyl,
+    d.truck,
+    d.note
+  ];
+  const allLeadFilled = leadFields.every(function(v){
+    return String(v||"").trim().length > 0;
+  });
+  if (allLeadFilled) return 'LEAD';
 
-  // 단순방문 판정: 관찰값 (현재단가/배출량/주수거/통갯수/비닐/차량) 중 하나 이상
-  const obsFields = [d.amount, d.price, d.freq, d.bins, d.vinyl, d.truck];
-  const hasObservation = obsFields.some(function(v){ return String(v||"").trim().length > 0; });
-  if (hasObservation) return 'VISITED';
+  const anyField = leadFields.some(function(v){ return String(v||"").trim().length > 0; });
+  const hasObservation = String(d.price||"").trim().length > 0 || String(d.freq||"").trim().length > 0;
+  if (anyField || hasObservation) return 'VISITED';
 
   return null;
 }
@@ -543,7 +555,7 @@ function moveToMyLocation(){
   navigator.geolocation.getCurrentPosition(
     function(pos){
       const lat = pos.coords.latitude, lng = pos.coords.longitude;
-      currentUserLocation = { lat: lat, lng: lng };  // 기계약 3km 필터용
+      currentUserLocation = { lat: lat, lng: lng };
       const loc = new kakao.maps.LatLng(lat, lng);
       map.setCenter(loc);
       map.setLevel(4);
@@ -561,7 +573,6 @@ function moveToMyLocation(){
         zIndex: 999
       });
 
-      // 위치가 업데이트됐으므로 지도 재조회 (기계약 3km 필터 적용)
       loadStoresInView();
     },
     function(err){ setStatus("⚠️ 위치 권한이 필요합니다."); },
@@ -569,10 +580,7 @@ function moveToMyLocation(){
   );
 }
 
-/* ==================== 업장 로딩 (경량 노드) ==================== */
-// stores_light 경량 노드에서 지도 범위 내 업장 로드
-// - 필드: lat, lng, name, grade, basic, plus (약 80 bytes/건)
-// - 상세 필드는 패널 열 때만 stores/{key}에서 1건 조회
+/* ==================== 업장 로딩 ==================== */
 async function loadStoresInView(){
   if (!map) return;
   const bounds = map.getBounds();
@@ -611,18 +619,15 @@ async function loadStoresInView(){
       list.push(s);
     }
 
-    // 기계약 업장 반경 제한: 현재 위치가 있으면 3km 이내만 표시
-    // - 비기계약은 기존처럼 지도 뷰 기반으로 모두 표시
-    // - 현재 위치가 없으면(권한 거부 등) 기계약도 뷰 기반 fallback
+    // 기계약 3km 반경 제한
     const radiusFiltered = (currentUserLocation)
       ? list.filter(function(s){
-          if (normalizeGrade(s.grade) !== "기계약") return true;  // 비기계약 통과
+          if (normalizeGrade(s.grade) !== "기계약") return true;
           const d = haversine(currentUserLocation.lat, currentUserLocation.lng, s.lat, s.lng);
           return d <= CONTRACT_RADIUS_KM;
         })
       : list;
 
-    // 기계약 중복 노출 방지
     const filtered = dedupeAgainstContracts(radiusFiltered);
 
     allStoresInView = filtered;
@@ -730,7 +735,6 @@ async function doGlobalSearch(keyword){
   resultsEl.innerHTML = '<div id="searchLoading">🔍 검색 중...</div>';
 
   try {
-    // 검색도 stores_light 경량 노드에서 조회
     const snap = await db.ref("stores_light")
       .orderByChild("name")
       .startAt(keyword)
@@ -783,7 +787,6 @@ function renderSearchResults(list, keyword){
       badge = '<span class="s-visited">단순방문</span>';
     }
     const safeKey = s._key.replace(/"/g, '&quot;');
-    // stores_light에는 address 없으므로 검색 결과에는 주소 대신 업장명만 표시
     return '<div class="searchItem" onclick="selectSearchResult(\'' + encodeURIComponent(safeKey) + '\')">'
       + '<div class="s-name">' + (s.name || "(이름없음)") + ' ' + badge + '</div>'
       + '</div>';
@@ -827,29 +830,22 @@ function setStatus(msg){
 }
 
 /* ==================== 업장 상세 패널 ==================== */
-// stores_light의 경량 객체를 받아서 stores/{key}의 상세 필드를 merge한 뒤 패널 렌더링
-// - 상세 조회 실패 시에도 경량 객체만으로 패널이 열리도록 try-catch
 async function openPanel(store){
   const panel = document.getElementById("storePanel");
   const content = document.getElementById("panelContent");
 
-  // 이전 패널의 로드뷰 인스턴스 정리 (새 DOM에 새 Roadview 생성을 위해 반드시 필요)
-  // - 이전 DOM은 content.innerHTML 교체로 사라지므로 rvInstance는 무효 참조가 됨
-  // - 명시적으로 null 처리하면 다음 loadRoadviewForCurrentStore 호출 시 새로 생성됨
+  // 이전 패널의 로드뷰 인스턴스 정리 (새 DOM에 새 Roadview 생성을 위해)
   rvInstance = null;
   currentRvState = 'collapsed';
 
-  // 로딩 중 표시
   content.innerHTML = '<h2 style="color:#999;">업장 정보 불러오는 중...</h2>';
   panel.classList.add("open");
 
   // stores/{key}에서 상세 필드 fetch하여 경량 객체에 병합
-  // - address, adminType, bizType, area, phone, volume, memo, sido, sigungu, gu, emd 등
   try {
     const detailSnap = await db.ref("stores/" + store._key).once("value");
     const detail = detailSnap.val();
     if (detail) {
-      // detail 위에 store(경량)를 덮어쓰면 lat/lng/grade/basic/plus 최신 유지
       store = Object.assign({}, detail, store);
     }
   } catch(e) {
@@ -900,6 +896,7 @@ async function openPanel(store){
       }).join('') + '</div>'
     : "";
 
+  // 기계약 업장은 방문기록/영업기준표/길찾기/로드뷰 UI 전부 숨김 (조회 전용 뷰)
   const visitFormHtml = isContract ? '' : (
     '<div id="visitForm">' +
     '<h3 id="visitFormTitle">📋 내 방문기록 (' + currentUser.name + ')</h3>' +
@@ -912,29 +909,18 @@ async function openPanel(store){
     '<div class="form-row"><label>현재 통 갯수</label><input id="v_bins" type="number" placeholder="예: 4"></div>' +
     '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
     '<div class="form-row"><label>5톤 차량 진입 가능여부</label><select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select></div>' +
-    '<div class="form-row"><label>기타 특이사항</label><textarea id="v_note" placeholder="예: 상담내용, 기타 폐기물 제안사항 등 기재"></textarea></div>' +
+    '<div class="form-row"><label>상세 상담내용</label><textarea id="v_note" placeholder="예: 상담내용, 기타 폐기물 제안사항 등 기재"></textarea></div>' +
     '<div class="form-row"><label>최종영업결과</label><select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option></select></div>' +
     '<button id="saveBtn" onclick="saveVisit()">💾 저장</button>' +
     '<div id="saveMsg"></div>' +
     '</div>'
   );
 
-  const contractNoticeHtml = isContract
-    ? '<div style="margin-top:16px;padding:14px;background:#F2AC57;border-radius:8px;font-size:13px;color:#fff;text-align:center;font-weight:600;">★ 업박스 기계약 업장입니다</div>'
-    : '';
+  const contractNoticeHtml = '';
+  const navBtnHtml = isContract ? '' : '<button id="navBtn" onclick="openKakaoNavigation()">카카오맵 길찾기</button>';
+  const priceGuideBtnHtml = isContract ? '' : '<button class="priceGuideBtn" onclick="openPriceGuide()">📊 영업기준표 확인</button>';
 
-  const navBtnHtml = '<button id="navBtn" onclick="openKakaoNavigation()">카카오맵 길찾기</button>';
-  const priceGuideBtnHtml = '<button class="priceGuideBtn" onclick="openPriceGuide()">📊 영업기준표 확인</button>';
-
-  const otherTs = otherLastContactByStore[sanitizeKey(store._key)];
-  const otherContactHtml = otherTs
-    ? '<div style="font-size:12px;color:#666;margin-bottom:10px;">타파트너 마지막접촉일자: ' + formatDateYmd(otherTs) + '</div>'
-    : '';
-
-  // 로드뷰 섹션 HTML (기계약 제외)
-  // - 기계약은 이미 계약된 업장이라 현장 재확인 불필요
-  // - 카카오맵 JS SDK의 Roadview 사용 (무료)
-  // - Firebase 대역폭 영향 없음 (카카오 서버에서 직접 로드)
+  // 로드뷰 섹션 (기계약 제외)
   const roadviewHtml = isContract ? '' :
     '<div class="roadview-section">' +
       '<div class="roadview-header" id="rvHeader" onclick="toggleRoadview()">' +
@@ -952,6 +938,11 @@ async function openPanel(store){
       '</div>' +
       '<div class="rv-nodata" id="rvNoData">로드뷰 없음</div>' +
     '</div>';
+
+  const otherTs = otherLastContactByStore[sanitizeKey(store._key)];
+  const otherContactHtml = otherTs
+    ? '<div style="font-size:12px;color:#666;margin-bottom:10px;">타파트너 마지막접촉일자: ' + formatDateYmd(otherTs) + '</div>'
+    : '';
 
   content.innerHTML =
     '<h2>' + (store.name || "(이름없음)") + '</h2>' +
@@ -973,17 +964,11 @@ async function openPanel(store){
 function closePanel(){
   document.getElementById("storePanel").classList.remove("open");
   selectedStore = null;
-  // 로드뷰 상태 초기화 (다음 패널 오픈 시 깨끗한 상태로 시작)
-  // rvInstance는 삭제된 DOM을 참조하므로 명시적으로 null 처리 → 메모리 누수 방지 + 다음 패널에서 새로 생성
   currentRvState = 'collapsed';
   rvInstance = null;
 }
 
 /* ==================== 로드뷰 (카카오맵 JS SDK, 무료) ==================== */
-// 헤더 클릭 시 섹션 펼치기/접기
-// - 기본값: 접힘 (모든 패널 오픈 시)
-// - 펼치면 해당 업장 좌표로 인터랙티브 로드뷰 바로 활성화
-// - 로드뷰 데이터 없는 지역은 "로드뷰 없음" 플레이스홀더
 function toggleRoadview(){
   if (!selectedStore) return;
 
@@ -995,7 +980,6 @@ function toggleRoadview(){
   if (!header || !status || !loading || !container || !nodata) return;
 
   if (currentRvState === 'collapsed'){
-    // 펼치기 → 로드뷰 로드
     header.classList.add("open");
     status.textContent = "(로드 중...)";
     loading.classList.add("show");
@@ -1005,7 +989,6 @@ function toggleRoadview(){
 
     loadRoadviewForCurrentStore();
   } else {
-    // 접기
     header.classList.remove("open");
     status.textContent = "(클릭하여 보기)";
     loading.classList.remove("show");
@@ -1015,7 +998,6 @@ function toggleRoadview(){
   }
 }
 
-// 현재 선택된 업장의 좌표로 로드뷰 로드
 function loadRoadviewForCurrentStore(){
   if (!selectedStore || !selectedStore.lat || !selectedStore.lng) return;
 
@@ -1023,12 +1005,10 @@ function loadRoadviewForCurrentStore(){
   const lng = selectedStore.lng;
   const position = new kakao.maps.LatLng(lat, lng);
 
-  // RoadviewClient는 stateless라서 한 번만 만들어서 재사용 가능
   if (!rvClientInstance){
     rvClientInstance = new kakao.maps.RoadviewClient();
   }
 
-  // 50m 반경 내 가장 가까운 파노라마 ID 검색
   rvClientInstance.getNearestPanoId(position, 50, function(panoId){
     const loading = document.getElementById("rvLoading");
     const container = document.getElementById("rvContainer");
@@ -1040,16 +1020,13 @@ function loadRoadviewForCurrentStore(){
     loading.classList.remove("show");
 
     if (panoId === null){
-      // 로드뷰 데이터 없음
       nodata.classList.add("show");
       status.textContent = "(데이터 없음)";
       currentRvState = 'nodata';
       return;
     }
 
-    // 중요: rvInstance는 매 패널마다 새로 생성해야 함
-    // - 패널 DOM은 패널 오픈마다 새로 그려지므로 이전 rvInstance가 참조하던 DOM은 무효
-    // - 기존 인스턴스가 있더라도 새 DOM(#roadview)에 새 Roadview를 만들어야 렌더링됨
+    // rvInstance는 매 패널마다 새로 생성 (DOM 교체 대응)
     const rvCanvas = document.getElementById("roadview");
     if (!rvCanvas) return;
     rvInstance = new kakao.maps.Roadview(rvCanvas);
@@ -1059,20 +1036,17 @@ function loadRoadviewForCurrentStore(){
     status.textContent = "(360° 활성)";
     currentRvState = 'active';
 
-    // 카카오맵 외부 링크
     if (externalLink){
       externalLink.href = "https://map.kakao.com/link/roadview/" + lat + "," + lng;
     }
 
-    // 컨테이너가 방금 display:none → block 으로 바뀌어서 로드뷰 렌더링이 제대로 안 될 수 있음
-    // relayout 호출로 강제 재렌더링 (Kakao 공식 권장)
     setTimeout(function(){
       if (rvInstance) rvInstance.relayout();
     }, 100);
   });
 }
 
-/* ==================== 카카오맵 길찾기 연결 ==================== */
+/* ==================== 카카오맵 길찾기 ==================== */
 function openKakaoNavigation(){
   if (!selectedStore) return;
 
@@ -1232,6 +1206,7 @@ async function saveVisit(){
     const sk = sanitizeKey(selectedStore._key);
     myVisitedStoreKeys[sk] = true;
     myVisitedStoreData[sk] = {
+      currentStoreName: currentData.currentStoreName || "",
       contact: currentData.contact || "",
       note: currentData.note || "",
       outcome: currentData.outcome || "",
