@@ -900,14 +900,14 @@ async function openPanel(store){
   const visitFormHtml = isContract ? '' : (
     '<div id="visitForm">' +
     '<h3 id="visitFormTitle">📋 내 방문기록 (' + currentUser.name + ')</h3>' +
-    '<div class="form-row"><label>현재 업체명</label><input id="v_storeName" type="text" placeholder="예: ㅇㅇ환경"></div>' +
+    '<div class="form-row"><label>현재 업체명</label><input id="v_storeName" type="text" placeholder="예: ㅇㅇ환경 (*처리기 사용 등 수거통 없을 경우 \'수거통없음\'으로 기재)"></div>' +
     '<div class="form-row"><label>담당자 연락처</label><input id="v_contact" type="tel" placeholder="예: 010-0000-0000"></div>' +
     '<div class="form-row"><label>월 예상배출량 (L)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
     '<div class="form-row"><label>현재 단가 (원/L)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
     '<div class="form-row"><label>제안 단가 (원/L)</label><input id="v_suggestedPrice" type="number" placeholder="예: 140"></div>' +
     '<div class="form-row"><label>현재 주 수거횟수</label><input id="v_freq" type="number" placeholder="예: 3"></div>' +
-    '<div class="form-row"><label>현재 통 갯수</label><input id="v_bins" type="number" placeholder="예: 4"></div>' +
-    '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
+    '<div class="form-row"><label>현재 통 갯수</label><input id="v_bins" type="text" placeholder="예: 4 (*처리기 사용 등 수거통 없을 경우 \'수거통없음\'으로 기재)"></div>' +
+    '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="수거통없음">수거통없음</option></select></div>' +
     '<div class="form-row"><label>5톤 차량 진입 가능여부</label><select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select></div>' +
     '<div class="form-row"><label>상세 상담내용</label><textarea id="v_note" placeholder="예: 상담내용, 기타 폐기물 제안사항 등 기재"></textarea></div>' +
     '<div class="form-row"><label>최종영업결과</label><select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option></select></div>' +
