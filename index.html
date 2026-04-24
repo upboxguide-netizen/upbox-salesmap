@@ -840,10 +840,22 @@ function setStatus(msg){
 
 /* ==================== 업장 상세 패널 ==================== */
 async function openPanel(store){
-  selectedStore = store;
   const panel = document.getElementById("storePanel");
   const content = document.getElementById("panelContent");
 
+  // stores_light 에는 경량 필드만 있으므로, stores/{key} 에서 전체 필드 1건 조회해 merge
+  // (주소, 행정신고구분, 업종, 면적, 전화번호, sido/sigungu/gu/emd 등)
+  try {
+    const detailSnap = await db.ref("stores/" + store._key).once("value");
+    const detail = detailSnap.val();
+    if (detail) {
+      // 경량 객체에 상세 필드 병합 (경량 객체의 lat/lng/name/grade/basic/plus 는 유지)
+      store = Object.assign({}, detail, store);
+    }
+  } catch(e) {
+    console.warn("업장 상세 조회 실패:", e);
+  }
+  selectedStore = store;
   const g = gradeInfo(store.grade);
   const normalizedGrade = normalizeGrade(store.grade);
   const isContract = (normalizedGrade === "기계약");
