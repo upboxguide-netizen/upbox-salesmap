@@ -124,9 +124,9 @@
   #navBtn:active { background:#363859; color:#fff; }
   #navBtn:disabled { border-color:#aaa; color:#aaa; cursor:not-allowed; }
 
-  /* 영업기준표 확인 버튼 (필 스타일, 브랜드 포인트 컬러) */
-  .priceGuideBtn { width:100%; padding:12px; background:#F2AC57; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; margin-top:10px; font-family: inherit; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .15s; }
-  .priceGuideBtn:active { background:#e09a46; }
+  /* 영업기준표 확인 버튼 (남색 메인 컬러) */
+  .priceGuideBtn { width:100%; padding:12px; background:#363859; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; margin-top:10px; font-family: inherit; display:flex; align-items:center; justify-content:center; gap:6px; transition:all .15s; }
+  .priceGuideBtn:active { background:#262840; }
   .priceGuideBtn:disabled { background:#bbb; cursor:not-allowed; }
 
   /* 저장 토스트 (화면 중앙 고정, 스크롤 영향 없음) */
@@ -134,6 +134,27 @@
   #saveToast.show { opacity:1; }
   #saveToast.success { background:rgba(54,56,89,0.95); }
   #saveToast.error { background:rgba(198,40,40,0.95); }
+
+  /* ==================== 로드뷰 섹션 ==================== */
+  .roadview-section { margin:14px 0; border-radius:12px; overflow:hidden; background:#fff; border:1px solid #e0e0e0; }
+  .roadview-header { background:linear-gradient(135deg, #363859 0%, #4a4d7a 100%); color:#fff; padding:10px 14px; font-size:13px; font-weight:600; display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; transition:background 0.2s; }
+  .roadview-header:hover { background:linear-gradient(135deg, #2a2c47 0%, #3d4069 100%); }
+  .roadview-header .rv-title { display:flex; align-items:center; gap:6px; }
+  .roadview-header .rv-status { font-size:11px; opacity:0.8; margin-left:6px; font-weight:400; }
+  .roadview-header .rv-toggle-icon { font-size:12px; transition:transform 0.2s; }
+  .roadview-header.open .rv-toggle-icon { transform:rotate(180deg); }
+
+  .rv-loading { width:100%; height:100px; display:none; align-items:center; justify-content:center; color:#999; font-size:13px; background:#f5f5f5; }
+  .rv-loading.show { display:flex; }
+
+  .rv-container { width:100%; height:220px; position:relative; background:#eaeaea; display:none; }
+  .rv-container.show { display:block; }
+  .rv-container .rv-canvas { width:100%; height:100%; }
+
+  .rv-external { position:absolute; bottom:8px; right:8px; background:rgba(255,255,255,0.95); color:#363859; font-size:11px; padding:5px 10px; border-radius:4px; text-decoration:none; font-weight:600; box-shadow:0 2px 6px rgba(0,0,0,.15); z-index:10; }
+
+  .rv-nodata { width:100%; height:80px; display:none; align-items:center; justify-content:center; color:#999; font-size:13px; background:#f5f5f5; }
+  .rv-nodata.show { display:flex; }
 </style>
 </head>
 <body>
@@ -215,6 +236,12 @@ let otherLastContactByStore = {};
 
 /* 기계약 업장 노출 반경 (km) - 현재 위치 기준으로 이 거리 이내만 표시 */
 const CONTRACT_RADIUS_KM = 3;
+
+/* ==================== 로드뷰 상태 ==================== */
+// 각 업장 패널마다 로드뷰 인스턴스를 새로 만들지 않고 재사용
+let rvInstance = null;
+let rvClientInstance = null;
+let currentRvState = 'collapsed';  // collapsed | loading | active | nodata
 
 /* ==================== 업장 추가 링크 ==================== */
 const ADD_STORE_URL = "https://walla.my/v/GEQSSOWtFYHulcSoAKC3";
@@ -898,12 +925,34 @@ async function openPanel(store){
     ? '<div style="font-size:12px;color:#666;margin-bottom:10px;">타파트너 마지막접촉일자: ' + formatDateYmd(otherTs) + '</div>'
     : '';
 
+  // 로드뷰 섹션 HTML (기본 접힘, 헤더 클릭 시 바로 인터랙티브 로드)
+  // - 카카오맵 JS SDK의 Roadview 사용 (무료)
+  // - Firebase 대역폭 영향 없음 (카카오 서버에서 직접 로드)
+  const roadviewHtml =
+    '<div class="roadview-section">' +
+      '<div class="roadview-header" id="rvHeader" onclick="toggleRoadview()">' +
+        '<div class="rv-title">' +
+          '<span>🌆</span>' +
+          '<span>현장 로드뷰</span>' +
+          '<span class="rv-status" id="rvStatus">(클릭하여 보기)</span>' +
+        '</div>' +
+        '<span class="rv-toggle-icon">▼</span>' +
+      '</div>' +
+      '<div class="rv-loading" id="rvLoading">로드뷰 확인 중...</div>' +
+      '<div class="rv-container" id="rvContainer">' +
+        '<div class="rv-canvas" id="roadview"></div>' +
+        '<a href="#" class="rv-external" id="rvExternalLink" target="_blank" onclick="event.stopPropagation()">카카오맵에서 보기 →</a>' +
+      '</div>' +
+      '<div class="rv-nodata" id="rvNoData">로드뷰 없음</div>' +
+    '</div>';
+
   content.innerHTML =
     '<h2>' + (store.name || "(이름없음)") + '</h2>' +
     '<div class="addr">' + (store.address || "") + '</div>' +
     '<div style="margin-bottom:10px;">' + regBadge + gradeBadge + '</div>' +
     otherContactHtml +
     (planBadges ? '<div style="margin-bottom:10px;">' + planBadges + '</div>' : '') +
+    roadviewHtml +
     infoHtml +
     memoHtml +
     priceGuideBtnHtml +
@@ -911,12 +960,109 @@ async function openPanel(store){
     contractNoticeHtml +
     visitFormHtml;
 
+  // 패널 오픈 시마다 로드뷰는 접힌 상태로 초기화 (새 업장용)
+  currentRvState = 'collapsed';
+
   if (!isContract) await loadMyVisit(store._key);
 }
 
 function closePanel(){
   document.getElementById("storePanel").classList.remove("open");
   selectedStore = null;
+  // 로드뷰 상태도 초기화 (다음 패널 오픈 시 깨끗한 상태로 시작)
+  currentRvState = 'collapsed';
+}
+
+/* ==================== 로드뷰 (카카오맵 JS SDK, 무료) ==================== */
+// 헤더 클릭 시 섹션 펼치기/접기
+// - 기본값: 접힘 (모든 패널 오픈 시)
+// - 펼치면 해당 업장 좌표로 인터랙티브 로드뷰 바로 활성화
+// - 로드뷰 데이터 없는 지역은 "로드뷰 없음" 플레이스홀더
+function toggleRoadview(){
+  if (!selectedStore) return;
+
+  const header = document.getElementById("rvHeader");
+  const status = document.getElementById("rvStatus");
+  const loading = document.getElementById("rvLoading");
+  const container = document.getElementById("rvContainer");
+  const nodata = document.getElementById("rvNoData");
+  if (!header || !status || !loading || !container || !nodata) return;
+
+  if (currentRvState === 'collapsed'){
+    // 펼치기 → 로드뷰 로드
+    header.classList.add("open");
+    status.textContent = "(로드 중...)";
+    loading.classList.add("show");
+    container.classList.remove("show");
+    nodata.classList.remove("show");
+    currentRvState = 'loading';
+
+    loadRoadviewForCurrentStore();
+  } else {
+    // 접기
+    header.classList.remove("open");
+    status.textContent = "(클릭하여 보기)";
+    loading.classList.remove("show");
+    container.classList.remove("show");
+    nodata.classList.remove("show");
+    currentRvState = 'collapsed';
+  }
+}
+
+// 현재 선택된 업장의 좌표로 로드뷰 로드
+function loadRoadviewForCurrentStore(){
+  if (!selectedStore || !selectedStore.lat || !selectedStore.lng) return;
+
+  const lat = selectedStore.lat;
+  const lng = selectedStore.lng;
+  const position = new kakao.maps.LatLng(lat, lng);
+
+  // RoadviewClient 초기화 (처음 한 번만)
+  if (!rvClientInstance){
+    rvClientInstance = new kakao.maps.RoadviewClient();
+  }
+
+  // 50m 반경 내 가장 가까운 파노라마 ID 검색
+  rvClientInstance.getNearestPanoId(position, 50, function(panoId){
+    const loading = document.getElementById("rvLoading");
+    const container = document.getElementById("rvContainer");
+    const nodata = document.getElementById("rvNoData");
+    const status = document.getElementById("rvStatus");
+    const externalLink = document.getElementById("rvExternalLink");
+    if (!loading || !container || !nodata || !status) return;
+
+    loading.classList.remove("show");
+
+    if (panoId === null){
+      // 로드뷰 데이터 없음
+      nodata.classList.add("show");
+      status.textContent = "(데이터 없음)";
+      currentRvState = 'nodata';
+      return;
+    }
+
+    // 인터랙티브 로드뷰 초기화 (처음만, 이후 재사용)
+    if (!rvInstance){
+      const rvCanvas = document.getElementById("roadview");
+      rvInstance = new kakao.maps.Roadview(rvCanvas);
+    }
+
+    container.classList.add("show");
+    rvInstance.setPanoId(panoId, position);
+    status.textContent = "(360° 활성)";
+    currentRvState = 'active';
+
+    // 카카오맵 외부 링크
+    if (externalLink){
+      externalLink.href = "https://map.kakao.com/link/roadview/" + lat + "," + lng;
+    }
+
+    // 컨테이너가 방금 display:none → block 으로 바뀌어서 로드뷰 렌더링이 제대로 안 될 수 있음
+    // relayout 호출로 강제 재렌더링
+    setTimeout(function(){
+      if (rvInstance) rvInstance.relayout();
+    }, 100);
+  });
 }
 
 /* ==================== 카카오맵 길찾기 연결 ==================== */
