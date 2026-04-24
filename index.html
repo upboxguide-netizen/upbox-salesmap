@@ -833,6 +833,12 @@ async function openPanel(store){
   const panel = document.getElementById("storePanel");
   const content = document.getElementById("panelContent");
 
+  // 이전 패널의 로드뷰 인스턴스 정리 (새 DOM에 새 Roadview 생성을 위해 반드시 필요)
+  // - 이전 DOM은 content.innerHTML 교체로 사라지므로 rvInstance는 무효 참조가 됨
+  // - 명시적으로 null 처리하면 다음 loadRoadviewForCurrentStore 호출 시 새로 생성됨
+  rvInstance = null;
+  currentRvState = 'collapsed';
+
   // 로딩 중 표시
   content.innerHTML = '<h2 style="color:#999;">업장 정보 불러오는 중...</h2>';
   panel.classList.add("open");
@@ -925,10 +931,11 @@ async function openPanel(store){
     ? '<div style="font-size:12px;color:#666;margin-bottom:10px;">타파트너 마지막접촉일자: ' + formatDateYmd(otherTs) + '</div>'
     : '';
 
-  // 로드뷰 섹션 HTML (기본 접힘, 헤더 클릭 시 바로 인터랙티브 로드)
+  // 로드뷰 섹션 HTML (기계약 제외)
+  // - 기계약은 이미 계약된 업장이라 현장 재확인 불필요
   // - 카카오맵 JS SDK의 Roadview 사용 (무료)
   // - Firebase 대역폭 영향 없음 (카카오 서버에서 직접 로드)
-  const roadviewHtml =
+  const roadviewHtml = isContract ? '' :
     '<div class="roadview-section">' +
       '<div class="roadview-header" id="rvHeader" onclick="toggleRoadview()">' +
         '<div class="rv-title">' +
@@ -960,17 +967,16 @@ async function openPanel(store){
     contractNoticeHtml +
     visitFormHtml;
 
-  // 패널 오픈 시마다 로드뷰는 접힌 상태로 초기화 (새 업장용)
-  currentRvState = 'collapsed';
-
   if (!isContract) await loadMyVisit(store._key);
 }
 
 function closePanel(){
   document.getElementById("storePanel").classList.remove("open");
   selectedStore = null;
-  // 로드뷰 상태도 초기화 (다음 패널 오픈 시 깨끗한 상태로 시작)
+  // 로드뷰 상태 초기화 (다음 패널 오픈 시 깨끗한 상태로 시작)
+  // rvInstance는 삭제된 DOM을 참조하므로 명시적으로 null 처리 → 메모리 누수 방지 + 다음 패널에서 새로 생성
   currentRvState = 'collapsed';
+  rvInstance = null;
 }
 
 /* ==================== 로드뷰 (카카오맵 JS SDK, 무료) ==================== */
@@ -1017,7 +1023,7 @@ function loadRoadviewForCurrentStore(){
   const lng = selectedStore.lng;
   const position = new kakao.maps.LatLng(lat, lng);
 
-  // RoadviewClient 초기화 (처음 한 번만)
+  // RoadviewClient는 stateless라서 한 번만 만들어서 재사용 가능
   if (!rvClientInstance){
     rvClientInstance = new kakao.maps.RoadviewClient();
   }
@@ -1041,11 +1047,12 @@ function loadRoadviewForCurrentStore(){
       return;
     }
 
-    // 인터랙티브 로드뷰 초기화 (처음만, 이후 재사용)
-    if (!rvInstance){
-      const rvCanvas = document.getElementById("roadview");
-      rvInstance = new kakao.maps.Roadview(rvCanvas);
-    }
+    // 중요: rvInstance는 매 패널마다 새로 생성해야 함
+    // - 패널 DOM은 패널 오픈마다 새로 그려지므로 이전 rvInstance가 참조하던 DOM은 무효
+    // - 기존 인스턴스가 있더라도 새 DOM(#roadview)에 새 Roadview를 만들어야 렌더링됨
+    const rvCanvas = document.getElementById("roadview");
+    if (!rvCanvas) return;
+    rvInstance = new kakao.maps.Roadview(rvCanvas);
 
     container.classList.add("show");
     rvInstance.setPanoId(panoId, position);
@@ -1058,7 +1065,7 @@ function loadRoadviewForCurrentStore(){
     }
 
     // 컨테이너가 방금 display:none → block 으로 바뀌어서 로드뷰 렌더링이 제대로 안 될 수 있음
-    // relayout 호출로 강제 재렌더링
+    // relayout 호출로 강제 재렌더링 (Kakao 공식 권장)
     setTimeout(function(){
       if (rvInstance) rvInstance.relayout();
     }, 100);
