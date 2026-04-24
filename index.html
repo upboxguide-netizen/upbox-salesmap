@@ -208,9 +208,13 @@ let currentFilter = 'ALL';
 let currentKeyword = '';
 let selectedStore = null;
 let userLocationMarker = null;
+let currentUserLocation = null;  // 현재 위치 {lat, lng} - 기계약 3km 필터용
 let myVisitedStoreKeys = {};
 let myVisitedStoreData = {};
 let otherLastContactByStore = {};
+
+/* 기계약 업장 노출 반경 (km) - 현재 위치 기준으로 이 거리 이내만 표시 */
+const CONTRACT_RADIUS_KM = 3;
 
 /* ==================== 업장 추가 링크 ==================== */
 const ADD_STORE_URL = "https://walla.my/v/GEQSSOWtFYHulcSoAKC3";
@@ -447,6 +451,7 @@ async function loadMyVisitedKeys(){
           outcome: d.outcome || "",
           amount: d.amount || "",
           price: d.price || "",
+          suggestedPrice: d.suggestedPrice || "",  // 제안 단가 (영업자가 업체에 제안한 단가)
           freq: d.freq || "",
           bins: d.bins || "",
           vinyl: d.vinyl || "",
@@ -467,10 +472,13 @@ function getVisitStatus(storeKey){
   if (outcome === "실패") return 'FAIL';
   if (outcome === "성사") return 'SUCCESS';
 
+  // 유효리드 판정: 연락처 OR 특이사항 OR 제안 단가 (영업자가 실제 제안한 증거)
   const hasContact = String(d.contact||"").trim().length > 0;
   const hasNote = String(d.note||"").trim().length > 0;
-  if (hasContact || hasNote) return 'LEAD';
+  const hasSuggestedPrice = String(d.suggestedPrice||"").trim().length > 0;
+  if (hasContact || hasNote || hasSuggestedPrice) return 'LEAD';
 
+  // 단순방문 판정: 관찰값 (현재단가/배출량/주수거/통갯수/비닐/차량) 중 하나 이상
   const obsFields = [d.amount, d.price, d.freq, d.bins, d.vinyl, d.truck];
   const hasObservation = obsFields.some(function(v){ return String(v||"").trim().length > 0; });
   if (hasObservation) return 'VISITED';
@@ -508,6 +516,7 @@ function moveToMyLocation(){
   navigator.geolocation.getCurrentPosition(
     function(pos){
       const lat = pos.coords.latitude, lng = pos.coords.longitude;
+      currentUserLocation = { lat: lat, lng: lng };  // 기계약 3km 필터용
       const loc = new kakao.maps.LatLng(lat, lng);
       map.setCenter(loc);
       map.setLevel(4);
@@ -524,6 +533,9 @@ function moveToMyLocation(){
         ),
         zIndex: 999
       });
+
+      // 위치가 업데이트됐으므로 지도 재조회 (기계약 3km 필터 적용)
+      loadStoresInView();
     },
     function(err){ setStatus("⚠️ 위치 권한이 필요합니다."); },
     { enableHighAccuracy:true, timeout:10000 }
@@ -572,8 +584,19 @@ async function loadStoresInView(){
       list.push(s);
     }
 
+    // 기계약 업장 반경 제한: 현재 위치가 있으면 3km 이내만 표시
+    // - 비기계약은 기존처럼 지도 뷰 기반으로 모두 표시
+    // - 현재 위치가 없으면(권한 거부 등) 기계약도 뷰 기반 fallback
+    const radiusFiltered = (currentUserLocation)
+      ? list.filter(function(s){
+          if (normalizeGrade(s.grade) !== "기계약") return true;  // 비기계약 통과
+          const d = haversine(currentUserLocation.lat, currentUserLocation.lng, s.lat, s.lng);
+          return d <= CONTRACT_RADIUS_KM;
+        })
+      : list;
+
     // 기계약 중복 노출 방지
-    const filtered = dedupeAgainstContracts(list);
+    const filtered = dedupeAgainstContracts(radiusFiltered);
 
     allStoresInView = filtered;
     renderMarkers();
@@ -851,6 +874,7 @@ async function openPanel(store){
     '<div class="form-row"><label>담당자 연락처</label><input id="v_contact" type="tel" placeholder="예: 010-0000-0000"></div>' +
     '<div class="form-row"><label>월 예상배출량 (L)</label><input id="v_amount" type="number" placeholder="예: 500"></div>' +
     '<div class="form-row"><label>현재 단가 (원/L)</label><input id="v_price" type="number" placeholder="예: 150"></div>' +
+    '<div class="form-row"><label>제안 단가 (원/L)</label><input id="v_suggestedPrice" type="number" placeholder="예: 140"></div>' +
     '<div class="form-row"><label>현재 주 수거횟수</label><input id="v_freq" type="number" placeholder="예: 3"></div>' +
     '<div class="form-row"><label>현재 통 갯수</label><input id="v_bins" type="number" placeholder="예: 4"></div>' +
     '<div class="form-row"><label>비닐 사용여부</label><select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option></select></div>' +
@@ -950,6 +974,10 @@ async function loadMyVisit(storeKey){
     }
     if (data.amount !== undefined) document.getElementById("v_amount").value = data.amount;
     if (data.price !== undefined) document.getElementById("v_price").value = data.price;
+    if (data.suggestedPrice !== undefined){
+      const el = document.getElementById("v_suggestedPrice");
+      if (el) el.value = data.suggestedPrice;
+    }
     if (data.freq !== undefined) document.getElementById("v_freq").value = data.freq;
     if (data.bins !== undefined){
       const el = document.getElementById("v_bins");
@@ -992,6 +1020,7 @@ async function saveVisit(){
       contact: (document.getElementById("v_contact") || {}).value || "",
       amount: document.getElementById("v_amount").value,
       price: document.getElementById("v_price").value,
+      suggestedPrice: (document.getElementById("v_suggestedPrice") || {}).value || "",
       freq: document.getElementById("v_freq").value,
       bins: (document.getElementById("v_bins") || {}).value || "",
       vinyl: document.getElementById("v_vinyl").value,
@@ -1009,6 +1038,7 @@ async function saveVisit(){
         contact: existing.contact || "",
         amount: existing.amount || "",
         price: existing.price || "",
+        suggestedPrice: existing.suggestedPrice || "",
         freq: existing.freq || "",
         bins: existing.bins || "",
         vinyl: existing.vinyl || "",
@@ -1034,6 +1064,7 @@ async function saveVisit(){
       contact: currentData.contact,
       amount: currentData.amount,
       price: currentData.price,
+      suggestedPrice: currentData.suggestedPrice,
       freq: currentData.freq,
       bins: currentData.bins,
       vinyl: currentData.vinyl,
@@ -1053,6 +1084,7 @@ async function saveVisit(){
       outcome: currentData.outcome || "",
       amount: currentData.amount || "",
       price: currentData.price || "",
+      suggestedPrice: currentData.suggestedPrice || "",
       freq: currentData.freq || "",
       bins: currentData.bins || "",
       vinyl: currentData.vinyl || "",
