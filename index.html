@@ -328,7 +328,7 @@ function initMap() {
     }, 100);
   });
 
-  // 패널 아래로 스와이프 시 닫기 (모바일/터치)
+  // 패널 아래로 스와이프 시 닫기 (모바일/터치) — 패널 맨 위에서만 동작
   let touchStartY = 0;
   let touchStartScroll = 0;
   let isDragging = false;
@@ -344,15 +344,9 @@ function initMap() {
     const currentY = e.touches[0].clientY;
     const deltaY = currentY - touchStartY;
     const atTop = panel.scrollTop <= 0;
-    const atBottom = panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1;
 
-    // 위에서 아래로 당기는데 스크롤이 맨 위에 있을 때
+    // 위에서 아래로 당기는데 스크롤이 맨 위에 있을 때만 닫힘
     if (deltaY > 80 && atTop && touchStartScroll <= 0) {
-      closePanel();
-      isDragging = false;
-    }
-    // 맨 아래에서 더 아래로 당길 때
-    if (deltaY < -80 && atBottom) {
       closePanel();
       isDragging = false;
     }
@@ -691,6 +685,13 @@ function openPriceGuide() {
   else params.append('gueup', '없음');
   if (selectedStore.emd) params.append('dong', selectedStore.emd);
   params.append('service', '베이직');
+
+  // SSO: 지도 CRM 로그인 정보 전달 → 영업기준표 자동 로그인
+  if (currentUser && currentUser.name && currentUser.code) {
+    params.append('partner_name', currentUser.name);
+    params.append('partner_code', currentUser.code);
+  }
+
   const url = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec?' + params.toString();
   window.open(url, '_blank');
 }
