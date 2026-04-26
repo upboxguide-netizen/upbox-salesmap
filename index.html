@@ -47,8 +47,12 @@
   .search-project-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 3px; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; font-size: 10px; font-weight: 600; flex-shrink: 0; }
 
   #filterBar { display: flex; gap: 6px; padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; overflow-x: auto; white-space: nowrap; }
-  .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; }
+  .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
   .filter-chip.active { color: white; border: none; }
+  /* 프로젝트영업 필터 (배정된 파트너만 표시) */
+  .filter-chip-project { display: none; align-items: center; gap: 3px; }
+  .filter-chip-project.visible { display: inline-flex; }
+  .filter-chip-project.active { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%) !important; }
 
   #map { flex: 1; position: relative; }
   #statusBar { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(54, 56, 89, 0.9); color: white; padding: 8px 12px; border-radius: 8px; font-size: 12px; text-align: center; z-index: 50; }
@@ -127,6 +131,7 @@
 
   <div id="filterBar">
     <button class="filter-chip active" data-filter="all" style="background:#363859;">전체</button>
+    <button class="filter-chip filter-chip-project" data-filter="project" id="filterProject">🎯 프로젝트영업</button>
     <button class="filter-chip" data-filter="visit" style="background:transparent;">단순방문</button>
     <button class="filter-chip" data-filter="lead" style="background:transparent;">유효리드</button>
     <button class="filter-chip" data-filter="success" style="background:transparent;">계약성사</button>
@@ -183,6 +188,7 @@ let currentRvState = 'collapsed';
 
 let otherPartnerLastContactMap = {};
 let myVisitedStoreData = {};
+let hasMyProjects = false;  // ⭐ v45.4.2: 본인이 담당하는 프로젝트가 있는지
 
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
@@ -291,10 +297,14 @@ function initMap() {
     btn.onclick = function() {
       document.querySelectorAll(".filter-chip").forEach(b => {
         b.classList.remove("active");
-        b.style.background = "transparent";
+        // 프로젝트 칩은 그라데이션이라 inline 스타일 제거 시 transparent로
+        b.style.background = b.dataset.filter === "project" ? "" : "transparent";
       });
       btn.classList.add("active");
-      btn.style.background = getFilterColor(btn.dataset.filter);
+      // 프로젝트 칩은 CSS 클래스로 그라데이션 처리, 나머지는 inline
+      if (btn.dataset.filter !== "project") {
+        btn.style.background = getFilterColor(btn.dataset.filter);
+      }
       currentFilter = btn.dataset.filter;
       renderMarkers();
     };
@@ -400,6 +410,18 @@ async function loadStoresInView() {
 
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
 
+    // ⭐ v45.4.2: 본인이 담당하는 프로젝트 업장이 1건이라도 있으면 프로젝트 필터 칩 노출
+    if (!hasMyProjects) {
+      for (const s of list) {
+        if (amIAssignedToProject(s, currentUser.key)) {
+          hasMyProjects = true;
+          const projChip = document.getElementById('filterProject');
+          if (projChip) projChip.classList.add('visible');
+          break;
+        }
+      }
+    }
+
     if (currentUserLocation) {
       list = list.filter(function(s) {
         if (!isContractGrade(s.grade)) return true;
@@ -487,7 +509,14 @@ function renderMarkers() {
   let shown = 0;
   for (const store of allStoresInView) {
     const status = getVisitStatus(store);
-    if (currentFilter !== "all" && status !== currentFilter) continue;
+
+    // ⭐ v45.4.2: 프로젝트영업 필터 - 본인 담당 프로젝트 업장만
+    if (currentFilter === "project") {
+      if (!amIAssignedToProject(store, currentUser.key)) continue;
+    } else if (currentFilter !== "all" && status !== currentFilter) {
+      continue;
+    }
+
     const marker = createMarker(store, status);
     marker.setMap(map);
     markers.push(marker);
