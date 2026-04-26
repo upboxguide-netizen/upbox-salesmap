@@ -238,7 +238,59 @@ async function startApp() {
   document.getElementById("userInfo").textContent = currentUser.name;
   await loadOtherPartnerContacts();
   await loadMyVisits();
+  await checkMyProjectAssignment();  // ⭐ v45.4.2: 본인 프로젝트 배정 여부 사전 확인
   initMap();
+}
+
+// ⭐ v45.4.2: 본인이 담당하는 프로젝트가 있는지 Firebase 전체 확인
+// 로그인 직후 1회 실행 → 화면 위치와 무관하게 정확하게 칩 노출 결정
+async function checkMyProjectAssignment() {
+  try {
+    const snap = await db.ref("stores_light").once("value");
+    const all = snap.val() || {};
+    let foundCount = 0;
+    let myKey = currentUser.key;
+    let firstMatch = null;
+
+    for (const k in all) {
+      const s = all[k];
+      if (!s || !s.projects) continue;
+      const projectNames = Object.keys(s.projects);
+      for (const projectName of projectNames) {
+        const codes = String(s.projects[projectName]).split(';').map(x => x.trim());
+        if (codes.indexOf(myKey) !== -1) {
+          foundCount++;
+          if (!firstMatch) firstMatch = { key: k, projectName: projectName, codes: codes };
+          break;
+        }
+      }
+      if (foundCount >= 1) break;  // 1건만 찾으면 충분 (성능)
+    }
+
+    console.log('[프로젝트 배정 확인]', {
+      파트너명: currentUser.name,
+      파트너코드: currentUser.code,
+      파트너키: myKey,
+      배정된업장발견: foundCount,
+      첫번째매칭: firstMatch
+    });
+
+    if (foundCount > 0) {
+      hasMyProjects = true;
+      // DOM 준비 후 칩 노출 (initMap 이후에도 적용 보장)
+      setTimeout(function() {
+        const projChip = document.getElementById('filterProject');
+        if (projChip) {
+          projChip.classList.add('visible');
+          console.log('[프로젝트 필터 칩 노출 ON]');
+        }
+      }, 100);
+    } else {
+      console.log('[프로젝트 배정 없음] 칩 노출 안 함');
+    }
+  } catch(e) {
+    console.warn("프로젝트 배정 확인 실패:", e);
+  }
 }
 
 async function loadOtherPartnerContacts() {
