@@ -189,6 +189,7 @@ let currentRvState = 'collapsed';
 let otherPartnerLastContactMap = {};
 let myVisitedStoreData = {};
 let hasMyProjects = false;  // ⭐ v45.4.2: 본인이 담당하는 프로젝트가 있는지
+let myProjectStores = [];   // ⭐ v45.4.3: 본인 담당 프로젝트 업장 좌표 목록 (지도 자동 이동용)
 
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
@@ -244,13 +245,17 @@ async function startApp() {
 
 // ⭐ v45.4.2: 본인이 담당하는 프로젝트가 있는지 Firebase 전체 확인
 // 로그인 직후 1회 실행 → 화면 위치와 무관하게 정확하게 칩 노출 결정
+// ⭐ v45.4.3: 매칭된 업장들의 좌표를 저장 (필터 클릭 시 자동 이동용)
 async function checkMyProjectAssignment() {
   try {
     const snap = await db.ref("stores_light").once("value");
     const all = snap.val() || {};
     let foundCount = 0;
-    let myKey = currentUser.key;
+    const myKey = String(currentUser.key).trim();
+    const myCode = String(currentUser.code).trim();
     let firstMatch = null;
+    let allProjectNames = new Set();
+    myProjectStores = [];  // 초기화
 
     for (const k in all) {
       const s = all[k];
@@ -258,39 +263,76 @@ async function checkMyProjectAssignment() {
       const projectNames = Object.keys(s.projects);
       for (const projectName of projectNames) {
         const codes = String(s.projects[projectName]).split(';').map(x => x.trim());
-        if (codes.indexOf(myKey) !== -1) {
+        if (codes.indexOf(myKey) !== -1 || codes.indexOf(myCode) !== -1) {
           foundCount++;
-          if (!firstMatch) firstMatch = { key: k, projectName: projectName, codes: codes };
+          allProjectNames.add(projectName);
+          if (!firstMatch) firstMatch = { key: k, storeName: s.name, projectName: projectName, codes: codes };
+          // ⭐ 좌표 저장 (지도 자동 이동용)
+          if (!isNaN(s.lat) && !isNaN(s.lng)) {
+            myProjectStores.push({ lat: s.lat, lng: s.lng });
+          }
           break;
         }
       }
-      if (foundCount >= 1) break;  // 1건만 찾으면 충분 (성능)
     }
 
     console.log('[프로젝트 배정 확인]', {
       파트너명: currentUser.name,
-      파트너코드: currentUser.code,
-      파트너키: myKey,
-      배정된업장발견: foundCount,
-      첫번째매칭: firstMatch
+      파트너코드_code: myCode,
+      파트너키_key: myKey,
+      배정된업장수: foundCount,
+      배정된프로젝트목록: Array.from(allProjectNames),
+      첫번째매칭샘플: firstMatch
     });
 
     if (foundCount > 0) {
       hasMyProjects = true;
-      // DOM 준비 후 칩 노출 (initMap 이후에도 적용 보장)
-      setTimeout(function() {
+      const showChip = function(retries) {
         const projChip = document.getElementById('filterProject');
         if (projChip) {
           projChip.classList.add('visible');
-          console.log('[프로젝트 필터 칩 노출 ON]');
+          console.log('[✅ 프로젝트 필터 칩 노출 완료]');
+        } else if (retries > 0) {
+          setTimeout(function() { showChip(retries - 1); }, 200);
+        } else {
+          console.warn('[⚠️ 프로젝트 칩 DOM을 찾을 수 없음]');
         }
-      }, 100);
+      };
+      showChip(5);
     } else {
       console.log('[프로젝트 배정 없음] 칩 노출 안 함');
     }
   } catch(e) {
     console.warn("프로젝트 배정 확인 실패:", e);
   }
+}
+
+// ⭐ v45.4.3: 본인 담당 프로젝트 업장이 한 화면에 보이도록 지도 자동 이동
+function moveToMyProjectStores() {
+  if (!myProjectStores || myProjectStores.length === 0) {
+    console.warn('[프로젝트 자동 이동] 저장된 업장 좌표 없음');
+    return;
+  }
+
+  // 업장이 1개면 해당 위치로 이동 + 적절한 줌
+  if (myProjectStores.length === 1) {
+    const s = myProjectStores[0];
+    map.setCenter(new kakao.maps.LatLng(s.lat, s.lng));
+    map.setLevel(4);
+    return;
+  }
+
+  // 여러 개면 모두가 한 화면에 보이도록 bounds 계산
+  const bounds = new kakao.maps.LatLngBounds();
+  myProjectStores.forEach(function(s) {
+    bounds.extend(new kakao.maps.LatLng(s.lat, s.lng));
+  });
+  map.setBounds(bounds);
+
+  // 너무 줌아웃되면 핀 안 보이니까 최대 레벨 제한
+  setTimeout(function() {
+    if (map.getLevel() > 10) map.setLevel(10);
+  }, 100);
 }
 
 async function loadOtherPartnerContacts() {
@@ -358,7 +400,14 @@ function initMap() {
         btn.style.background = getFilterColor(btn.dataset.filter);
       }
       currentFilter = btn.dataset.filter;
-      renderMarkers();
+
+      // ⭐ v45.4.3: 프로젝트영업 필터 클릭 시 본인 담당 업장이 보이는 지역으로 자동 이동
+      if (btn.dataset.filter === "project") {
+        moveToMyProjectStores();
+        // 지도 이동 후 idle 이벤트가 자동으로 loadStoresInView() 호출 → 그 안에서 renderMarkers()
+      } else {
+        renderMarkers();
+      }
     };
   });
 
@@ -506,9 +555,12 @@ function amIAssignedToProject(store, currentPartnerKey) {
   if (!store.projects) return false;
   const keys = Object.keys(store.projects);
   if (keys.length === 0) return false;
+  // ⭐ v45.4.2: key + code 둘 다 매칭 시도 (시트 입력 형식 다양성 대응)
+  const myKey = String(currentPartnerKey || '').trim();
+  const myCode = currentUser ? String(currentUser.code || '').trim() : '';
   for (const projectName of keys) {
     const codes = String(store.projects[projectName]).split(';').map(s => s.trim());
-    if (codes.indexOf(currentPartnerKey) !== -1) return true;
+    if (codes.indexOf(myKey) !== -1 || (myCode && codes.indexOf(myCode) !== -1)) return true;
   }
   return false;
 }
