@@ -40,7 +40,11 @@
   .search-item { padding: 10px 12px; border-bottom: 1px solid #EEE; cursor: pointer; }
   .search-item:hover { background: #F5F5F5; }
   .search-item:last-child { border-bottom: none; }
-  .search-name { font-size: 13px; color: #333; }
+  .search-name-row { display: flex; align-items: center; gap: 6px; }
+  .search-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .search-name { font-size: 13px; color: #333; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search-status-label { font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex-shrink: 0; color: white; }
+  .search-project-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 3px; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; font-size: 10px; font-weight: 600; flex-shrink: 0; }
 
   #filterBar { display: flex; gap: 6px; padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; overflow-x: auto; white-space: nowrap; }
   .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; }
@@ -936,7 +940,21 @@ function renderSearchResults(list) {
     return;
   }
   resultsEl.innerHTML = list.map(function(s, idx) {
-    return `<div class="search-item" data-idx="${idx}"><div class="search-name">${escapeHtml(s.name || '(이름 없음)')}</div></div>`;
+    const status = getVisitStatus(s);
+    const statusColor = getStatusColor(status);
+    const statusLabel = getStatusLabel(status);
+
+    // 프로젝트 태그 (담당자만)
+    const projectTag = amIAssignedToProject(s, currentUser.key) ? '<span class="search-project-tag">🎯</span>' : '';
+
+    return `<div class="search-item" data-idx="${idx}">
+      <div class="search-name-row">
+        <span class="search-status-dot" style="background:${statusColor};"></span>
+        <span class="search-name">${escapeHtml(s.name || '(이름 없음)')}</span>
+        ${projectTag}
+        <span class="search-status-label" style="background:${statusColor};">${statusLabel}</span>
+      </div>
+    </div>`;
   }).join('');
   resultsEl.querySelectorAll(".search-item").forEach(function(el) {
     el.onclick = function() {
@@ -951,6 +969,17 @@ function renderSearchResults(list) {
     };
   });
   resultsEl.style.display = "block";
+}
+
+function getStatusLabel(status) {
+  return {
+    visit: "단순방문",
+    lead: "유효리드",
+    success: "계약성사",
+    fail: "최종불발",
+    contract: "기계약",
+    none: "미방문"
+  }[status] || "미방문";
 }
 
 function formatDate(ts) {
