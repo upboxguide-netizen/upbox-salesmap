@@ -49,14 +49,16 @@
   #map { flex: 1; position: relative; }
   #statusBar { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(54, 56, 89, 0.9); color: white; padding: 8px 12px; border-radius: 8px; font-size: 12px; text-align: center; z-index: 50; }
 
-  #fabGroup { position: absolute; bottom: 60px; right: 14px; z-index: 60; display: flex; flex-direction: column; gap: 8px; }
-  .fab { width: 48px; height: 48px; border-radius: 50%; border: none; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  .fab.primary { background: #F2AC57; color: white; font-weight: 700; }
+  #addBtn { position: absolute; bottom: 60px; right: 14px; z-index: 60; height: 44px; padding: 0 18px; border: none; border-radius: 22px; background: #F2AC57; color: white; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 4px; font-family: inherit; }
+  #addBtn:hover { background: #e89a3e; }
+  #locBtn { position: absolute; bottom: 116px; right: 14px; z-index: 60; width: 48px; height: 48px; border-radius: 50%; border: none; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-  #storePanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 85vh; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); transform: translateY(100%); transition: transform 0.3s; z-index: 200; overflow-y: auto; overscroll-behavior: contain; }
+  #storePanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 67vh; height: 67vh; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); transform: translateY(100%); transition: transform 0.3s; z-index: 200; overflow-y: auto; overscroll-behavior: contain; }
   #storePanel.open { transform: translateY(0); }
-  #panelDrag { width: 40px; height: 4px; background: #CCC; border-radius: 2px; margin: 8px auto; }
-  #panelContent { padding: 4px 18px 20px; }
+  #panelDrag { width: 40px; height: 4px; background: #CCC; border-radius: 2px; margin: 8px auto; cursor: pointer; }
+  #panelClose { position: sticky; top: 0; float: right; margin-top: -4px; margin-right: 4px; width: 32px; height: 32px; border: none; background: rgba(255,255,255,0.95); border-radius: 50%; font-size: 16px; color: #666; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  #panelClose:hover { background: #F5F5F5; color: #333; }
+  #panelContent { padding: 4px 18px 20px; clear: both; }
   #panelContent h2 { font-size: 18px; color: #222; margin-bottom: 8px; line-height: 1.3; }
   #panelContent .addr { font-size: 13px; color: #666; margin-bottom: 10px; }
   #panelContent .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -130,10 +132,8 @@
 
   <div id="map">
     <div id="statusBar">업장 로딩 중...</div>
-    <div id="fabGroup">
-      <button class="fab" id="locBtn" title="현재 위치">📍</button>
-      <button class="fab primary" id="addBtn" title="업장 추가">＋</button>
-    </div>
+    <button id="locBtn" title="현재 위치">📍</button>
+    <button id="addBtn" title="업장 추가">＋ 업장추가</button>
   </div>
 </div>
 
@@ -150,6 +150,7 @@
 
 <div id="storePanel">
   <div id="panelDrag"></div>
+  <button id="panelClose" type="button" aria-label="닫기">✕</button>
   <div id="panelContent"></div>
 </div>
 
@@ -304,6 +305,67 @@ function initMap() {
       document.getElementById("searchResults").style.display = "none";
     }
   });
+
+  // X 버튼 닫기
+  document.getElementById("panelClose").onclick = function(e) {
+    e.stopPropagation();
+    closePanel();
+  };
+
+  // 패널 하단 스크롤 시 닫기 (스크롤이 끝까지 내려가면)
+  const panel = document.getElementById("storePanel");
+  let scrollEndTimer;
+  panel.addEventListener("scroll", function() {
+    clearTimeout(scrollEndTimer);
+    scrollEndTimer = setTimeout(function() {
+      // 스크롤이 끝까지 내려갔는지 확인
+      const scrolledToBottom = panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 5;
+      if (scrolledToBottom && panel.scrollHeight > panel.clientHeight + 50) {
+        // 추가 스크롤 시도 감지: 스크롤이 끝에 도달했고 컨텐츠가 충분히 클 때
+        // 사용자가 더 끌어내리려는 의도로 간주
+        // (실제 구현은 touchmove 으로 더 정확하게)
+      }
+    }, 100);
+  });
+
+  // 패널 아래로 스와이프 시 닫기 (모바일/터치)
+  let touchStartY = 0;
+  let touchStartScroll = 0;
+  let isDragging = false;
+
+  panel.addEventListener("touchstart", function(e) {
+    touchStartY = e.touches[0].clientY;
+    touchStartScroll = panel.scrollTop;
+    isDragging = true;
+  }, { passive: true });
+
+  panel.addEventListener("touchmove", function(e) {
+    if (!isDragging) return;
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - touchStartY;
+    const atTop = panel.scrollTop <= 0;
+    const atBottom = panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1;
+
+    // 위에서 아래로 당기는데 스크롤이 맨 위에 있을 때
+    if (deltaY > 80 && atTop && touchStartScroll <= 0) {
+      closePanel();
+      isDragging = false;
+    }
+    // 맨 아래에서 더 아래로 당길 때
+    if (deltaY < -80 && atBottom) {
+      closePanel();
+      isDragging = false;
+    }
+  }, { passive: true });
+
+  panel.addEventListener("touchend", function() {
+    isDragging = false;
+  }, { passive: true });
+
+  // 드래그 핸들 클릭 시 닫기
+  document.getElementById("panelDrag").onclick = function() {
+    closePanel();
+  };
 }
 
 function getFilterColor(f) {
@@ -445,7 +507,7 @@ function createMarker(store, status) {
   const position = new kakao.maps.LatLng(store.lat, store.lng);
   const color = getStatusColor(status);
   const icon = getGradeIcon(store.grade);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 0 C7 0 0 7 0 16 C0 25 16 40 16 40 C16 40 32 25 32 16 C32 7 25 0 16 0 Z" fill="${color}"/><circle cx="16" cy="16" r="10" fill="white"/><text x="16" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="${color}">${icon}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 0 C7 0 0 7 0 16 C0 25 16 40 16 40 C16 40 32 25 32 16 C32 7 25 0 16 0 Z" fill="${color}"/><text x="16" y="21" text-anchor="middle" font-size="13" font-weight="bold" fill="white">${icon}</text></svg>`;
   const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
   const imageSize = new kakao.maps.Size(32, 40);
   const imageOption = { offset: new kakao.maps.Point(16, 40) };
@@ -638,28 +700,29 @@ function buildVisitForm() {
     <div class="visit-form">
       <h3>방문기록</h3>
       <div class="visit-dates" id="visitDates"></div>
-      <label>현재 업체명</label>
-      <input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (*처리기 사용 등 수거통 없을 경우 '수거통없음'으로 기재)">
+      <label><span style="color:#E53935;">*</span> 현재 업체명</label>
+      <input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (없을경우 사유기재. 지자체, 처리기 등)">
       <label>담당자 연락처</label>
-      <input id="v_contact" type="text" placeholder="예: 010-0000-0000">
+      <input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">
       <label>월 예상배출량 (L)</label>
-      <input id="v_amount" type="text" placeholder="예: 500">
+      <input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500">
       <label>현재 단가 (원/L)</label>
-      <input id="v_price" type="text" placeholder="예: 180">
+      <input id="v_price" type="text" inputmode="numeric" placeholder="예: 180">
       <label>제안 단가 (원/L)</label>
-      <input id="v_suggestedPrice" type="text" placeholder="예: 170">
+      <input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170">
       <label>현재 주 수거횟수</label>
-      <input id="v_freq" type="text" placeholder="예: 3">
-      <label>현재 통 갯수</label>
-      <input id="v_bins" type="text" placeholder="예: 4 (*처리기 사용 등 수거통 없을 경우 '수거통없음'으로 기재)">
-      <label>비닐 사용여부</label>
+      <input id="v_freq" type="text" inputmode="numeric" placeholder="예: 3">
+      <label><span style="color:#E53935;">*</span> 현재 통 갯수</label>
+      <input id="v_bins" type="text" inputmode="numeric" placeholder="예: 4 (없을경우 0 기재)">
+      <label><span style="color:#E53935;">*</span> 비닐 사용여부</label>
       <select id="v_vinyl">
         <option value="">선택</option>
         <option value="사용">사용</option>
         <option value="미사용">미사용</option>
-        <option value="수거통없음">수거통없음</option>
+        <option value="지자체">지자체</option>
+        <option value="처리기">처리기</option>
       </select>
-      <label>5톤 차량 진입 가능여부</label>
+      <label><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>
       <select id="v_truck">
         <option value="">선택</option>
         <option value="가능">가능</option>
@@ -710,6 +773,43 @@ function bindVisitForm(store) {
   const btn = document.getElementById("saveVisitBtn");
   if (!btn) return;
   btn.onclick = function() { saveVisit(store); };
+
+  // 담당자 연락처 자동 포맷팅: 010-XXXX-XXXX, 011-XXX-XXXX, 그 외는 그대로
+  const contactInput = document.getElementById("v_contact");
+  if (contactInput) {
+    contactInput.addEventListener("input", function(e) {
+      let v = e.target.value.replace(/[^0-9]/g, "");  // 숫자만 남김
+      if (!v) { e.target.value = ""; return; }
+
+      // 010, 011, 016, 017, 018, 019 (휴대폰): - 자동 추가
+      const mobilePrefix = ["010", "011", "016", "017", "018", "019"];
+      const prefix3 = v.substring(0, 3);
+
+      if (mobilePrefix.indexOf(prefix3) !== -1) {
+        // 010-XXXX-XXXX (010,011은 010-XXX-XXXX/010-XXXX-XXXX 둘 다 처리)
+        if (v.length <= 3) {
+          e.target.value = v;
+        } else if (v.length <= 7) {
+          e.target.value = v.substring(0, 3) + "-" + v.substring(3);
+        } else {
+          // 010은 010-XXXX-XXXX (총 11자리), 011은 011-XXX-XXXX (총 10자리)
+          if (prefix3 === "010") {
+            e.target.value = v.substring(0, 3) + "-" + v.substring(3, 7) + "-" + v.substring(7, 11);
+          } else {
+            // 011, 016~019: 11자리이면 4자리, 10자리이면 3자리
+            if (v.length === 11) {
+              e.target.value = v.substring(0, 3) + "-" + v.substring(3, 7) + "-" + v.substring(7, 11);
+            } else {
+              e.target.value = v.substring(0, 3) + "-" + v.substring(3, 6) + "-" + v.substring(6, 10);
+            }
+          }
+        }
+      } else {
+        // 070, 02, 031 등: - 없이 그대로
+        e.target.value = v;
+      }
+    });
+  }
 }
 
 async function saveVisit(store) {
@@ -799,7 +899,7 @@ async function searchStores(q) {
 function renderSearchResults(list) {
   const resultsEl = document.getElementById("searchResults");
   if (list.length === 0) {
-    resultsEl.innerHTML = '<div class="search-item" style="color:#999;">검색 결과가 없습니다</div>';
+    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px; line-height:1.5;">검색 결과가 없습니다.<br><span style="color:#F2AC57; font-weight:600;">＋ 업장추가</span> 버튼으로 추가해주세요.</div>';
     resultsEl.style.display = "block";
     return;
   }
