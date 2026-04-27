@@ -112,6 +112,24 @@
   .visit-form input:focus, .visit-form select:focus, .visit-form textarea:focus { outline: none; border-color: #F2AC57; }
   .save-btn { width: 100%; padding: 12px; margin-top: 14px; border: none; border-radius: 8px; background: #F2AC57; color: white; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* 공지 팝업 */
+  #noticeModal { position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; }
+  #noticeModal.show { display: flex; }
+  .notice-box { background: white; border-radius: 16px; padding: 28px 24px; max-width: 360px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: noticePopup 0.3s ease-out; }
+  @keyframes noticePopup {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .notice-icon { font-size: 36px; text-align: center; margin-bottom: 12px; }
+  .notice-title { font-size: 17px; font-weight: 700; color: #363859; text-align: center; margin-bottom: 12px; }
+  .notice-message { font-size: 14px; color: #555; text-align: center; line-height: 1.5; margin-bottom: 20px; padding: 12px; background: #FAFAFA; border-radius: 8px; }
+  .notice-buttons { display: flex; gap: 8px; }
+  .notice-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .notice-btn-primary { background: #F2AC57; color: white; }
+  .notice-btn-primary:hover { background: #e89a3e; }
+  .notice-btn-secondary { background: #EEE; color: #555; }
+  .notice-btn-secondary:hover { background: #DDD; }
 </style>
 </head>
 <body>
@@ -120,7 +138,6 @@
   <div id="header">
     <div class="title">업박스 영업 지도</div>
     <div class="user" id="userInfo"></div>
-    <button class="header-btn" id="refreshBtn" title="캐시 비우고 최신 데이터 새로고침">🔄</button>
     <button class="header-btn" id="logoutBtn">로그아웃</button>
   </div>
 
@@ -163,6 +180,18 @@
   <div id="panelContent"></div>
 </div>
 
+<div id="noticeModal">
+  <div class="notice-box">
+    <div class="notice-icon" id="noticeIcon">📢</div>
+    <div class="notice-title" id="noticeTitle">새로운 안내사항이 있습니다</div>
+    <div class="notice-message" id="noticeMessage"></div>
+    <div class="notice-buttons">
+      <button class="notice-btn notice-btn-secondary" id="noticeBtnLater">나중에</button>
+      <button class="notice-btn notice-btn-primary" id="noticeBtnApply">지금 갱신</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const firebaseConfig = {
   databaseURL: "https://salespartners-map-67daf-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -170,19 +199,18 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ⭐ v45.4 SSO 설정
 const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec';
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 
 /* ════════════════════════════════════════════
- * v45.5 NEW: localStorage 캐시 (Firebase 트래픽 절감)
- * - stores_light 전체 (~40MB) → 24시간 캐싱 (프로젝트 배정 정보)
- * - visits 전체 (다른 파트너 접촉일자) → 6시간 캐싱
- * 효과: 30명 영업자 기준 다운로드 80% 절감
+ * v45.6 캐싱 시스템 (Firebase 트래픽 절감)
+ * - stores_light 전체 (프로젝트 배정) → 30일 캐싱
+ * - visits 전체 (다른 파트너 접촉일자) → 24시간 캐싱
+ * 영업자 자율 새로고침 X (공지 팝업으로만 갱신)
  * ════════════════════════════════════════════ */
 const CACHE = {
-  OTHER_VISITS: { key: 'cache_other_visits', ttlMs: 24 * 60 * 60 * 1000 },        // 24시간 (1일)
-  MY_PROJECTS:  { key: 'cache_my_projects',  ttlMs: 30 * 24 * 60 * 60 * 1000 }    // 30일 (영구에 가까움)
+  OTHER_VISITS: { key: 'cache_other_visits', ttlMs: 24 * 60 * 60 * 1000 },        // 24시간
+  MY_PROJECTS:  { key: 'cache_my_projects',  ttlMs: 30 * 24 * 60 * 60 * 1000 }    // 30일
 };
 
 function getCache(cacheConfig) {
@@ -228,6 +256,92 @@ function clearAllCaches() {
   console.log('[캐시] 전체 캐시 삭제 완료');
 }
 
+/* ════════════════════════════════════════════
+ * 공지 시스템 (캐시 갱신 안내 팝업)
+ * ════════════════════════════════════════════ */
+const NOTICE_TYPES = {
+  projectAssignments: {
+    icon: '🎯',
+    title: '프로젝트 배정 변경',
+    cacheKeysToClear: ['cache_my_projects']
+  },
+  contractStores: {
+    icon: '⭐',
+    title: '기계약 업장 변경',
+    cacheKeysToClear: []  // bounds 쿼리로 자동 갱신되므로 캐시 클리어 불필요
+  }
+};
+
+const NOTICE_SEEN_PREFIX = 'notice_seen_';
+
+async function checkNotices() {
+  try {
+    const snap = await db.ref('notices').once('value');
+    const notices = snap.val() || {};
+
+    const queue = [];
+    for (const type in notices) {
+      const notice = notices[type];
+      if (!notice || !notice.version) continue;
+
+      const seenKey = NOTICE_SEEN_PREFIX + type;
+      const seenVersion = localStorage.getItem(seenKey);
+
+      if (seenVersion !== notice.version) {
+        queue.push({ type: type, notice: notice });
+      }
+    }
+
+    if (queue.length > 0) {
+      console.log('[공지] 미확인 공지 ' + queue.length + '개 발견');
+      showNoticesSequentially(queue);
+    } else {
+      console.log('[공지] 새 공지 없음');
+    }
+  } catch(e) {
+    console.warn('공지 확인 실패:', e);
+  }
+}
+
+function showNoticesSequentially(queue) {
+  if (queue.length === 0) return;
+  const item = queue.shift();
+  showNoticeModal(item.type, item.notice, function() {
+    showNoticesSequentially(queue);
+  });
+}
+
+function showNoticeModal(type, notice, onClose) {
+  const meta = NOTICE_TYPES[type] || { icon: '📢', title: '안내', cacheKeysToClear: [] };
+  const modal = document.getElementById('noticeModal');
+
+  document.getElementById('noticeIcon').textContent = meta.icon;
+  document.getElementById('noticeTitle').textContent = meta.title;
+  document.getElementById('noticeMessage').textContent = notice.message;
+
+  modal.classList.add('show');
+
+  const btnApply = document.getElementById('noticeBtnApply');
+  const btnLater = document.getElementById('noticeBtnLater');
+
+  btnApply.onclick = function() {
+    if (meta.cacheKeysToClear && meta.cacheKeysToClear.length > 0) {
+      meta.cacheKeysToClear.forEach(function(k) {
+        localStorage.removeItem(k);
+        console.log('[공지] 캐시 갱신: ' + k);
+      });
+    }
+    localStorage.setItem(NOTICE_SEEN_PREFIX + type, notice.version);
+    modal.classList.remove('show');
+    location.reload();
+  };
+
+  btnLater.onclick = function() {
+    modal.classList.remove('show');
+    if (onClose) setTimeout(onClose, 200);
+  };
+}
+
 let map, currentUser = null;
 let markers = [];
 let allStoresInView = [];
@@ -248,12 +362,6 @@ let myProjectStores = [];
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
 document.getElementById("logoutBtn").onclick = logout;
-document.getElementById("refreshBtn").onclick = function() {
-  if (confirm('캐시를 비우고 최신 데이터로 새로고침합니다.\n계속할까요?')) {
-    clearAllCaches();
-    location.reload();
-  }
-};
 
 async function tryLogin() {
   const name = document.getElementById("loginName").value.trim();
@@ -280,6 +388,10 @@ async function tryLogin() {
 function logout() {
   localStorage.removeItem("upboxPartner");
   clearAllCaches();
+  // 공지 확인 기록도 삭제 (다음 로그인 시 다시 확인하도록)
+  Object.keys(localStorage).forEach(function(k) {
+    if (k.indexOf(NOTICE_SEEN_PREFIX) === 0) localStorage.removeItem(k);
+  });
   location.reload();
 }
 
@@ -302,16 +414,11 @@ async function startApp() {
   await loadMyVisits();
   await checkMyProjectAssignment();
   initMap();
+  // 지도 로딩 후 비동기로 공지 확인
+  checkNotices();
 }
 
-/**
- * v45.5: 프로젝트 배정 정보 캐싱 (24시간)
- *
- * 캐시 적중 시: stores_light 전체(~40MB) 다운로드 0
- * 캐시 미스 시: 기존과 동일하게 Firebase에서 받음
- */
 async function checkMyProjectAssignment() {
-  // 1. 캐시 확인
   const cached = getCache(CACHE.MY_PROJECTS);
   if (cached) {
     hasMyProjects = cached.hasMyProjects;
@@ -332,7 +439,6 @@ async function checkMyProjectAssignment() {
     return;
   }
 
-  // 2. 캐시 미스 → Firebase에서 로드
   try {
     const snap = await db.ref("stores_light").once("value");
     const all = snap.val() || {};
@@ -363,16 +469,13 @@ async function checkMyProjectAssignment() {
 
     console.log('[프로젝트 배정 확인]', {
       파트너명: currentUser.name,
-      파트너코드_code: myCode,
-      파트너키_key: myKey,
+      파트너코드: myCode,
       배정된업장수: foundCount,
-      배정된프로젝트목록: Array.from(allProjectNames),
-      첫번째매칭샘플: firstMatch
+      배정된프로젝트목록: Array.from(allProjectNames)
     });
 
     hasMyProjects = (foundCount > 0);
 
-    // 3. 캐시 저장 (좌표 + flag만 → 매우 작음)
     setCache(CACHE.MY_PROJECTS, {
       hasMyProjects: hasMyProjects,
       myProjectStores: myProjectStores
@@ -387,13 +490,11 @@ async function checkMyProjectAssignment() {
           console.log('[✅ 프로젝트 필터 칩 노출 완료]');
         } else if (retries > 0) {
           setTimeout(function() { showChip(retries - 1); }, 200);
-        } else {
-          console.warn('[⚠️ 프로젝트 칩 DOM을 찾을 수 없음]');
         }
       };
       showChip(5);
     } else {
-      console.log('[프로젝트 배정 없음] 칩 노출 안 함');
+      console.log('[프로젝트 배정 없음]');
     }
   } catch(e) {
     console.warn("프로젝트 배정 확인 실패:", e);
@@ -424,15 +525,7 @@ function moveToMyProjectStores() {
   }, 100);
 }
 
-/**
- * v45.5: 타파트너 접촉일자 캐싱 (6시간)
- *
- * 캐시 적중 시: visits 전체 다운로드 0
- * 노출 정보: storeKey → 마지막 접촉 timestamp만
- *           (다른 파트너의 이름/연락처/메모 등은 노출되지 않음)
- */
 async function loadOtherPartnerContacts() {
-  // 1. 캐시 확인
   const cached = getCache(CACHE.OTHER_VISITS);
   if (cached) {
     otherPartnerLastContactMap = cached;
@@ -440,7 +533,6 @@ async function loadOtherPartnerContacts() {
     return;
   }
 
-  // 2. 캐시 미스 → Firebase에서 로드
   try {
     const snap = await db.ref("visits").once("value");
     const all = snap.val() || {};
@@ -457,7 +549,6 @@ async function loadOtherPartnerContacts() {
         }
       }
     }
-    // 3. 캐시 저장 (timestamp 맵만 → 작음)
     setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
     console.log('[캐시 저장] 타파트너 접촉일자 (' + Object.keys(otherPartnerLastContactMap).length + '개, 24시간 유효)');
   } catch(e) {
