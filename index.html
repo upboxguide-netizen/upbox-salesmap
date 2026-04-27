@@ -377,7 +377,7 @@ async function checkMyProjectAssignment() {
       hasMyProjects: hasMyProjects,
       myProjectStores: myProjectStores
     });
-    console.log('[캐시 저장] 프로젝트 배정 (' + myProjectStores.length + '개 업장, 24시간 유효)');
+    console.log('[캐시 저장] 프로젝트 배정 (' + myProjectStores.length + '개 업장, 30일 유효)');
 
     if (hasMyProjects) {
       const showChip = function(retries) {
@@ -459,7 +459,7 @@ async function loadOtherPartnerContacts() {
     }
     // 3. 캐시 저장 (timestamp 맵만 → 작음)
     setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
-    console.log('[캐시 저장] 타파트너 접촉일자 (' + Object.keys(otherPartnerLastContactMap).length + '개, 6시간 유효)');
+    console.log('[캐시 저장] 타파트너 접촉일자 (' + Object.keys(otherPartnerLastContactMap).length + '개, 24시간 유효)');
   } catch(e) {
     console.warn("타파트너 접촉일 로드 실패:", e);
   }
