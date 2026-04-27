@@ -181,8 +181,8 @@ const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
  * 효과: 30명 영업자 기준 다운로드 80% 절감
  * ════════════════════════════════════════════ */
 const CACHE = {
-  OTHER_VISITS: { key: 'cache_other_visits', ttlMs: 6 * 60 * 60 * 1000 },   // 6시간
-  MY_PROJECTS:  { key: 'cache_my_projects',  ttlMs: 24 * 60 * 60 * 1000 }   // 24시간
+  OTHER_VISITS: { key: 'cache_other_visits', ttlMs: 24 * 60 * 60 * 1000 },        // 24시간 (1일)
+  MY_PROJECTS:  { key: 'cache_my_projects',  ttlMs: 30 * 24 * 60 * 60 * 1000 }    // 30일 (영구에 가까움)
 };
 
 function getCache(cacheConfig) {
