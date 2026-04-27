@@ -388,10 +388,8 @@ async function tryLogin() {
 function logout() {
   localStorage.removeItem("upboxPartner");
   clearAllCaches();
-  // 공지 확인 기록도 삭제 (다음 로그인 시 다시 확인하도록)
-  Object.keys(localStorage).forEach(function(k) {
-    if (k.indexOf(NOTICE_SEEN_PREFIX) === 0) localStorage.removeItem(k);
-  });
+  // 공지 확인 기록(notice_seen_*)은 유지
+  // → 같은 사용자가 재로그인 시 이미 본 공지는 다시 안 뜸
   location.reload();
 }
 
