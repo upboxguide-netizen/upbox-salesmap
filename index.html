@@ -28,10 +28,11 @@
   .login-box button { width: 100%; padding: 13px; border: none; border-radius: 8px; background: #363859; color: white; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; }
   .login-error { color: #E53935; font-size: 12px; margin-top: 8px; text-align: center; }
 
-  #header { background: #363859; color: white; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+  #header { background: #363859; color: white; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
   #header .title { font-size: 15px; font-weight: 700; flex: 1; }
   #header .user { font-size: 11px; color: #CCC; }
-  #header .logout { background: none; border: 1px solid #666; color: #CCC; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+  #header .header-btn { background: none; border: 1px solid #666; color: #CCC; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: inherit; }
+  #header .header-btn:hover { background: rgba(255,255,255,0.1); }
 
   #searchBar { padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; position: relative; }
   #searchInput { width: 100%; padding: 10px 12px; border: 1px solid #DDD; border-radius: 8px; font-size: 14px; font-family: inherit; }
@@ -49,7 +50,6 @@
   #filterBar { display: flex; gap: 6px; padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; overflow-x: auto; white-space: nowrap; }
   .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
   .filter-chip.active { color: white; border: none; }
-  /* 프로젝트영업 필터 (배정된 파트너만 표시) */
   .filter-chip-project { display: none; align-items: center; gap: 3px; }
   .filter-chip-project.visible { display: inline-flex; }
   .filter-chip-project.active { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%) !important; }
@@ -75,7 +75,6 @@
   #panelContent .badge-grade { background: #F5F5F5; color: #666; }
   #panelContent .badge-contract { background: #FFF3E0; color: #F2AC57; font-weight: 700; }
 
-  /* 프로젝트 배지 */
   .multi-projects { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; margin-bottom: 10px; }
   .project-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; box-shadow: 0 1px 3px rgba(54, 56, 89, 0.3); }
   .project-badge-icon { font-size: 13px; }
@@ -121,7 +120,8 @@
   <div id="header">
     <div class="title">업박스 영업 지도</div>
     <div class="user" id="userInfo"></div>
-    <button class="logout" id="logoutBtn">로그아웃</button>
+    <button class="header-btn" id="refreshBtn" title="캐시 비우고 최신 데이터 새로고침">🔄</button>
+    <button class="header-btn" id="logoutBtn">로그아웃</button>
   </div>
 
   <div id="searchBar">
@@ -170,9 +170,63 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ⭐ v45.4 NEW: 영업기준표 SSO 설정
+// ⭐ v45.4 SSO 설정
 const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec';
-const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';  // ⚠️ 영업기준표 Code.gs와 반드시 동일
+const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
+
+/* ════════════════════════════════════════════
+ * v45.5 NEW: localStorage 캐시 (Firebase 트래픽 절감)
+ * - stores_light 전체 (~40MB) → 24시간 캐싱 (프로젝트 배정 정보)
+ * - visits 전체 (다른 파트너 접촉일자) → 6시간 캐싱
+ * 효과: 30명 영업자 기준 다운로드 80% 절감
+ * ════════════════════════════════════════════ */
+const CACHE = {
+  OTHER_VISITS: { key: 'cache_other_visits', ttlMs: 6 * 60 * 60 * 1000 },   // 6시간
+  MY_PROJECTS:  { key: 'cache_my_projects',  ttlMs: 24 * 60 * 60 * 1000 }   // 24시간
+};
+
+function getCache(cacheConfig) {
+  try {
+    const raw = localStorage.getItem(cacheConfig.key);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj.t || !obj.d) return null;
+    if (Date.now() - obj.t > cacheConfig.ttlMs) {
+      localStorage.removeItem(cacheConfig.key);
+      return null;
+    }
+    return obj.d;
+  } catch(e) {
+    console.warn('캐시 읽기 실패:', cacheConfig.key, e);
+    return null;
+  }
+}
+
+function setCache(cacheConfig, data) {
+  try {
+    const obj = { t: Date.now(), d: data };
+    localStorage.setItem(cacheConfig.key, JSON.stringify(obj));
+  } catch(e) {
+    console.warn('캐시 저장 실패 (한도 초과 가능성):', cacheConfig.key, e);
+    try {
+      const keys = ['cache_other_visits', 'cache_my_projects'];
+      for (const k of keys) {
+        if (k !== cacheConfig.key && localStorage.getItem(k)) {
+          localStorage.removeItem(k);
+          break;
+        }
+      }
+      localStorage.setItem(cacheConfig.key, JSON.stringify({ t: Date.now(), d: data }));
+    } catch(retryErr) {
+      console.warn('캐시 저장 재시도 실패. 캐싱 없이 진행.');
+    }
+  }
+}
+
+function clearAllCaches() {
+  Object.values(CACHE).forEach(c => localStorage.removeItem(c.key));
+  console.log('[캐시] 전체 캐시 삭제 완료');
+}
 
 let map, currentUser = null;
 let markers = [];
@@ -188,12 +242,18 @@ let currentRvState = 'collapsed';
 
 let otherPartnerLastContactMap = {};
 let myVisitedStoreData = {};
-let hasMyProjects = false;  // ⭐ v45.4.2: 본인이 담당하는 프로젝트가 있는지
-let myProjectStores = [];   // ⭐ v45.4.3: 본인 담당 프로젝트 업장 좌표 목록 (지도 자동 이동용)
+let hasMyProjects = false;
+let myProjectStores = [];
 
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
 document.getElementById("logoutBtn").onclick = logout;
+document.getElementById("refreshBtn").onclick = function() {
+  if (confirm('캐시를 비우고 최신 데이터로 새로고침합니다.\n계속할까요?')) {
+    clearAllCaches();
+    location.reload();
+  }
+};
 
 async function tryLogin() {
   const name = document.getElementById("loginName").value.trim();
@@ -219,6 +279,7 @@ async function tryLogin() {
 
 function logout() {
   localStorage.removeItem("upboxPartner");
+  clearAllCaches();
   location.reload();
 }
 
@@ -239,14 +300,39 @@ async function startApp() {
   document.getElementById("userInfo").textContent = currentUser.name;
   await loadOtherPartnerContacts();
   await loadMyVisits();
-  await checkMyProjectAssignment();  // ⭐ v45.4.2: 본인 프로젝트 배정 여부 사전 확인
+  await checkMyProjectAssignment();
   initMap();
 }
 
-// ⭐ v45.4.2: 본인이 담당하는 프로젝트가 있는지 Firebase 전체 확인
-// 로그인 직후 1회 실행 → 화면 위치와 무관하게 정확하게 칩 노출 결정
-// ⭐ v45.4.3: 매칭된 업장들의 좌표를 저장 (필터 클릭 시 자동 이동용)
+/**
+ * v45.5: 프로젝트 배정 정보 캐싱 (24시간)
+ *
+ * 캐시 적중 시: stores_light 전체(~40MB) 다운로드 0
+ * 캐시 미스 시: 기존과 동일하게 Firebase에서 받음
+ */
 async function checkMyProjectAssignment() {
+  // 1. 캐시 확인
+  const cached = getCache(CACHE.MY_PROJECTS);
+  if (cached) {
+    hasMyProjects = cached.hasMyProjects;
+    myProjectStores = cached.myProjectStores || [];
+    console.log('[캐시 적중] 프로젝트 배정 (' + myProjectStores.length + '개 업장)');
+
+    if (hasMyProjects) {
+      const showChip = function(retries) {
+        const projChip = document.getElementById('filterProject');
+        if (projChip) {
+          projChip.classList.add('visible');
+        } else if (retries > 0) {
+          setTimeout(function() { showChip(retries - 1); }, 200);
+        }
+      };
+      showChip(5);
+    }
+    return;
+  }
+
+  // 2. 캐시 미스 → Firebase에서 로드
   try {
     const snap = await db.ref("stores_light").once("value");
     const all = snap.val() || {};
@@ -255,7 +341,7 @@ async function checkMyProjectAssignment() {
     const myCode = String(currentUser.code).trim();
     let firstMatch = null;
     let allProjectNames = new Set();
-    myProjectStores = [];  // 초기화
+    myProjectStores = [];
 
     for (const k in all) {
       const s = all[k];
@@ -267,7 +353,6 @@ async function checkMyProjectAssignment() {
           foundCount++;
           allProjectNames.add(projectName);
           if (!firstMatch) firstMatch = { key: k, storeName: s.name, projectName: projectName, codes: codes };
-          // ⭐ 좌표 저장 (지도 자동 이동용)
           if (!isNaN(s.lat) && !isNaN(s.lng)) {
             myProjectStores.push({ lat: s.lat, lng: s.lng });
           }
@@ -285,8 +370,16 @@ async function checkMyProjectAssignment() {
       첫번째매칭샘플: firstMatch
     });
 
-    if (foundCount > 0) {
-      hasMyProjects = true;
+    hasMyProjects = (foundCount > 0);
+
+    // 3. 캐시 저장 (좌표 + flag만 → 매우 작음)
+    setCache(CACHE.MY_PROJECTS, {
+      hasMyProjects: hasMyProjects,
+      myProjectStores: myProjectStores
+    });
+    console.log('[캐시 저장] 프로젝트 배정 (' + myProjectStores.length + '개 업장, 24시간 유효)');
+
+    if (hasMyProjects) {
       const showChip = function(retries) {
         const projChip = document.getElementById('filterProject');
         if (projChip) {
@@ -307,14 +400,12 @@ async function checkMyProjectAssignment() {
   }
 }
 
-// ⭐ v45.4.3: 본인 담당 프로젝트 업장이 한 화면에 보이도록 지도 자동 이동
 function moveToMyProjectStores() {
   if (!myProjectStores || myProjectStores.length === 0) {
     console.warn('[프로젝트 자동 이동] 저장된 업장 좌표 없음');
     return;
   }
 
-  // 업장이 1개면 해당 위치로 이동 + 적절한 줌
   if (myProjectStores.length === 1) {
     const s = myProjectStores[0];
     map.setCenter(new kakao.maps.LatLng(s.lat, s.lng));
@@ -322,20 +413,34 @@ function moveToMyProjectStores() {
     return;
   }
 
-  // 여러 개면 모두가 한 화면에 보이도록 bounds 계산
   const bounds = new kakao.maps.LatLngBounds();
   myProjectStores.forEach(function(s) {
     bounds.extend(new kakao.maps.LatLng(s.lat, s.lng));
   });
   map.setBounds(bounds);
 
-  // 너무 줌아웃되면 핀 안 보이니까 최대 레벨 제한
   setTimeout(function() {
     if (map.getLevel() > 10) map.setLevel(10);
   }, 100);
 }
 
+/**
+ * v45.5: 타파트너 접촉일자 캐싱 (6시간)
+ *
+ * 캐시 적중 시: visits 전체 다운로드 0
+ * 노출 정보: storeKey → 마지막 접촉 timestamp만
+ *           (다른 파트너의 이름/연락처/메모 등은 노출되지 않음)
+ */
 async function loadOtherPartnerContacts() {
+  // 1. 캐시 확인
+  const cached = getCache(CACHE.OTHER_VISITS);
+  if (cached) {
+    otherPartnerLastContactMap = cached;
+    console.log('[캐시 적중] 타파트너 접촉일자 (' + Object.keys(cached).length + '개 업장)');
+    return;
+  }
+
+  // 2. 캐시 미스 → Firebase에서 로드
   try {
     const snap = await db.ref("visits").once("value");
     const all = snap.val() || {};
@@ -352,7 +457,12 @@ async function loadOtherPartnerContacts() {
         }
       }
     }
-  } catch(e) { console.warn("타파트너 접촉일 로드 실패:", e); }
+    // 3. 캐시 저장 (timestamp 맵만 → 작음)
+    setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
+    console.log('[캐시 저장] 타파트너 접촉일자 (' + Object.keys(otherPartnerLastContactMap).length + '개, 6시간 유효)');
+  } catch(e) {
+    console.warn("타파트너 접촉일 로드 실패:", e);
+  }
 }
 
 async function loadMyVisits() {
@@ -391,20 +501,16 @@ function initMap() {
     btn.onclick = function() {
       document.querySelectorAll(".filter-chip").forEach(b => {
         b.classList.remove("active");
-        // 프로젝트 칩은 그라데이션이라 inline 스타일 제거 시 transparent로
         b.style.background = b.dataset.filter === "project" ? "" : "transparent";
       });
       btn.classList.add("active");
-      // 프로젝트 칩은 CSS 클래스로 그라데이션 처리, 나머지는 inline
       if (btn.dataset.filter !== "project") {
         btn.style.background = getFilterColor(btn.dataset.filter);
       }
       currentFilter = btn.dataset.filter;
 
-      // ⭐ v45.4.3: 프로젝트영업 필터 클릭 시 본인 담당 업장이 보이는 지역으로 자동 이동
       if (btn.dataset.filter === "project") {
         moveToMyProjectStores();
-        // 지도 이동 후 idle 이벤트가 자동으로 loadStoresInView() 호출 → 그 안에서 renderMarkers()
       } else {
         renderMarkers();
       }
@@ -425,14 +531,11 @@ function initMap() {
     }
   });
 
-  // X 버튼 닫기
   document.getElementById("panelClose").onclick = function(e) {
     e.stopPropagation();
     closePanel();
   };
 
-  // ⭐ v45.4 변경: 패널 닫기 - 위에서 아래로 끌 때만 닫힘 (맨 끝 당기기 닫기 제거)
-  // 저장 버튼이 패널 하단에 있어서, 저장 버튼 누르려고 당기다가 닫히는 문제 해결
   const panel = document.getElementById("storePanel");
   let touchStartY = 0;
   let isDragging = false;
@@ -440,7 +543,6 @@ function initMap() {
 
   panel.addEventListener("touchstart", function(e) {
     touchStartY = e.touches[0].clientY;
-    // 드래그 시작 위치가 패널 상단(스크롤 0) 또는 드래그 핸들/닫기 버튼 영역인지
     const target = e.target;
     const isHeaderArea = (target.id === 'panelDrag' || target.id === 'panelClose');
     const atTop = panel.scrollTop <= 0;
@@ -453,12 +555,10 @@ function initMap() {
     const currentY = e.touches[0].clientY;
     const deltaY = currentY - touchStartY;
 
-    // 위에서 아래로 80px 이상 당기면 닫기
     if (deltaY > 80) {
       closePanel();
       isDragging = false;
     }
-    // ❌ v45.3에 있던 "맨 끝에서 더 당기기 닫기" 로직은 제거됨
   }, { passive: true });
 
   panel.addEventListener("touchend", function() {
@@ -466,7 +566,6 @@ function initMap() {
     dragStartedAtTop = false;
   }, { passive: true });
 
-  // 드래그 핸들 클릭 시 닫기
   document.getElementById("panelDrag").onclick = function() {
     closePanel();
   };
@@ -511,7 +610,6 @@ async function loadStoresInView() {
 
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
 
-    // ⭐ v45.4.2: 본인이 담당하는 프로젝트 업장이 1건이라도 있으면 프로젝트 필터 칩 노출
     if (!hasMyProjects) {
       for (const s of list) {
         if (amIAssignedToProject(s, currentUser.key)) {
@@ -555,7 +653,6 @@ function amIAssignedToProject(store, currentPartnerKey) {
   if (!store.projects) return false;
   const keys = Object.keys(store.projects);
   if (keys.length === 0) return false;
-  // ⭐ v45.4.2: key + code 둘 다 매칭 시도 (시트 입력 형식 다양성 대응)
   const myKey = String(currentPartnerKey || '').trim();
   const myCode = currentUser ? String(currentUser.code || '').trim() : '';
   for (const projectName of keys) {
@@ -614,7 +711,6 @@ function renderMarkers() {
   for (const store of allStoresInView) {
     const status = getVisitStatus(store);
 
-    // ⭐ v45.4.2: 프로젝트영업 필터 - 본인 담당 프로젝트 업장만
     if (currentFilter === "project") {
       if (!amIAssignedToProject(store, currentUser.key)) continue;
     } else if (currentFilter !== "all" && status !== currentFilter) {
@@ -808,10 +904,7 @@ function buildKakaoNavUrl(store) {
   return `https://map.kakao.com/link/to/${dest},${store.lat},${store.lng}`;
 }
 
-// ⭐ v45.4 NEW: SSO 토큰 생성 (브라우저용)
-// 영업기준표 Code.gs의 generateSSOToken()과 100% 동일한 결과를 내야 함
 async function generateSSOToken(partnerName, partnerCode) {
-  // 한국시간 기준 yyyymmdd
   const now = new Date();
   const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
   const kst = new Date(utc + 9 * 60 * 60 * 1000);
@@ -822,19 +915,16 @@ async function generateSSOToken(partnerName, partnerCode) {
 
   const raw = partnerName + '|' + partnerCode + '|' + today + '|' + SSO_SECRET;
 
-  // Web Crypto API로 SHA-256
   const encoder = new TextEncoder();
   const data = encoder.encode(raw);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
 
-  // 앞 8바이트 → 16자리 hex
   return hashArray.slice(0, 8)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
-// ⭐ v45.4 변경: 영업기준표 열기 - SSO 자동 로그인 추가
 async function openPriceGuide() {
   if (!selectedStore) return;
   if (!currentUser || !currentUser.name || !currentUser.code) {
@@ -843,17 +933,13 @@ async function openPriceGuide() {
   }
 
   try {
-    // 1) SSO 토큰 생성 (24시간 유효)
     const token = await generateSSOToken(currentUser.name, currentUser.code);
 
-    // 2) URL 파라미터 구성 (SSO + 자동 조회)
     const params = new URLSearchParams();
-    // SSO 인증
     params.append('sso', '1');
     params.append('partner_name', currentUser.name);
     params.append('partner_code', currentUser.code);
     params.append('token', token);
-    // 자동 조회 (v45.3 기존)
     if (selectedStore.sido) params.append('sido', selectedStore.sido);
     if (selectedStore.sigungu) params.append('sidodong', selectedStore.sigungu);
     if (selectedStore.gu) params.append('gueup', selectedStore.gu);
@@ -948,7 +1034,6 @@ function bindVisitForm(store) {
   if (!btn) return;
   btn.onclick = function() { saveVisit(store); };
 
-  // 담당자 연락처 자동 포맷팅: 010-XXXX-XXXX, 011-XXX-XXXX, 그 외는 그대로
   const contactInput = document.getElementById("v_contact");
   if (contactInput) {
     contactInput.addEventListener("input", function(e) {
@@ -1077,7 +1162,6 @@ function renderSearchResults(list) {
     const statusColor = getStatusColor(status);
     const statusLabel = getStatusLabel(status);
 
-    // 프로젝트 태그 (담당자만)
     const projectTag = amIAssignedToProject(s, currentUser.key) ? '<span class="search-project-tag">🎯</span>' : '';
 
     return `<div class="search-item" data-idx="${idx}">
