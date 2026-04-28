@@ -344,12 +344,19 @@ function showNoticeModal(type, notice, onClose) {
 
 let map, currentUser = null;
 let markers = [];
+let markerByKey = {};  // v45.8: storeKey → marker 매핑 (선택 강조용)
 let allStoresInView = [];
 let currentFilter = "all";
 let selectedStore = null;
 let searchTimer = null;
 let currentUserLocation = null;
 const CONTRACT_RADIUS_KM = 3;
+
+/* ════════════════════════════════════════════
+ * v45.8 신규: 현재 위치 마커 + 위치 추적
+ * ════════════════════════════════════════════ */
+let myLocationMarker = null;        // 현재 위치를 표시하는 카카오맵 Marker
+let geoWatchId = null;              // watchPosition ID (clearWatch용)
 
 let rvInstance = null;
 let currentRvState = 'collapsed';
@@ -386,6 +393,8 @@ async function tryLogin() {
 }
 
 function logout() {
+  // v45.8: 위치 추적 종료
+  stopLocationTracking();
   localStorage.removeItem("upboxPartner");
   clearAllCaches();
   // 공지 확인 기록(notice_seen_*)은 유지
@@ -571,6 +580,8 @@ function initMap() {
   const options = { center: new kakao.maps.LatLng(37.5665, 126.9780), level: 4 };
   map = new kakao.maps.Map(container, options);
 
+  // v45.8: 위치 추적 시작 (지도 중심 이동은 별도)
+  startLocationTracking();
   moveToMyLocation();
 
   let moveDebounce;
@@ -579,7 +590,10 @@ function initMap() {
     moveDebounce = setTimeout(loadStoresInView, 400);
   });
 
-  kakao.maps.event.addListener(map, "click", function() { closePanel(); });
+  // v45.8: 지도 빈 영역 클릭 시 패널 닫기 + 선택 해제
+  kakao.maps.event.addListener(map, "click", function() {
+    closePanel(true);  // clearSelection = true
+  });
 
   document.getElementById("locBtn").onclick = moveToMyLocation;
   document.getElementById("addBtn").onclick = function() {
@@ -620,9 +634,10 @@ function initMap() {
     }
   });
 
+  // v45.8: 패널 X 버튼 클릭 시 → 패널만 닫고 선택 강조는 유지
   document.getElementById("panelClose").onclick = function(e) {
     e.stopPropagation();
-    closePanel();
+    closePanel(false);  // clearSelection = false
   };
 
   const panel = document.getElementById("storePanel");
@@ -645,7 +660,7 @@ function initMap() {
     const deltaY = currentY - touchStartY;
 
     if (deltaY > 80) {
-      closePanel();
+      closePanel(false);  // 드래그로 닫을 때도 선택 강조 유지
       isDragging = false;
     }
   }, { passive: true });
@@ -655,8 +670,9 @@ function initMap() {
     dragStartedAtTop = false;
   }, { passive: true });
 
+  // v45.8: 드래그 핸들 클릭 시 → 패널만 닫고 선택 강조는 유지
   document.getElementById("panelDrag").onclick = function() {
-    closePanel();
+    closePanel(false);
   };
 }
 
@@ -664,15 +680,101 @@ function getFilterColor(f) {
   return { all:"#363859", visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935", contract:"#F2AC57" }[f] || "#363859";
 }
 
+/* ════════════════════════════════════════════
+ * v45.8 신규: 현재 위치 추적 (watchPosition)
+ *
+ * - GPS 좌표 변경 시마다 마커 위치 업데이트
+ * - 지도 중심은 자동으로 따라가지 않음 (📍 버튼 눌러야 이동)
+ * - Firebase 트래픽 영향 없음 (브라우저 GPS API만 사용)
+ * - 백그라운드 시 브라우저가 자동 일시정지
+ * ════════════════════════════════════════════ */
+function startLocationTracking() {
+  if (!navigator.geolocation) {
+    console.warn('[위치 추적] geolocation 미지원 브라우저');
+    return;
+  }
+  if (geoWatchId !== null) return;  // 이미 추적 중
+
+  geoWatchId = navigator.geolocation.watchPosition(
+    function(pos) {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      currentUserLocation = { lat: lat, lng: lng };
+      updateMyLocationMarker(lat, lng);
+    },
+    function(err) {
+      console.warn('[위치 추적 실패]', err.message);
+      // 위치 권한 거부 등 → 조용히 실패 (점만 안 보임)
+    },
+    {
+      enableHighAccuracy: true,    // GPS 우선 (영업 현장 정확도 중요)
+      maximumAge: 5000,            // 5초 이내 캐시된 좌표는 재사용
+      timeout: 15000               // 15초 안에 좌표 못 받으면 에러
+    }
+  );
+  console.log('[위치 추적] 시작 (watchPosition)');
+}
+
+function stopLocationTracking() {
+  if (geoWatchId !== null) {
+    navigator.geolocation.clearWatch(geoWatchId);
+    geoWatchId = null;
+    console.log('[위치 추적] 종료');
+  }
+  if (myLocationMarker) {
+    myLocationMarker.setMap(null);
+    myLocationMarker = null;
+  }
+}
+
+function updateMyLocationMarker(lat, lng) {
+  const position = new kakao.maps.LatLng(lat, lng);
+
+  if (myLocationMarker) {
+    myLocationMarker.setPosition(position);
+    return;
+  }
+
+  // 파란 점 SVG (구글맵/카카오맵 스타일)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+    <circle cx="11" cy="11" r="10" fill="#FFFFFF"/>
+    <circle cx="11" cy="11" r="7" fill="#1A73E8"/>
+  </svg>`;
+  const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+  const imageSize = new kakao.maps.Size(22, 22);
+  const imageOption = { offset: new kakao.maps.Point(11, 11) };  // 중심점이 좌표에 위치
+  const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
+
+  myLocationMarker = new kakao.maps.Marker({
+    position: position,
+    image: markerImage,
+    zIndex: 9999  // 항상 업장 핀 위에 표시
+  });
+  myLocationMarker.setMap(map);
+}
+
 function moveToMyLocation() {
+  // 이미 추적 중이고 좌표를 알고 있으면 → 즉시 이동
+  if (currentUserLocation) {
+    map.setCenter(new kakao.maps.LatLng(currentUserLocation.lat, currentUserLocation.lng));
+    map.setLevel(4);
+    loadStoresInView();
+    return;
+  }
+
+  // 좌표 없으면 즉시 1회성 조회
   if (!navigator.geolocation) { alert("위치 기능을 지원하지 않는 브라우저입니다."); return; }
   navigator.geolocation.getCurrentPosition(function(pos) {
     const lat = pos.coords.latitude, lng = pos.coords.longitude;
     currentUserLocation = { lat: lat, lng: lng };
+    updateMyLocationMarker(lat, lng);
     map.setCenter(new kakao.maps.LatLng(lat, lng));
     map.setLevel(4);
     loadStoresInView();
-  }, function(err) { console.warn("위치 조회 실패:", err); });
+  }, function(err) {
+    console.warn("위치 조회 실패:", err);
+    alert("현재 위치를 가져올 수 없습니다.\n위치 권한을 허용해주세요.");
+  });
 }
 
 async function loadStoresInView() {
@@ -795,8 +897,10 @@ function nameSimilarity(a, b) {
 function renderMarkers() {
   markers.forEach(m => m.setMap(null));
   markers = [];
+  markerByKey = {};  // v45.8: 매핑 초기화
 
   let shown = 0;
+  let selectedRendered = false;
   for (const store of allStoresInView) {
     const status = getVisitStatus(store);
 
@@ -806,24 +910,62 @@ function renderMarkers() {
       continue;
     }
 
-    const marker = createMarker(store, status);
+    // v45.8: 선택된 업장인지 체크
+    const isSelected = selectedStore && selectedStore._key === store._key;
+    if (isSelected) selectedRendered = true;
+
+    const marker = createMarker(store, status, isSelected);
     marker.setMap(map);
     markers.push(marker);
+    markerByKey[store._key] = marker;
     shown++;
   }
+
+  // v45.8: 선택된 업장이 현재 뷰/필터 밖에 있으면 단독으로 그려서 강조 유지
+  if (selectedStore && !selectedRendered) {
+    const status = getVisitStatus(selectedStore);
+    const marker = createMarker(selectedStore, status, true);
+    marker.setMap(map);
+    markers.push(marker);
+    markerByKey[selectedStore._key] = marker;
+  }
+
   document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
 }
 
-function createMarker(store, status) {
+/**
+ * v45.8 변경: isSelected 인자 추가
+ * - 선택된 핀: 36×46px (1.4배), 검정 외곽선 2.5px, zIndex 높음
+ * - 일반 핀: 26×33px, 흰색 외곽선 1.6px
+ */
+function createMarker(store, status, isSelected) {
   const position = new kakao.maps.LatLng(store.lat, store.lng);
   const color = getStatusColor(status);
   const icon = getGradeIcon(store.grade);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="33" viewBox="0 0 32 40"><path d="M16 0.8 C7.4 0.8 0.8 7.4 0.8 16 C0.8 24.6 16 39.2 16 39.2 C16 39.2 31.2 24.6 31.2 16 C31.2 7.4 24.6 0.8 16 0.8 Z" fill="${color}" stroke="white" stroke-width="1.6"/><text x="16" y="21" text-anchor="middle" font-size="13" font-weight="bold" fill="white">${icon}</text></svg>`;
+
+  let svg, w, h, anchorX, anchorY, zIdx;
+  if (isSelected) {
+    // 선택된 핀: 1.4배 확대 + 검정 외곽선
+    w = 36; h = 46;
+    anchorX = 18; anchorY = 46;
+    zIdx = 1000;
+    svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 32 40"><path d="M16 0.8 C7.4 0.8 0.8 7.4 0.8 16 C0.8 24.6 16 39.2 16 39.2 C16 39.2 31.2 24.6 31.2 16 C31.2 7.4 24.6 0.8 16 0.8 Z" fill="${color}" stroke="#1a1a1a" stroke-width="2.5"/><text x="16" y="21" text-anchor="middle" font-size="13" font-weight="bold" fill="white">${icon}</text></svg>`;
+  } else {
+    w = 26; h = 33;
+    anchorX = 13; anchorY = 33;
+    zIdx = 1;
+    svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 32 40"><path d="M16 0.8 C7.4 0.8 0.8 7.4 0.8 16 C0.8 24.6 16 39.2 16 39.2 C16 39.2 31.2 24.6 31.2 16 C31.2 7.4 24.6 0.8 16 0.8 Z" fill="${color}" stroke="white" stroke-width="1.6"/><text x="16" y="21" text-anchor="middle" font-size="13" font-weight="bold" fill="white">${icon}</text></svg>`;
+  }
+
   const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
-  const imageSize = new kakao.maps.Size(26, 33);
-  const imageOption = { offset: new kakao.maps.Point(13, 33) };
+  const imageSize = new kakao.maps.Size(w, h);
+  const imageOption = { offset: new kakao.maps.Point(anchorX, anchorY) };
   const markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imageOption);
-  const marker = new kakao.maps.Marker({ position: position, image: markerImage });
+  const marker = new kakao.maps.Marker({
+    position: position,
+    image: markerImage,
+    zIndex: zIdx
+  });
   kakao.maps.event.addListener(marker, "click", function() { openPanel(store); });
   return marker;
 }
@@ -864,6 +1006,13 @@ async function openPanel(store) {
   rvInstance = null;
   currentRvState = 'collapsed';
 
+  // v45.8: 선택 변경 → 마커 강조 갱신
+  const previousKey = selectedStore ? selectedStore._key : null;
+  selectedStore = store;
+  if (previousKey !== store._key) {
+    refreshMarkerSelection(previousKey, store._key);
+  }
+
   const panel = document.getElementById("storePanel");
   const content = document.getElementById("panelContent");
   content.innerHTML = '<h2 style="color:#999;">업장 정보 불러오는 중...</h2>';
@@ -874,7 +1023,7 @@ async function openPanel(store) {
     const detail = detailSnap.val();
     if (detail) store = Object.assign({}, detail, store);
   } catch(e) { console.warn("업장 상세 조회 실패:", e); }
-  selectedStore = store;
+  selectedStore = store;  // 상세 정보 합쳐진 객체로 갱신
 
   const isContract = isContractGrade(store.grade);
 
@@ -937,11 +1086,66 @@ async function openPanel(store) {
   }
 }
 
-function closePanel() {
+/**
+ * v45.8 신규: 선택 마커 갱신
+ * - 이전 선택 마커는 일반 스타일로 다시 그리기
+ * - 새 선택 마커는 강조 스타일로 다시 그리기
+ */
+function refreshMarkerSelection(previousKey, newKey) {
+  // 이전 선택 마커 일반화
+  if (previousKey && markerByKey[previousKey]) {
+    const prevMarker = markerByKey[previousKey];
+    prevMarker.setMap(null);
+    const prevStore = allStoresInView.find(s => s._key === previousKey);
+    if (prevStore) {
+      const status = getVisitStatus(prevStore);
+      const newMarker = createMarker(prevStore, status, false);
+      newMarker.setMap(map);
+      markerByKey[previousKey] = newMarker;
+      // markers 배열에서도 교체
+      const idx = markers.indexOf(prevMarker);
+      if (idx !== -1) markers[idx] = newMarker;
+    }
+  }
+
+  // 새 선택 마커 강조화
+  if (newKey && markerByKey[newKey]) {
+    const newSelMarker = markerByKey[newKey];
+    newSelMarker.setMap(null);
+    const newStore = allStoresInView.find(s => s._key === newKey) || selectedStore;
+    if (newStore) {
+      const status = getVisitStatus(newStore);
+      const newMarker = createMarker(newStore, status, true);
+      newMarker.setMap(map);
+      markerByKey[newKey] = newMarker;
+      const idx = markers.indexOf(newSelMarker);
+      if (idx !== -1) markers[idx] = newMarker;
+    }
+  } else if (newKey && selectedStore) {
+    // 현재 마커 배열에 없으면 새로 추가 (검색으로 진입한 경우 등)
+    const status = getVisitStatus(selectedStore);
+    const newMarker = createMarker(selectedStore, status, true);
+    newMarker.setMap(map);
+    markerByKey[newKey] = newMarker;
+    markers.push(newMarker);
+  }
+}
+
+/**
+ * v45.8 변경: clearSelection 인자
+ * - true: 패널 닫기 + 선택 강조 해제 (빈 지도 클릭 시)
+ * - false: 패널만 닫기, 강조 유지 (X 버튼, 드래그 닫기, 핸들 클릭)
+ */
+function closePanel(clearSelection) {
   document.getElementById("storePanel").classList.remove("open");
-  selectedStore = null;
   rvInstance = null;
   currentRvState = 'collapsed';
+
+  if (clearSelection && selectedStore) {
+    const previousKey = selectedStore._key;
+    selectedStore = null;
+    refreshMarkerSelection(previousKey, null);
+  }
 }
 
 function toggleRoadview() {
