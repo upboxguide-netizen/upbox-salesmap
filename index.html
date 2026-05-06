@@ -1105,7 +1105,7 @@ async function openPanel(store) {
   const memoHtml = store.memo ? '<div class="memo">📝 ' + escapeHtml(store.memo) + '</div>' : '';
 
   const priceGuideBtnHtml = isContract ? '' : `<button class="priceGuideBtn" onclick="openPriceGuide()">📊 영업기준표 확인</button>`;
-  const navBtnHtml = isContract ? '' : `<a class="navBtn" href="${buildKakaoNavUrl(store)}" target="_blank">🧭 카카오맵 길찾기</a>`;
+  const navBtnHtml = isContract ? '' : `<button class="navBtn" type="button" onclick="openKakaoNav(selectedStore)">🧭 카카오맵 길찾기</button>`;
   const visitFormHtml = isContract ? '' : buildVisitForm();
 
   content.innerHTML = `
@@ -1220,9 +1220,14 @@ function loadRoadviewForCurrentStore() {
 
 function buildKakaoNavUrl(store) {
   const dest = encodeURIComponent(store.name || '업장');
-  // 출발지를 지정하지 않으면 카카오맵 앱이 GPS로 자동 설정.
-  // from을 명시할 경우 모바일 앱에서 길찾기로 이어지지 않는 문제가 있어 제거함.
   return `https://map.kakao.com/link/to/${dest},${store.lat},${store.lng}`;
+}
+
+function openKakaoNav(store) {
+  const url = buildKakaoNavUrl(store);
+  // iOS에서 target="_blank"로 외부앱 deep link 호출 시 파라미터 손실 발생.
+  // 같은 창에서 location.href로 직접 이동하면 카카오맵 앱이 정상적으로 파라미터를 받음.
+  window.location.href = url;
 }
 
 async function generateSSOToken(partnerName, partnerCode) {
