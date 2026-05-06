@@ -1220,9 +1220,8 @@ function loadRoadviewForCurrentStore() {
 
 function buildKakaoNavUrl(store) {
   const dest = encodeURIComponent(store.name || '업장');
-  if (currentUserLocation) {
-    return `https://map.kakao.com/link/to/${dest},${store.lat},${store.lng}/from/현재위치,${currentUserLocation.lat},${currentUserLocation.lng}`;
-  }
+  // 출발지를 지정하지 않으면 카카오맵 앱이 GPS로 자동 설정.
+  // from을 명시할 경우 모바일 앱에서 길찾기로 이어지지 않는 문제가 있어 제거함.
   return `https://map.kakao.com/link/to/${dest},${store.lat},${store.lng}`;
 }
 
