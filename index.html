@@ -29,7 +29,8 @@
   .login-error { color: #E53935; font-size: 12px; margin-top: 8px; text-align: center; }
 
   #header { background: #363859; color: white; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
-  #header .title { font-size: 15px; font-weight: 700; flex: 1; }
+  #header .title { font-size: 15px; font-weight: 700; flex: 1; display: flex; align-items: center; gap: 6px; }
+  #header .admin-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #F2AC57; color: white; font-size: 10px; font-weight: 700; }
   #header .user { font-size: 11px; color: #CCC; }
   #header .header-btn { background: none; border: 1px solid #666; color: #CCC; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: inherit; }
   #header .header-btn:hover { background: rgba(255,255,255,0.1); }
@@ -54,17 +55,79 @@
   .filter-chip-project.visible { display: inline-flex; }
   .filter-chip-project.active { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%) !important; }
 
-  /* v45.9 신규: 필터 칩에 붙는 카운트 */
   .chip-count { margin-left: 3px; font-weight: 600; opacity: 0.9; }
   .chip-count:empty { display: none; }
 
+  /* v47.0: 관리자 전용 전체 통계 영역 */
+  #adminStatsBar {
+    display: none;
+    padding: 8px 10px;
+    background: linear-gradient(90deg, #363859 0%, #5c5e8a 100%);
+    color: white;
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: nowrap;
+    border-bottom: 1px solid #DDD;
+  }
+  #adminStatsBar.visible { display: flex; align-items: center; gap: 10px; }
+  .admin-stats-label {
+    font-weight: 700;
+    color: #F2AC57;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .admin-stats-version {
+    font-size: 10px;
+    color: #BBB;
+    flex-shrink: 0;
+  }
+  .admin-stat-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.15);
+    flex-shrink: 0;
+  }
+  .admin-stat-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+  .admin-stat-name { font-size: 11px; color: #EEE; }
+  .admin-stat-value { font-size: 12px; font-weight: 700; color: white; }
+
   #map { flex: 1; position: relative; }
   #statusBar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(54, 56, 89, 0.9); color: white; padding: 6px 14px; border-radius: 16px; font-size: 12px; text-align: center; z-index: 50; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
- 
+
   #addBtn { position: absolute; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; height: 44px; padding: 0 18px; border: none; border-radius: 22px; background: #F2AC57; color: white; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 4px; font-family: inherit; }
   #addBtn:hover { background: #e89a3e; }
   #locBtn { position: absolute; bottom: calc(126px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; width: 48px; height: 48px; border-radius: 50%; border: none; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-  
+
+  /* v47.0: 관리자 모드 토글 버튼 */
+  #adminViewBtn {
+    display: none;
+    position: absolute;
+    bottom: calc(182px + env(safe-area-inset-bottom, 0px));
+    right: 14px;
+    z-index: 60;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    font-size: 18px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+  #adminViewBtn.visible { display: flex; }
+  #adminViewBtn.active { background: #F2AC57; color: white; }
+
   #storePanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 67vh; height: 67vh; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); transform: translateY(100%); transition: transform 0.3s; z-index: 200; overflow-y: auto; overscroll-behavior: contain; }
   #storePanel.open { transform: translateY(0); }
   #panelDrag { width: 40px; height: 4px; background: #CCC; border-radius: 2px; margin: 8px auto; cursor: pointer; }
@@ -79,6 +142,18 @@
   #panelContent .badge-grade { background: #F5F5F5; color: #666; }
   #panelContent .badge-contract { background: #FFF3E0; color: #F2AC57; font-weight: 700; }
   #panelContent .badge-closed { background: #E0E0E0; color: #424242; font-weight: 600; }
+
+  /* v47.0: 관리자 전용 패널 정보 박스 */
+  .admin-info-box {
+    background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%);
+    color: white;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .admin-info-box .admin-info-label { color: #F2AC57; font-weight: 700; margin-right: 6px; }
 
   .multi-projects { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; margin-bottom: 10px; }
   .project-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; box-shadow: 0 1px 3px rgba(54, 56, 89, 0.3); }
@@ -141,7 +216,10 @@
 
 <div id="app">
   <div id="header">
-    <div class="title">업박스 영업 지도</div>
+    <div class="title">
+      <span>업박스 영업 지도</span>
+      <span class="admin-badge" id="adminBadge" style="display:none;">관리자</span>
+    </div>
     <div class="user" id="userInfo"></div>
     <button class="header-btn" id="logoutBtn">로그아웃</button>
   </div>
@@ -149,6 +227,37 @@
   <div id="searchBar">
     <input type="text" id="searchInput" placeholder="업장명으로 검색...">
     <div id="searchResults"></div>
+  </div>
+
+  <!-- v47.0: 관리자 전용 전체 통계 -->
+  <div id="adminStatsBar">
+    <span class="admin-stats-label">📊 전체</span>
+    <span class="admin-stat-item">
+      <span class="admin-stat-dot" style="background:#4d4678;"></span>
+      <span class="admin-stat-name">단순방문</span>
+      <span class="admin-stat-value" id="adminStat-visit">0</span>
+    </span>
+    <span class="admin-stat-item">
+      <span class="admin-stat-dot" style="background:#43A047;"></span>
+      <span class="admin-stat-name">유효리드</span>
+      <span class="admin-stat-value" id="adminStat-lead">0</span>
+    </span>
+    <span class="admin-stat-item">
+      <span class="admin-stat-dot" style="background:#F5B800;"></span>
+      <span class="admin-stat-name">계약성사</span>
+      <span class="admin-stat-value" id="adminStat-success">0</span>
+    </span>
+    <span class="admin-stat-item">
+      <span class="admin-stat-dot" style="background:#E53935;"></span>
+      <span class="admin-stat-name">최종불발</span>
+      <span class="admin-stat-value" id="adminStat-fail">0</span>
+    </span>
+    <span class="admin-stat-item">
+      <span class="admin-stat-dot" style="background:#616161;"></span>
+      <span class="admin-stat-name">폐업</span>
+      <span class="admin-stat-value" id="adminStat-closedByMe">0</span>
+    </span>
+    <span class="admin-stats-version" id="adminStatsVersion"></span>
   </div>
 
   <div id="filterBar">
@@ -164,6 +273,7 @@
   <div id="map">
     <div id="statusBar">업장 로딩 중...</div>
     <button id="locBtn" title="현재 위치">📍</button>
+    <button id="adminViewBtn" title="관리자 뷰 토글">👁️</button>
     <button id="addBtn" title="업장 추가">＋ 업장추가</button>
   </div>
 </div>
@@ -208,21 +318,37 @@ const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOp
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 
 /* ════════════════════════════════════════════
- * v46.0 변경사항 (2026-05-07)
- *   - 폐업 업장(closed=true) 기본 숨김
- *   - 단, 내 방문기록이 "유효리드(lead)" 상태이면 노출 (신규 업장 진입 가능성)
- *   - 방문기록 폼에 "폐업" 옵션 추가 (성사/실패와 별개의 closure 사유)
- *   - outcome="폐업" + lead 조건 미달 → "closedByMe" 상태 (짙은 회색 핀)
- *   - outcome="폐업"이지만 lead 필드 다 차있으면 → "lead" 우선 (초록 핀)
- *   - 기계약 중복 제거 거리: 5m → 30m
+ * v47.0 변경사항 (2026-05-07)
+ *   - 관리자 7명 전용 뷰 추가 (박성철0001 ~ 김시연0007)
+ *   - 관리자 모드 ON/OFF 토글 (👁️ 버튼)
+ *   - 전체 통계 바 (필터바 위, 그라데이션 배경)
+ *   - 관리자 모드에서 핀 색상 = visits_aggregate.lastStatus 기준
+ *   - 핀 옆 라벨로 lastPartnerName 표시 (줌 레벨 5+ 노출)
+ *   - 패널에 "최신 접촉" 정보 박스 표시
+ *   - visits_aggregate 캐시 (12시간 TTL)
+ *
+ * v46.0 (2026-05-07):
+ *   - 폐업 처리 + 30m 중복제거
  * ════════════════════════════════════════════ */
 
 /* ════════════════════════════════════════════
- * v45.9 캐싱 시스템 (Firebase 트래픽 절감)
+ * 관리자 코드 7명 (하드코딩)
+ * 향후 변경 시 권한관리 시트에 isAdmin 컬럼 추가하는 것을 검토
+ * ════════════════════════════════════════════ */
+const ADMIN_CODES = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'];
+const ADMIN_LABEL_MIN_LEVEL = 5;  // 줌 레벨 5 이하(=확대)에서만 라벨 노출
+
+function isAdmin(code) {
+  return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
+}
+
+/* ════════════════════════════════════════════
+ * 캐싱 시스템
  * ════════════════════════════════════════════ */
 const CACHE = {
-  OTHER_VISITS: { key: 'cache_other_visits_v2', ttlMs: 24 * 60 * 60 * 1000 },        // 24시간
-  MY_PROJECTS:  { key: 'cache_my_projects_v2',  ttlMs: 30 * 24 * 60 * 60 * 1000 }    // 30일
+  OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },        // 24시간
+  MY_PROJECTS:     { key: 'cache_my_projects_v2',      ttlMs: 30 * 24 * 60 * 60 * 1000 },   // 30일
+  ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v1',  ttlMs: 12 * 60 * 60 * 1000 }         // 12시간
 };
 
 function getCache(cacheConfig) {
@@ -247,9 +373,9 @@ function setCache(cacheConfig, data) {
     const obj = { t: Date.now(), d: data };
     localStorage.setItem(cacheConfig.key, JSON.stringify(obj));
   } catch(e) {
-    console.warn('캐시 저장 실패 (한도 초과 가능성):', cacheConfig.key, e);
+    console.warn('캐시 저장 실패:', cacheConfig.key, e);
     try {
-      const keys = ['cache_other_visits_v2', 'cache_my_projects_v2',
+      const keys = ['cache_other_visits_v2', 'cache_my_projects_v2', 'cache_admin_aggregate_v1',
                     'cache_other_visits', 'cache_my_projects'];
       for (const k of keys) {
         if (k !== cacheConfig.key && localStorage.getItem(k)) {
@@ -265,7 +391,7 @@ function setCache(cacheConfig, data) {
 }
 
 function clearAllCaches() {
-  const keys = ['cache_other_visits_v2', 'cache_my_projects_v2',
+  const keys = ['cache_other_visits_v2', 'cache_my_projects_v2', 'cache_admin_aggregate_v1',
                 'cache_other_visits', 'cache_my_projects'];
   keys.forEach(k => localStorage.removeItem(k));
   console.log('[캐시] 전체 캐시 삭제 완료');
@@ -280,7 +406,7 @@ function clearAllCaches() {
       removed++;
     }
   });
-  if (removed > 0) console.log('[v45.9 마이그레이션] 옛 캐시 ' + removed + '개 자동 삭제');
+  if (removed > 0) console.log('[마이그레이션] 옛 캐시 ' + removed + '개 자동 삭제');
 })();
 
 /* ════════════════════════════════════════════
@@ -372,13 +498,15 @@ function showNoticeModal(type, notice, onClose) {
 let map, currentUser = null;
 let markers = [];
 let markerByKey = {};
+let labelOverlays = [];          // v47.0: 관리자 라벨용
+let labelByKey = {};             // v47.0
 let allStoresInView = [];
 let currentFilter = "all";
 let selectedStore = null;
 let searchTimer = null;
 let currentUserLocation = null;
 const CONTRACT_RADIUS_KM = 3;
-const DUPLICATE_RADIUS_M = 30;  // v46.0: 기계약/DB 중복 판정 거리
+const DUPLICATE_RADIUS_M = 30;
 
 let myLocationMarker = null;
 let geoWatchId = null;
@@ -390,6 +518,11 @@ let otherPartnerLastContactMap = {};
 let myVisitedStoreData = {};
 let hasMyProjects = false;
 let myProjectStores = [];
+
+// v47.0 신규 상태
+let isAdminUser = false;
+let adminViewActive = false;     // 관리자 뷰 ON/OFF
+let visitsAggregate = null;      // { stores: {}, summary: {}, version, updatedAt }
 
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
@@ -439,12 +572,99 @@ function logout() {
 async function startApp() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("userInfo").textContent = currentUser.name;
+
+  // v47.0: 관리자 판정
+  isAdminUser = isAdmin(currentUser.code);
+  if (isAdminUser) {
+    document.getElementById('adminBadge').style.display = 'inline-block';
+    document.getElementById('adminViewBtn').classList.add('visible');
+    console.log('[관리자 모드] 활성화 가능 - ' + currentUser.name + ' (' + currentUser.code + ')');
+  }
+
   await loadOtherPartnerContacts();
   await loadMyVisits();
   updateChipCounts();
+
+  // v47.0: 관리자면 집계 데이터 미리 로드
+  if (isAdminUser) {
+    await loadVisitsAggregate();
+  }
+
   await checkMyProjectAssignment();
   initMap();
   checkNotices();
+}
+
+/* v47.0: 관리자 통계 집계 데이터 로드 */
+async function loadVisitsAggregate() {
+  const cached = getCache(CACHE.ADMIN_AGGREGATE);
+  if (cached) {
+    visitsAggregate = cached;
+    console.log('[캐시 적중] 관리자 집계 (' +
+                (cached.stores ? Object.keys(cached.stores).length : 0) + '개 업장, version=' + cached.version + ')');
+    return;
+  }
+
+  try {
+    const snap = await db.ref('visits_aggregate').once('value');
+    const data = snap.val();
+    if (!data) {
+      console.warn('[관리자 집계] visits_aggregate 노드 없음. 시연님이 시트에서 "관리자 통계 즉시 집계" 실행 필요.');
+      visitsAggregate = { stores: {}, summary: {}, version: '미집계', updatedAt: 0 };
+      return;
+    }
+    visitsAggregate = data;
+    setCache(CACHE.ADMIN_AGGREGATE, data);
+    const storeCount = data.stores ? Object.keys(data.stores).length : 0;
+    console.log('[관리자 집계] Firebase 로드 완료: ' + storeCount + '개 업장, version=' + data.version);
+  } catch(e) {
+    console.warn('관리자 집계 로드 실패:', e);
+    visitsAggregate = { stores: {}, summary: {}, version: '오류', updatedAt: 0 };
+  }
+}
+
+function updateAdminStatsBar() {
+  if (!isAdminUser || !adminViewActive || !visitsAggregate) {
+    document.getElementById('adminStatsBar').classList.remove('visible');
+    return;
+  }
+  const summary = visitsAggregate.summary || {};
+  document.getElementById('adminStat-visit').textContent = summary.visit || 0;
+  document.getElementById('adminStat-lead').textContent = summary.lead || 0;
+  document.getElementById('adminStat-success').textContent = summary.success || 0;
+  document.getElementById('adminStat-fail').textContent = summary.fail || 0;
+  document.getElementById('adminStat-closedByMe').textContent = summary.closedByMe || 0;
+
+  const v = visitsAggregate.version || '미집계';
+  const ts = visitsAggregate.updatedAt;
+  let versionText = 'v' + v;
+  if (ts) {
+    const d = new Date(ts);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    versionText = '집계: ' + mm + '/' + dd + ' ' + hh + ':' + mi;
+  }
+  document.getElementById('adminStatsVersion').textContent = versionText;
+
+  document.getElementById('adminStatsBar').classList.add('visible');
+}
+
+function toggleAdminView() {
+  adminViewActive = !adminViewActive;
+  const btn = document.getElementById('adminViewBtn');
+  if (adminViewActive) {
+    btn.classList.add('active');
+    btn.title = '관리자 뷰 끄기';
+    console.log('[관리자 뷰] ON');
+  } else {
+    btn.classList.remove('active');
+    btn.title = '관리자 뷰 켜기';
+    console.log('[관리자 뷰] OFF');
+  }
+  updateAdminStatsBar();
+  renderMarkers();
 }
 
 async function checkMyProjectAssignment() {
@@ -481,7 +701,6 @@ async function checkMyProjectAssignment() {
     for (const k in all) {
       const s = all[k];
       if (!s || !s.projects) continue;
-      // v46.0: 폐업 업장은 프로젝트 카운트에서 제외 (단, 유효리드인 경우는 살림)
       if (isClosed(s)) {
         s._key = k;
         const status = getVisitStatus(s);
@@ -603,14 +822,6 @@ async function loadMyVisits() {
   } catch(e) { console.warn("내 방문기록 로드 실패:", e); }
 }
 
-/* ════════════════════════════════════════════
- * v45.9 신규: 필터 칩 카운트 (v46.0 폐업 보완)
- * - 내 방문기록 전체 기준 (지도 뷰 무관)
- * - 단순방문/유효리드/계약성사/최종불발만 카운트
- * - "폐업"은 별도 칩 없으므로 카운트 제외
- *
- * ⚠️ 주의: 판정 로직은 getVisitStatus()와 완벽히 동일하게 유지할 것
- * ════════════════════════════════════════════ */
 function computeMyVisitCounts() {
   const counts = { visit: 0, lead: 0, success: 0, fail: 0 };
 
@@ -619,20 +830,16 @@ function computeMyVisitCounts() {
     const cur = rec.current || {};
     const outcome = String(cur.outcome || "").trim();
 
-    // 1순위: 명시적 outcome (성사/실패)
     if (outcome === "성사") { counts.success++; continue; }
     if (outcome === "실패") { counts.fail++; continue; }
 
-    // 2순위: lead 필드 전체 충족 → 유효리드 (outcome="폐업"이어도 우선)
     const leadFields = [cur.currentStoreName, cur.contact, cur.amount,
                         cur.suggestedPrice, cur.bins, cur.vinyl, cur.truck, cur.note];
     const allLeadFilled = leadFields.every(v => String(v || "").trim().length > 0);
     if (allLeadFilled) { counts.lead++; continue; }
 
-    // 3순위: outcome="폐업"은 어디에도 카운트 안 함 (별도 칩 없음)
     if (outcome === "폐업") continue;
 
-    // 4순위: 일부 필드만 채워졌으면 단순방문
     const anyField = leadFields.some(v => String(v || "").trim().length > 0)
                      || String(cur.price || "").trim().length > 0
                      || String(cur.freq || "").trim().length > 0;
@@ -663,7 +870,11 @@ function initMap() {
   let moveDebounce;
   kakao.maps.event.addListener(map, "idle", function() {
     clearTimeout(moveDebounce);
-    moveDebounce = setTimeout(loadStoresInView, 400);
+    moveDebounce = setTimeout(function() {
+      loadStoresInView();
+      // v47.0: 줌 변경 시 라벨 표시/숨김 갱신
+      updateAdminLabelVisibility();
+    }, 400);
   });
 
   kakao.maps.event.addListener(map, "click", function() {
@@ -674,6 +885,9 @@ function initMap() {
   document.getElementById("addBtn").onclick = function() {
     window.open("https://walla.my/v/GEQSSOWtFYHulcSoAKC3", "_blank");
   };
+
+  // v47.0: 관리자 뷰 토글
+  document.getElementById("adminViewBtn").onclick = toggleAdminView;
 
   document.querySelectorAll(".filter-chip").forEach(function(btn) {
     btn.onclick = function() {
@@ -863,9 +1077,6 @@ async function loadStoresInView() {
       list.push(s);
     }
 
-    // v46.0: 폐업 업장 필터링
-    // - 기본: closed=true 숨김
-    // - 예외: 내 방문기록이 "유효리드(lead)" 상태면 노출 (신규 업장 진입 가능성)
     list = list.filter(s => {
       if (!isClosed(s)) return true;
       const status = getVisitStatus(s);
@@ -932,10 +1143,6 @@ function isContractGrade(g) {
   return s === "기계약" || s === "업박스기계약업장" || s.indexOf("기계약") !== -1;
 }
 
-/* v46.0: 폐업 업장 판정
- * Firebase의 closed 필드가 true면 폐업으로 간주
- * (firebase_sync.gs v8에서 시트 T열 "폐업" 입력 시 closed: true로 동기화됨)
- */
 function isClosed(store) {
   return store && store.closed === true;
 }
@@ -948,10 +1155,6 @@ function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/* v46.0: 기계약/DB 중복 제거
- * - 거리 30m 이내 + 업장명 70% 이상 유사 → 일반 DB 숨김 (기계약만 노출)
- * - 기존 5m → 30m 확장 (인접 건물/필지 케이스 커버)
- */
 function removeContractDuplicates(list) {
   const contracts = list.filter(s => isContractGrade(s.grade));
   const others = list.filter(s => !isContractGrade(s.grade));
@@ -979,15 +1182,36 @@ function nameSimilarity(a, b) {
   return matches / longer.length;
 }
 
+/* v47.0: 관리자 모드용 효과적 상태 판정
+ * - 관리자 뷰 ON일 때: visits_aggregate.stores[storeKey].lastStatus 우선
+ * - 관리자 뷰 OFF / 일반 영업자: 기존 getVisitStatus (내 방문기록 기준)
+ */
+function getEffectiveStatus(store) {
+  if (isAdminUser && adminViewActive && visitsAggregate && visitsAggregate.stores) {
+    const aggData = visitsAggregate.stores[store._key];
+    if (aggData && aggData.lastStatus) {
+      // 기계약은 grade 기준이 우선 (집계엔 contract가 없음)
+      if (isContractGrade(store.grade)) return "contract";
+      return aggData.lastStatus;
+    }
+  }
+  return getVisitStatus(store);
+}
+
 function renderMarkers() {
   markers.forEach(m => m.setMap(null));
   markers = [];
   markerByKey = {};
 
+  // v47.0: 라벨도 함께 정리
+  labelOverlays.forEach(o => o.setMap(null));
+  labelOverlays = [];
+  labelByKey = {};
+
   let shown = 0;
   let selectedRendered = false;
   for (const store of allStoresInView) {
-    const status = getVisitStatus(store);
+    const status = getEffectiveStatus(store);
 
     if (currentFilter === "project") {
       if (!amIAssignedToProject(store, currentUser.key)) continue;
@@ -1003,17 +1227,66 @@ function renderMarkers() {
     markers.push(marker);
     markerByKey[store._key] = marker;
     shown++;
+
+    // v47.0: 관리자 뷰 활성 시 라벨 생성
+    if (isAdminUser && adminViewActive) {
+      const aggData = visitsAggregate && visitsAggregate.stores ? visitsAggregate.stores[store._key] : null;
+      if (aggData && aggData.lastPartnerName) {
+        const label = createAdminLabel(store, aggData.lastPartnerName);
+        labelOverlays.push(label);
+        labelByKey[store._key] = label;
+      }
+    }
   }
 
   if (selectedStore && !selectedRendered) {
-    const status = getVisitStatus(selectedStore);
+    const status = getEffectiveStatus(selectedStore);
     const marker = createMarker(selectedStore, status, true);
     marker.setMap(map);
     markers.push(marker);
     markerByKey[selectedStore._key] = marker;
   }
 
+  // v47.0: 줌 레벨 따라 라벨 표시/숨김
+  updateAdminLabelVisibility();
+
   document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
+}
+
+/* v47.0: 핀 옆 라벨 (CustomOverlay) */
+function createAdminLabel(store, partnerName) {
+  const html = '<div style="' +
+    'background:rgba(54,56,89,0.92);' +
+    'color:white;' +
+    'padding:2px 8px;' +
+    'border-radius:10px;' +
+    'font-size:11px;' +
+    'font-weight:600;' +
+    'white-space:nowrap;' +
+    'box-shadow:0 2px 4px rgba(0,0,0,0.2);' +
+    'transform:translate(14px, -36px);' +
+    'pointer-events:none;' +
+    '">' + escapeHtml(partnerName) + '</div>';
+
+  const overlay = new kakao.maps.CustomOverlay({
+    position: new kakao.maps.LatLng(store.lat, store.lng),
+    content: html,
+    yAnchor: 1,
+    xAnchor: 0,
+    zIndex: 10
+  });
+  overlay.setMap(map);
+  return overlay;
+}
+
+function updateAdminLabelVisibility() {
+  if (!isAdminUser || !adminViewActive) {
+    labelOverlays.forEach(o => o.setMap(null));
+    return;
+  }
+  const level = map.getLevel();
+  const shouldShow = level <= ADMIN_LABEL_MIN_LEVEL;
+  labelOverlays.forEach(o => o.setMap(shouldShow ? map : null));
 }
 
 function createMarker(store, status, isSelected) {
@@ -1047,9 +1320,6 @@ function createMarker(store, status, isSelected) {
   return marker;
 }
 
-/* v46.0: 상태별 핀 색상
- * - closedByMe: 짙은 회색 (#616161) - 내가 폐업 처리한 업장
- */
 function getStatusColor(status) {
   return {
     visit:"#4d4678",
@@ -1072,16 +1342,6 @@ function getGradeIcon(grade) {
   return "-";
 }
 
-/* v46.0: 방문 상태 판정
- * 우선순위:
- *   1. 기계약 → contract
- *   2. outcome="성사" → success
- *   3. outcome="실패" → fail
- *   4. lead 8개 필드 전체 충족 → lead (outcome="폐업"이어도 lead 우선)
- *   5. outcome="폐업" → closedByMe (회색)
- *   6. 일부 필드라도 입력 → visit
- *   7. 그 외 → none
- */
 function getVisitStatus(store) {
   if (isContractGrade(store.grade)) return "contract";
   const rec = myVisitedStoreData[store._key];
@@ -1095,10 +1355,8 @@ function getVisitStatus(store) {
   const leadFields = [cur.currentStoreName, cur.contact, cur.amount, cur.suggestedPrice, cur.bins, cur.vinyl, cur.truck, cur.note];
   const allLeadFilled = leadFields.every(v => String(v || "").trim().length > 0);
 
-  // 유효리드 우선: outcome="폐업"이어도 lead 필드 다 차있으면 유효리드로 노출
   if (allLeadFilled) return "lead";
 
-  // 폐업 처리: lead 조건 미달이면 회색 폐업 상태
   if (outcome === "폐업") return "closedByMe";
 
   const anyField = leadFields.some(v => String(v || "").trim().length > 0) || String(cur.price || "").trim().length > 0 || String(cur.freq || "").trim().length > 0;
@@ -1133,7 +1391,6 @@ async function openPanel(store) {
 
   const adminBadge = store.adminType ? `<span class="badge badge-admin">${escapeHtml(store.adminType)}</span>` : '';
   const gradeBadge = isContract ? `<span class="badge badge-contract">★ 기계약</span>` : `<span class="badge badge-grade">${escapeHtml(store.grade || '미지정')}</span>`;
-  // v46.0: 폐업 배지 추가 (지도용DB T열 기준)
   const closedBadge = closedFlag ? `<span class="badge badge-closed">⚠️ 폐업</span>` : '';
 
   let projectsBadgeHtml = '';
@@ -1142,6 +1399,21 @@ async function openPanel(store) {
     projectsBadgeHtml = '<div class="multi-projects">' + projectNames.map(name => {
       return `<div class="project-badge"><span class="project-badge-icon">🎯</span><span>${escapeHtml(name)}</span></div>`;
     }).join('') + '</div>';
+  }
+
+  // v47.0: 관리자 정보 박스 (관리자 본인이 관리자뷰 ON일 때만)
+  let adminInfoHtml = '';
+  if (isAdminUser && adminViewActive && visitsAggregate && visitsAggregate.stores) {
+    const aggData = visitsAggregate.stores[store._key];
+    if (aggData) {
+      const lastDate = aggData.lastUpdatedAt ? formatDate(aggData.lastUpdatedAt) : '-';
+      const statusLabel = getStatusLabel(aggData.lastStatus);
+      adminInfoHtml = `<div class="admin-info-box">
+        <div><span class="admin-info-label">최신 접촉:</span>${escapeHtml(aggData.lastPartnerName || '-')} (${lastDate})</div>
+        <div><span class="admin-info-label">최신 상태:</span>${statusLabel}</div>
+        <div><span class="admin-info-label">접촉 파트너 수:</span>${aggData.totalContacts || 1}명</div>
+      </div>`;
+    }
   }
 
   const otherTs = otherPartnerLastContactMap[store._key];
@@ -1176,6 +1448,7 @@ async function openPanel(store) {
     <div class="addr">${escapeHtml(store.address || '')}</div>
     <div class="badges">${adminBadge}${gradeBadge}${closedBadge}</div>
     ${projectsBadgeHtml}
+    ${adminInfoHtml}
     ${otherContactHtml}
     ${serviceHtml}
     ${roadviewHtml}
@@ -1198,7 +1471,7 @@ function refreshMarkerSelection(previousKey, newKey) {
     prevMarker.setMap(null);
     const prevStore = allStoresInView.find(s => s._key === previousKey);
     if (prevStore) {
-      const status = getVisitStatus(prevStore);
+      const status = getEffectiveStatus(prevStore);
       const newMarker = createMarker(prevStore, status, false);
       newMarker.setMap(map);
       markerByKey[previousKey] = newMarker;
@@ -1212,7 +1485,7 @@ function refreshMarkerSelection(previousKey, newKey) {
     newSelMarker.setMap(null);
     const newStore = allStoresInView.find(s => s._key === newKey) || selectedStore;
     if (newStore) {
-      const status = getVisitStatus(newStore);
+      const status = getEffectiveStatus(newStore);
       const newMarker = createMarker(newStore, status, true);
       newMarker.setMap(map);
       markerByKey[newKey] = newMarker;
@@ -1220,7 +1493,7 @@ function refreshMarkerSelection(previousKey, newKey) {
       if (idx !== -1) markers[idx] = newMarker;
     }
   } else if (newKey && selectedStore) {
-    const status = getVisitStatus(selectedStore);
+    const status = getEffectiveStatus(selectedStore);
     const newMarker = createMarker(selectedStore, status, true);
     newMarker.setMap(map);
     markerByKey[newKey] = newMarker;
@@ -1365,10 +1638,6 @@ async function openPriceGuide() {
   }
 }
 
-/* v46.0: 방문기록 폼
- * - 최종영업결과에 "폐업" 옵션 추가
- *   (지도용DB T열과 별개로 파트너가 현장 확인한 폐업 사실 기록용)
- */
 function buildVisitForm() {
   return `
     <div class="visit-form">
@@ -1571,7 +1840,6 @@ async function searchStores(q) {
       s._key = k;
       list.push(s);
     }
-    // v46.0: 폐업 업장 필터링 (지도와 동일 룰)
     list = list.filter(s => {
       if (!isClosed(s)) return true;
       const status = getVisitStatus(s);
@@ -1590,7 +1858,7 @@ function renderSearchResults(list) {
     return;
   }
   resultsEl.innerHTML = list.map(function(s, idx) {
-    const status = getVisitStatus(s);
+    const status = getEffectiveStatus(s);
     const statusColor = getStatusColor(status);
     const statusLabel = getStatusLabel(status);
 
@@ -1620,9 +1888,6 @@ function renderSearchResults(list) {
   resultsEl.style.display = "block";
 }
 
-/* v46.0: 상태 라벨
- * - closedByMe: "폐업"
- */
 function getStatusLabel(status) {
   return {
     visit: "단순방문",
