@@ -474,6 +474,7 @@ async function checkMyProjectAssignment() {
     for (const k in all) {
       const s = all[k];
       if (!s || !s.projects) continue;
+      if (isClosed(s)) continue;  // v46.0: 폐업 업장 제외
       const projectNames = Object.keys(s.projects);
       for (const projectName of projectNames) {
         const codes = String(s.projects[projectName]).split(';').map(x => x.trim());
@@ -851,6 +852,7 @@ async function loadStoresInView() {
       list.push(s);
     }
 
+    list = list.filter(s => !isClosed(s));  // v46.0: 폐업 업장 제외
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
 
     if (!hasMyProjects) {
@@ -909,6 +911,14 @@ function isContractGrade(g) {
   if (!g) return false;
   const s = String(g).trim();
   return s === "기계약" || s === "업박스기계약업장" || s.indexOf("기계약") !== -1;
+}
+
+/* v46.0: 폐업 업장 판정
+ * Firebase의 closed 필드가 true면 폐업으로 간주
+ * (firebase_sync.gs v8에서 시트 T열 "폐업" 입력 시 closed: true로 동기화됨)
+ */
+function isClosed(store) {
+  return store && store.closed === true;
 }
 
 function haversine(lat1, lng1, lat2, lng2) {
@@ -1515,6 +1525,7 @@ async function searchStores(q) {
       s._key = k;
       list.push(s);
     }
+    list = list.filter(s => !isClosed(s));  // v46.0: 폐업 업장 검색 결과 제외
     list = removeContractDuplicates(list);
     renderSearchResults(list);
   } catch(e) { console.error("검색 오류:", e); }
