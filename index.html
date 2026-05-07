@@ -78,6 +78,7 @@
   #panelContent .badge-admin { background: #ECEEF3; color: #363859; }
   #panelContent .badge-grade { background: #F5F5F5; color: #666; }
   #panelContent .badge-contract { background: #FFF3E0; color: #F2AC57; font-weight: 700; }
+  #panelContent .badge-closed { background: #E0E0E0; color: #424242; font-weight: 600; }
 
   .multi-projects { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; margin-bottom: 10px; }
   .project-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; box-shadow: 0 1px 3px rgba(54, 56, 89, 0.3); }
@@ -207,10 +208,17 @@ const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOp
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 
 /* ════════════════════════════════════════════
+ * v46.0 변경사항 (2026-05-07)
+ *   - 폐업 업장(closed=true) 기본 숨김
+ *   - 단, 내 방문기록이 "유효리드(lead)" 상태이면 노출 (신규 업장 진입 가능성)
+ *   - 방문기록 폼에 "폐업" 옵션 추가 (성사/실패와 별개의 closure 사유)
+ *   - outcome="폐업" + lead 조건 미달 → "closedByMe" 상태 (짙은 회색 핀)
+ *   - outcome="폐업"이지만 lead 필드 다 차있으면 → "lead" 우선 (초록 핀)
+ *   - 기계약 중복 제거 거리: 5m → 30m
+ * ════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════
  * v45.9 캐싱 시스템 (Firebase 트래픽 절감)
- *
- * 캐시 키에 v2 접미사 부여 → v45.8까지의 옛 캐시 자동 무효화
- * (stores_light가 v7로 갈아엎힌 뒤 옛 형식 캐시 잔존 방지)
  * ════════════════════════════════════════════ */
 const CACHE = {
   OTHER_VISITS: { key: 'cache_other_visits_v2', ttlMs: 24 * 60 * 60 * 1000 },        // 24시간
@@ -242,7 +250,7 @@ function setCache(cacheConfig, data) {
     console.warn('캐시 저장 실패 (한도 초과 가능성):', cacheConfig.key, e);
     try {
       const keys = ['cache_other_visits_v2', 'cache_my_projects_v2',
-                    'cache_other_visits', 'cache_my_projects'];  // 옛 키도 같이 청소
+                    'cache_other_visits', 'cache_my_projects'];
       for (const k of keys) {
         if (k !== cacheConfig.key && localStorage.getItem(k)) {
           localStorage.removeItem(k);
@@ -257,14 +265,12 @@ function setCache(cacheConfig, data) {
 }
 
 function clearAllCaches() {
-  // 새 키 + 옛 키 모두 청소
   const keys = ['cache_other_visits_v2', 'cache_my_projects_v2',
                 'cache_other_visits', 'cache_my_projects'];
   keys.forEach(k => localStorage.removeItem(k));
   console.log('[캐시] 전체 캐시 삭제 완료');
 }
 
-// 로그인 시점에 옛 캐시 자동 정리 (v45.8→v45.9 마이그레이션)
 (function migrateOldCaches() {
   const oldKeys = ['cache_other_visits', 'cache_my_projects'];
   let removed = 0;
@@ -278,7 +284,7 @@ function clearAllCaches() {
 })();
 
 /* ════════════════════════════════════════════
- * 공지 시스템 (캐시 갱신 안내 팝업)
+ * 공지 시스템
  * ════════════════════════════════════════════ */
 const NOTICE_TYPES = {
   projectAssignments: {
@@ -372,6 +378,7 @@ let selectedStore = null;
 let searchTimer = null;
 let currentUserLocation = null;
 const CONTRACT_RADIUS_KM = 3;
+const DUPLICATE_RADIUS_M = 30;  // v46.0: 기계약/DB 중복 판정 거리
 
 let myLocationMarker = null;
 let geoWatchId = null;
@@ -434,7 +441,7 @@ async function startApp() {
   document.getElementById("userInfo").textContent = currentUser.name;
   await loadOtherPartnerContacts();
   await loadMyVisits();
-  updateChipCounts();  // v45.9: 내 방문기록 로드 직후 카운트 1차 계산
+  updateChipCounts();
   await checkMyProjectAssignment();
   initMap();
   checkNotices();
@@ -474,7 +481,12 @@ async function checkMyProjectAssignment() {
     for (const k in all) {
       const s = all[k];
       if (!s || !s.projects) continue;
-      if (isClosed(s)) continue;  // v46.0: 폐업 업장 제외
+      // v46.0: 폐업 업장은 프로젝트 카운트에서 제외 (단, 유효리드인 경우는 살림)
+      if (isClosed(s)) {
+        s._key = k;
+        const status = getVisitStatus(s);
+        if (status !== "lead") continue;
+      }
       const projectNames = Object.keys(s.projects);
       for (const projectName of projectNames) {
         const codes = String(s.projects[projectName]).split(';').map(x => x.trim());
@@ -592,13 +604,12 @@ async function loadMyVisits() {
 }
 
 /* ════════════════════════════════════════════
- * v45.9 신규: 필터 칩 카운트
+ * v45.9 신규: 필터 칩 카운트 (v46.0 폐업 보완)
  * - 내 방문기록 전체 기준 (지도 뷰 무관)
  * - 단순방문/유효리드/계약성사/최종불발만 카운트
- * - 0건이면 빈 문자열 → CSS :empty로 자동 숨김
+ * - "폐업"은 별도 칩 없으므로 카운트 제외
  *
  * ⚠️ 주의: 판정 로직은 getVisitStatus()와 완벽히 동일하게 유지할 것
- *         (한쪽만 바꾸면 칩 카운트 ≠ 핀 색깔이 어긋남)
  * ════════════════════════════════════════════ */
 function computeMyVisitCounts() {
   const counts = { visit: 0, lead: 0, success: 0, fail: 0 };
@@ -608,22 +619,24 @@ function computeMyVisitCounts() {
     const cur = rec.current || {};
     const outcome = String(cur.outcome || "").trim();
 
-    // 1순위: 명시적 outcome
+    // 1순위: 명시적 outcome (성사/실패)
     if (outcome === "성사") { counts.success++; continue; }
     if (outcome === "실패") { counts.fail++; continue; }
 
-    // 2순위: 모든 lead 필수 필드 채워졌으면 유효리드
+    // 2순위: lead 필드 전체 충족 → 유효리드 (outcome="폐업"이어도 우선)
     const leadFields = [cur.currentStoreName, cur.contact, cur.amount,
                         cur.suggestedPrice, cur.bins, cur.vinyl, cur.truck, cur.note];
     const allLeadFilled = leadFields.every(v => String(v || "").trim().length > 0);
     if (allLeadFilled) { counts.lead++; continue; }
 
-    // 3순위: 일부 필드만 채워졌으면 단순방문
+    // 3순위: outcome="폐업"은 어디에도 카운트 안 함 (별도 칩 없음)
+    if (outcome === "폐업") continue;
+
+    // 4순위: 일부 필드만 채워졌으면 단순방문
     const anyField = leadFields.some(v => String(v || "").trim().length > 0)
                      || String(cur.price || "").trim().length > 0
                      || String(cur.freq || "").trim().length > 0;
     if (anyField) counts.visit++;
-    // 모두 비어있으면 어디에도 카운트 안 됨 (미방문)
   }
 
   return counts;
@@ -634,7 +647,6 @@ function updateChipCounts() {
   document.querySelectorAll('.chip-count').forEach(el => {
     const key = el.dataset.countFor;
     const n = counts[key] || 0;
-    // 0건이면 빈 문자열 → CSS :empty로 자동 숨김
     el.textContent = n > 0 ? '(' + n + ')' : '';
   });
   console.log('[칩 카운트]', counts);
@@ -675,7 +687,6 @@ function initMap() {
       }
       currentFilter = btn.dataset.filter;
 
-      // v45.9: 프로젝트영업만 줌/이동, 나머지는 현재 뷰 유지하며 핀만 필터링
       if (btn.dataset.filter === "project") {
         moveToMyProjectStores();
       } else {
@@ -852,7 +863,15 @@ async function loadStoresInView() {
       list.push(s);
     }
 
-    list = list.filter(s => !isClosed(s));  // v46.0: 폐업 업장 제외
+    // v46.0: 폐업 업장 필터링
+    // - 기본: closed=true 숨김
+    // - 예외: 내 방문기록이 "유효리드(lead)" 상태면 노출 (신규 업장 진입 가능성)
+    list = list.filter(s => {
+      if (!isClosed(s)) return true;
+      const status = getVisitStatus(s);
+      return status === "lead";
+    });
+
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
 
     if (!hasMyProjects) {
@@ -929,13 +948,17 @@ function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/* v46.0: 기계약/DB 중복 제거
+ * - 거리 30m 이내 + 업장명 70% 이상 유사 → 일반 DB 숨김 (기계약만 노출)
+ * - 기존 5m → 30m 확장 (인접 건물/필지 케이스 커버)
+ */
 function removeContractDuplicates(list) {
   const contracts = list.filter(s => isContractGrade(s.grade));
   const others = list.filter(s => !isContractGrade(s.grade));
   const filteredOthers = others.filter(function(o) {
     for (const c of contracts) {
       const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
-      if (distM <= 5 && nameSimilarity(o.name, c.name) >= 0.7) return false;
+      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.7) return false;
     }
     return true;
   });
@@ -1024,8 +1047,19 @@ function createMarker(store, status, isSelected) {
   return marker;
 }
 
+/* v46.0: 상태별 핀 색상
+ * - closedByMe: 짙은 회색 (#616161) - 내가 폐업 처리한 업장
+ */
 function getStatusColor(status) {
-  return { visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935", contract:"#F2AC57", none:"#9E9E9E" }[status] || "#9E9E9E";
+  return {
+    visit:"#4d4678",
+    lead:"#43A047",
+    success:"#F5B800",
+    fail:"#E53935",
+    contract:"#F2AC57",
+    closedByMe:"#616161",
+    none:"#9E9E9E"
+  }[status] || "#9E9E9E";
 }
 
 function getGradeIcon(grade) {
@@ -1038,18 +1072,34 @@ function getGradeIcon(grade) {
   return "-";
 }
 
+/* v46.0: 방문 상태 판정
+ * 우선순위:
+ *   1. 기계약 → contract
+ *   2. outcome="성사" → success
+ *   3. outcome="실패" → fail
+ *   4. lead 8개 필드 전체 충족 → lead (outcome="폐업"이어도 lead 우선)
+ *   5. outcome="폐업" → closedByMe (회색)
+ *   6. 일부 필드라도 입력 → visit
+ *   7. 그 외 → none
+ */
 function getVisitStatus(store) {
   if (isContractGrade(store.grade)) return "contract";
   const rec = myVisitedStoreData[store._key];
   if (!rec) return "none";
   const cur = rec.current || {};
   const outcome = String(cur.outcome || "").trim();
-  if (outcome === "실패") return "fail";
+
   if (outcome === "성사") return "success";
+  if (outcome === "실패") return "fail";
 
   const leadFields = [cur.currentStoreName, cur.contact, cur.amount, cur.suggestedPrice, cur.bins, cur.vinyl, cur.truck, cur.note];
   const allLeadFilled = leadFields.every(v => String(v || "").trim().length > 0);
+
+  // 유효리드 우선: outcome="폐업"이어도 lead 필드 다 차있으면 유효리드로 노출
   if (allLeadFilled) return "lead";
+
+  // 폐업 처리: lead 조건 미달이면 회색 폐업 상태
+  if (outcome === "폐업") return "closedByMe";
 
   const anyField = leadFields.some(v => String(v || "").trim().length > 0) || String(cur.price || "").trim().length > 0 || String(cur.freq || "").trim().length > 0;
   if (anyField) return "visit";
@@ -1079,9 +1129,12 @@ async function openPanel(store) {
   selectedStore = store;
 
   const isContract = isContractGrade(store.grade);
+  const closedFlag = isClosed(store);
 
   const adminBadge = store.adminType ? `<span class="badge badge-admin">${escapeHtml(store.adminType)}</span>` : '';
   const gradeBadge = isContract ? `<span class="badge badge-contract">★ 기계약</span>` : `<span class="badge badge-grade">${escapeHtml(store.grade || '미지정')}</span>`;
+  // v46.0: 폐업 배지 추가 (지도용DB T열 기준)
+  const closedBadge = closedFlag ? `<span class="badge badge-closed">⚠️ 폐업</span>` : '';
 
   let projectsBadgeHtml = '';
   if (amIAssignedToProject(store, currentUser.key)) {
@@ -1121,7 +1174,7 @@ async function openPanel(store) {
   content.innerHTML = `
     <h2>${escapeHtml(store.name || '(이름 없음)')}</h2>
     <div class="addr">${escapeHtml(store.address || '')}</div>
-    <div class="badges">${adminBadge}${gradeBadge}</div>
+    <div class="badges">${adminBadge}${gradeBadge}${closedBadge}</div>
     ${projectsBadgeHtml}
     ${otherContactHtml}
     ${serviceHtml}
@@ -1229,39 +1282,28 @@ function loadRoadviewForCurrentStore() {
 }
 
 function buildKakaoNavUrl(store) {
-  // PC/폴백용 웹 URL (앱 안 깔린 사용자 또는 PC 사용자 대상)
   const name = String(store.name || '업장').replace(/[,/]/g, ' ').trim();
   return `https://map.kakao.com/link/to/${name},${store.lat},${store.lng}`;
 }
 
 function openKakaoNav(store) {
-  // 카카오 공식 앱 스킴 사용 (interstitial 페이지 우회)
-  // 출발지(sp)는 생략 → 카카오맵이 GPS로 자동 설정
-  // 참고: https://apis.map.kakao.com/ios_v2/docs/getting-started/urlscheme/
   const appScheme = `kakaomap://route?ep=${store.lat},${store.lng}&by=car`;
   const webFallback = buildKakaoNavUrl(store);
 
-  // 모바일 디바이스 감지
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   if (!isMobile) {
-    // PC는 그냥 웹으로
     window.open(webFallback, '_blank');
     return;
   }
 
-  // 모바일: 앱 스킴 시도 → 실패하면 웹으로 폴백
-  // 1.5초 안에 앱이 안 열리면 사용자가 페이지에 남아있을 것이므로 웹 페이지로 이동
   const startTime = Date.now();
   const fallbackTimer = setTimeout(function() {
-    // 페이지가 백그라운드로 갔다면(=앱이 열렸다면) 폴백 안 함
     if (document.hidden || document.webkitHidden) return;
-    // 사용자가 너무 빨리 다른 행동을 한 경우도 폴백 스킵
     if (Date.now() - startTime < 1400) return;
     window.location.href = webFallback;
   }, 1500);
 
-  // 페이지가 숨겨지면(=앱이 열렸다는 뜻) 타이머 취소
   document.addEventListener('visibilitychange', function onVis() {
     if (document.hidden) {
       clearTimeout(fallbackTimer);
@@ -1269,7 +1311,6 @@ function openKakaoNav(store) {
     }
   });
 
-  // 앱 스킴 호출
   window.location.href = appScheme;
 }
 
@@ -1324,6 +1365,10 @@ async function openPriceGuide() {
   }
 }
 
+/* v46.0: 방문기록 폼
+ * - 최종영업결과에 "폐업" 옵션 추가
+ *   (지도용DB T열과 별개로 파트너가 현장 확인한 폐업 사실 기록용)
+ */
 function buildVisitForm() {
   return `
     <div class="visit-form">
@@ -1364,6 +1409,7 @@ function buildVisitForm() {
         <option value="">선택</option>
         <option value="성사">성사</option>
         <option value="실패">실패</option>
+        <option value="폐업">폐업</option>
       </select>
       <button class="save-btn" id="saveVisitBtn">저장</button>
     </div>`;
@@ -1470,7 +1516,7 @@ async function saveVisit(store) {
       payload = {
         storeKey: store._key,
         storeName: store.name || '',
-        storeAddress: store.address || '',     // v45.9: 주소 박제 (visits_sync v6.5의 J열용)
+        storeAddress: store.address || '',
         partnerName: currentUser.name,
         partnerKey: currentUser.key,
         firstVisitAt: existing.firstVisitAt || now,
@@ -1482,7 +1528,7 @@ async function saveVisit(store) {
       payload = {
         storeKey: store._key,
         storeName: store.name || '',
-        storeAddress: store.address || '',     // v45.9: 주소 박제
+        storeAddress: store.address || '',
         partnerName: currentUser.name,
         partnerKey: currentUser.key,
         firstVisitAt: now,
@@ -1495,7 +1541,7 @@ async function saveVisit(store) {
     await recRef.set(payload);
     myVisitedStoreData[store._key] = payload;
     renderMarkers();
-    updateChipCounts();  // v45.9: 저장 직후 칩 카운트 즉시 갱신
+    updateChipCounts();
 
     btn.textContent = "✓ 저장됨";
     setTimeout(function() { btn.textContent = "저장"; btn.disabled = false; }, 1500);
@@ -1525,7 +1571,12 @@ async function searchStores(q) {
       s._key = k;
       list.push(s);
     }
-    list = list.filter(s => !isClosed(s));  // v46.0: 폐업 업장 검색 결과 제외
+    // v46.0: 폐업 업장 필터링 (지도와 동일 룰)
+    list = list.filter(s => {
+      if (!isClosed(s)) return true;
+      const status = getVisitStatus(s);
+      return status === "lead";
+    });
     list = removeContractDuplicates(list);
     renderSearchResults(list);
   } catch(e) { console.error("검색 오류:", e); }
@@ -1569,12 +1620,16 @@ function renderSearchResults(list) {
   resultsEl.style.display = "block";
 }
 
+/* v46.0: 상태 라벨
+ * - closedByMe: "폐업"
+ */
 function getStatusLabel(status) {
   return {
     visit: "단순방문",
     lead: "유효리드",
     success: "계약성사",
     fail: "최종불발",
+    closedByMe: "폐업",
     contract: "기계약",
     none: "미방문"
   }[status] || "미방문";
