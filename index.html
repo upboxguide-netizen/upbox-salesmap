@@ -59,6 +59,7 @@
   .chip-count:empty { display: none; }
 
   /* v47.0: 관리자 전용 전체 통계 영역 (한 줄 고정, 스크롤 없음) */
+  /* v47.1: 클릭 가능한 필터로도 동작 */
   #adminStatsBar {
     display: none;
     padding: 8px 10px;
@@ -89,10 +90,20 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 8px;
-    border-radius: 10px;
+    padding: 3px 10px;
+    border-radius: 12px;
     background: rgba(255,255,255,0.15);
     flex-shrink: 0;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .admin-stat-item:hover { background: rgba(255,255,255,0.25); }
+  .admin-stat-item.active {
+    background: rgba(255,255,255,0.35);
+    border-color: white;
+    box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.4);
   }
   .admin-stat-dot {
     width: 7px;
@@ -210,33 +221,28 @@
     <div id="searchResults"></div>
   </div>
 
-  <!-- v47.0: 관리자 전용 전체 통계 -->
+  <!-- v47.1: 관리자 전용 전체 통계 + 필터 (폐업 칩 제거, 클릭 가능) -->
   <div id="adminStatsBar">
     <span class="admin-stats-label">📊 전체</span>
-    <span class="admin-stat-item">
+    <span class="admin-stat-item" data-admin-filter="visit">
       <span class="admin-stat-dot" style="background:#4d4678;"></span>
       <span class="admin-stat-name">단순방문</span>
       <span class="admin-stat-value" id="adminStat-visit">0</span>
     </span>
-    <span class="admin-stat-item">
+    <span class="admin-stat-item" data-admin-filter="lead">
       <span class="admin-stat-dot" style="background:#43A047;"></span>
       <span class="admin-stat-name">유효리드</span>
       <span class="admin-stat-value" id="adminStat-lead">0</span>
     </span>
-    <span class="admin-stat-item">
+    <span class="admin-stat-item" data-admin-filter="success">
       <span class="admin-stat-dot" style="background:#F5B800;"></span>
       <span class="admin-stat-name">계약성사</span>
       <span class="admin-stat-value" id="adminStat-success">0</span>
     </span>
-    <span class="admin-stat-item">
+    <span class="admin-stat-item" data-admin-filter="fail">
       <span class="admin-stat-dot" style="background:#E53935;"></span>
       <span class="admin-stat-name">최종불발</span>
       <span class="admin-stat-value" id="adminStat-fail">0</span>
-    </span>
-    <span class="admin-stat-item">
-      <span class="admin-stat-dot" style="background:#616161;"></span>
-      <span class="admin-stat-name">폐업</span>
-      <span class="admin-stat-value" id="adminStat-closedByMe">0</span>
     </span>
     <span class="admin-stats-version" id="adminStatsVersion"></span>
   </div>
@@ -558,6 +564,8 @@ async function startApp() {
   if (isAdminUser) {
     adminViewActive = true;
     document.getElementById('adminBadge').style.display = 'inline-block';
+    // v47.1: 관리자는 하단 필터칩 바 숨김 (통계바가 필터 역할)
+    document.getElementById('filterBar').style.display = 'none';
     console.log('[관리자 모드] 자동 활성화 - ' + currentUser.name + ' (' + currentUser.code + ')');
   }
 
@@ -569,11 +577,32 @@ async function startApp() {
   if (isAdminUser) {
     await loadVisitsAggregate();
     updateAdminStatsBar();
+    bindAdminStatsFilters();
   }
 
   await checkMyProjectAssignment();
   initMap();
   checkNotices();
+}
+
+// v47.1: 통계바 칩 클릭으로 필터링
+function bindAdminStatsFilters() {
+  document.querySelectorAll('.admin-stat-item[data-admin-filter]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      const filter = el.dataset.adminFilter;
+      // 같은 칩 다시 클릭 → 해제 (전체 보기)
+      if (currentFilter === filter) {
+        currentFilter = 'all';
+        el.classList.remove('active');
+      } else {
+        currentFilter = filter;
+        document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
+        el.classList.add('active');
+      }
+      console.log('[관리자 필터]', currentFilter);
+      renderMarkers();
+    });
+  });
 }
 
 /* v47.0: 관리자 통계 집계 데이터 로드 */
@@ -614,7 +643,7 @@ function updateAdminStatsBar() {
   document.getElementById('adminStat-lead').textContent = summary.lead || 0;
   document.getElementById('adminStat-success').textContent = summary.success || 0;
   document.getElementById('adminStat-fail').textContent = summary.fail || 0;
-  document.getElementById('adminStat-closedByMe').textContent = summary.closedByMe || 0;
+  // v47.1: 폐업 칩 제거됨
 
   const v = visitsAggregate.version || '미집계';
   const ts = visitsAggregate.updatedAt;
@@ -815,6 +844,14 @@ function computeMyVisitCounts() {
 }
 
 function updateChipCounts() {
+  // v47.0: 관리자는 본인 카운트 숨김 (전체 통계 바만 사용)
+  if (isAdminUser) {
+    document.querySelectorAll('.chip-count').forEach(el => {
+      el.textContent = '';
+    });
+    return;
+  }
+
   const counts = computeMyVisitCounts();
   document.querySelectorAll('.chip-count').forEach(el => {
     const key = el.dataset.countFor;
