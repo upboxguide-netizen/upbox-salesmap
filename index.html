@@ -1219,15 +1219,48 @@ function loadRoadviewForCurrentStore() {
 }
 
 function buildKakaoNavUrl(store) {
-  // encodeURIComponent를 쓰면 iOS 카카오맵 앱이 한글 파라미터를 못 받는 경우가 있음.
-  // 한글을 그대로 두고, 카카오맵에 문제가 되는 쉼표/슬래시만 제거.
+  // PC/폴백용 웹 URL (앱 안 깔린 사용자 또는 PC 사용자 대상)
   const name = String(store.name || '업장').replace(/[,/]/g, ' ').trim();
   return `https://map.kakao.com/link/to/${name},${store.lat},${store.lng}`;
 }
 
 function openKakaoNav(store) {
-  const url = buildKakaoNavUrl(store);
-  window.location.href = url;
+  // 카카오 공식 앱 스킴 사용 (interstitial 페이지 우회)
+  // 출발지(sp)는 생략 → 카카오맵이 GPS로 자동 설정
+  // 참고: https://apis.map.kakao.com/ios_v2/docs/getting-started/urlscheme/
+  const appScheme = `kakaomap://route?ep=${store.lat},${store.lng}&by=car`;
+  const webFallback = buildKakaoNavUrl(store);
+
+  // 모바일 디바이스 감지
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (!isMobile) {
+    // PC는 그냥 웹으로
+    window.open(webFallback, '_blank');
+    return;
+  }
+
+  // 모바일: 앱 스킴 시도 → 실패하면 웹으로 폴백
+  // 1.5초 안에 앱이 안 열리면 사용자가 페이지에 남아있을 것이므로 웹 페이지로 이동
+  const startTime = Date.now();
+  const fallbackTimer = setTimeout(function() {
+    // 페이지가 백그라운드로 갔다면(=앱이 열렸다면) 폴백 안 함
+    if (document.hidden || document.webkitHidden) return;
+    // 사용자가 너무 빨리 다른 행동을 한 경우도 폴백 스킵
+    if (Date.now() - startTime < 1400) return;
+    window.location.href = webFallback;
+  }, 1500);
+
+  // 페이지가 숨겨지면(=앱이 열렸다는 뜻) 타이머 취소
+  document.addEventListener('visibilitychange', function onVis() {
+    if (document.hidden) {
+      clearTimeout(fallbackTimer);
+      document.removeEventListener('visibilitychange', onVis);
+    }
+  });
+
+  // 앱 스킴 호출
+  window.location.href = appScheme;
 }
 
 async function generateSSOToken(partnerName, partnerCode) {
