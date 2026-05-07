@@ -1219,14 +1219,14 @@ function loadRoadviewForCurrentStore() {
 }
 
 function buildKakaoNavUrl(store) {
-  const dest = encodeURIComponent(store.name || '업장');
-  return `https://map.kakao.com/link/to/${dest},${store.lat},${store.lng}`;
+  // encodeURIComponent를 쓰면 iOS 카카오맵 앱이 한글 파라미터를 못 받는 경우가 있음.
+  // 한글을 그대로 두고, 카카오맵에 문제가 되는 쉼표/슬래시만 제거.
+  const name = String(store.name || '업장').replace(/[,/]/g, ' ').trim();
+  return `https://map.kakao.com/link/to/${name},${store.lat},${store.lng}`;
 }
 
 function openKakaoNav(store) {
   const url = buildKakaoNavUrl(store);
-  // iOS에서 target="_blank"로 외부앱 deep link 호출 시 파라미터 손실 발생.
-  // 같은 창에서 location.href로 직접 이동하면 카카오맵 앱이 정상적으로 파라미터를 받음.
   window.location.href = url;
 }
 
