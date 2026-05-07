@@ -585,7 +585,7 @@ async function startApp() {
   checkNotices();
 }
 
-// v47.1: 통계바 칩 클릭으로 필터링
+// v47.1: 통계바 칩 클릭으로 필터링 + 해당 상태 핀들이 보이는 범위로 자동 이동
 function bindAdminStatsFilters() {
   document.querySelectorAll('.admin-stat-item[data-admin-filter]').forEach(function(el) {
     el.addEventListener('click', function() {
@@ -594,15 +594,89 @@ function bindAdminStatsFilters() {
       if (currentFilter === filter) {
         currentFilter = 'all';
         el.classList.remove('active');
+        renderMarkers();
       } else {
         currentFilter = filter;
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
+        // v47.2: 해당 상태 핀들이 모두 보이는 범위로 지도 이동
+        moveToFilteredStores(filter);
       }
       console.log('[관리자 필터]', currentFilter);
-      renderMarkers();
     });
   });
+}
+
+// v47.2: visits_aggregate 기준으로 해당 상태인 모든 업장의 좌표를 모아 bounds fit
+async function moveToFilteredStores(filter) {
+  if (!visitsAggregate || !visitsAggregate.stores) {
+    console.warn('[필터 이동] visits_aggregate 없음. 단순 필터링만 진행.');
+    renderMarkers();
+    return;
+  }
+
+  // 1. visits_aggregate에서 해당 상태인 storeKey 목록 수집
+  const targetKeys = [];
+  for (const storeKey in visitsAggregate.stores) {
+    if (visitsAggregate.stores[storeKey].lastStatus === filter) {
+      targetKeys.push(storeKey);
+    }
+  }
+
+  if (targetKeys.length === 0) {
+    console.log('[필터 이동] 해당 상태 업장 없음:', filter);
+    renderMarkers();
+    return;
+  }
+
+  console.log('[필터 이동] ' + filter + ' 상태 업장 ' + targetKeys.length + '개 좌표 조회 중...');
+
+  // 2. stores_light에서 좌표 조회 (병렬)
+  const statusBar = document.getElementById('statusBar');
+  if (statusBar) statusBar.textContent = '필터 적용 중...';
+
+  try {
+    const fetchPromises = targetKeys.map(function(k) {
+      return db.ref('stores_light/' + k).once('value').then(function(snap) {
+        const v = snap.val();
+        if (v && !isNaN(v.lat) && !isNaN(v.lng)) {
+          return { lat: v.lat, lng: v.lng };
+        }
+        return null;
+      }).catch(function() { return null; });
+    });
+
+    const results = await Promise.all(fetchPromises);
+    const validCoords = results.filter(function(c) { return c !== null; });
+
+    if (validCoords.length === 0) {
+      console.warn('[필터 이동] 유효한 좌표 없음');
+      renderMarkers();
+      return;
+    }
+
+    // 3. 단일 좌표면 그 위치로, 여러 좌표면 bounds fit
+    if (validCoords.length === 1) {
+      map.setCenter(new kakao.maps.LatLng(validCoords[0].lat, validCoords[0].lng));
+      map.setLevel(4);
+    } else {
+      const bounds = new kakao.maps.LatLngBounds();
+      validCoords.forEach(function(c) {
+        bounds.extend(new kakao.maps.LatLng(c.lat, c.lng));
+      });
+      map.setBounds(bounds);
+      // 너무 줌인되면 보기 불편하니 최소 레벨 4 보장
+      setTimeout(function() {
+        if (map.getLevel() < 4) map.setLevel(4);
+      }, 100);
+    }
+
+    console.log('[필터 이동] ' + validCoords.length + '개 핀 보이도록 이동 완료');
+    // map의 idle 이벤트가 자동으로 loadStoresInView() 호출 → renderMarkers()
+  } catch(e) {
+    console.error('[필터 이동] 좌표 조회 실패:', e);
+    renderMarkers();
+  }
 }
 
 /* v47.0: 관리자 통계 집계 데이터 로드 */
@@ -1228,10 +1302,11 @@ function renderMarkers() {
     shown++;
 
     // v47.0: 관리자 뷰 활성 시 라벨 생성
+    // v47.2: 라벨 색상 = 핀 색상
     if (isAdminUser && adminViewActive) {
       const aggData = visitsAggregate && visitsAggregate.stores ? visitsAggregate.stores[store._key] : null;
       if (aggData && aggData.lastPartnerName) {
-        const label = createAdminLabel(store, aggData.lastPartnerName);
+        const label = createAdminLabel(store, aggData.lastPartnerName, status);
         labelOverlays.push(label);
         labelByKey[store._key] = label;
       }
@@ -1252,17 +1327,21 @@ function renderMarkers() {
   document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
 }
 
-/* v47.0: 핀 옆 라벨 (CustomOverlay) */
-function createAdminLabel(store, partnerName) {
+/* v47.0: 핀 옆 라벨 (CustomOverlay)
+ * v47.2: 라벨 배경색을 핀 상태 색상과 동일하게 매칭
+ */
+function createAdminLabel(store, partnerName, status) {
+  const bgColor = getStatusColor(status);
   const html = '<div style="' +
-    'background:rgba(54,56,89,0.92);' +
+    'background:' + bgColor + ';' +
     'color:white;' +
     'padding:2px 8px;' +
     'border-radius:10px;' +
     'font-size:11px;' +
     'font-weight:600;' +
     'white-space:nowrap;' +
-    'box-shadow:0 2px 4px rgba(0,0,0,0.2);' +
+    'box-shadow:0 2px 4px rgba(0,0,0,0.25);' +
+    'border:1.5px solid white;' +
     'transform:translate(14px, -36px);' +
     'pointer-events:none;' +
     '">' + escapeHtml(partnerName) + '</div>';
