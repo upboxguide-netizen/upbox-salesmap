@@ -790,7 +790,8 @@ function clearAllCaches() {
 
 const NOTICE_TYPES = {
   projectAssignments: { icon: '🎯', title: '프로젝트 배정 변경', cacheKeysToClear: ['cache_my_projects_v2'] },
-  contractStores: { icon: '⭐', title: '기계약 업장 변경', cacheKeysToClear: [] }
+  contractStores: { icon: '⭐', title: '기계약 업장 변경', cacheKeysToClear: [] },
+  general: { icon: '📢', title: '공지사항', cacheKeysToClear: [] }
 };
 const NOTICE_SEEN_PREFIX = 'notice_seen_';
 
@@ -819,20 +820,53 @@ function showNoticesSequentially(queue) {
 function showNoticeModal(type, notice, onClose) {
   const meta = NOTICE_TYPES[type] || { icon: '📢', title: '안내', cacheKeysToClear: [] };
   const modal = document.getElementById('noticeModal');
+
   document.getElementById('noticeIcon').textContent = meta.icon;
-  document.getElementById('noticeTitle').textContent = meta.title;
-  document.getElementById('noticeMessage').textContent = notice.message;
+
+  // 자유 공지(general)는 시연님이 입력한 title을 우선 사용
+  const displayTitle = (type === 'general' && notice.title) ? notice.title : meta.title;
+  document.getElementById('noticeTitle').textContent = displayTitle;
+
+  // 자유 공지의 message는 \n 줄바꿈 보존을 위해 white-space: pre-line 적용
+  const messageEl = document.getElementById('noticeMessage');
+  messageEl.textContent = notice.message;
+  if (type === 'general') {
+    messageEl.style.whiteSpace = 'pre-line';
+    messageEl.style.textAlign = 'left';
+  } else {
+    messageEl.style.whiteSpace = '';
+    messageEl.style.textAlign = '';
+  }
+
+  const laterBtn = document.getElementById('noticeBtnLater');
+  const applyBtn = document.getElementById('noticeBtnApply');
+
+  if (type === 'general') {
+    // 자유 공지: "확인" 버튼 하나만 (캐시 클리어 X, 새로고침 X)
+    laterBtn.style.display = 'none';
+    applyBtn.textContent = '확인';
+    applyBtn.onclick = function() {
+      localStorage.setItem(NOTICE_SEEN_PREFIX + type, notice.version);
+      modal.classList.remove('show');
+      if (onClose) setTimeout(onClose, 200);
+    };
+  } else {
+    // 프로젝트/기계약 공지: 기존 동작 유지 (지금 갱신 / 나중에)
+    laterBtn.style.display = '';
+    applyBtn.textContent = '지금 갱신';
+    applyBtn.onclick = function() {
+      if (meta.cacheKeysToClear) meta.cacheKeysToClear.forEach(k => localStorage.removeItem(k));
+      localStorage.setItem(NOTICE_SEEN_PREFIX + type, notice.version);
+      modal.classList.remove('show');
+      location.reload();
+    };
+    laterBtn.onclick = function() {
+      modal.classList.remove('show');
+      if (onClose) setTimeout(onClose, 200);
+    };
+  }
+
   modal.classList.add('show');
-  document.getElementById('noticeBtnApply').onclick = function() {
-    if (meta.cacheKeysToClear) meta.cacheKeysToClear.forEach(k => localStorage.removeItem(k));
-    localStorage.setItem(NOTICE_SEEN_PREFIX + type, notice.version);
-    modal.classList.remove('show');
-    location.reload();
-  };
-  document.getElementById('noticeBtnLater').onclick = function() {
-    modal.classList.remove('show');
-    if (onClose) setTimeout(onClose, 200);
-  };
 }
 
 let map, currentUser = null;
