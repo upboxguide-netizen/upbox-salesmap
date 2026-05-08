@@ -244,6 +244,251 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .init-text { font-size: 14px; color: #EEE; }
   .init-subtext { font-size: 11px; color: #AAA; margin-top: 6px; }
+
+  /* ============================================================ */
+  /* v49.0 신규업장추가 모달 (D 작업) */
+  /* ============================================================ */
+  .new-store-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    justify-content: center;
+    align-items: flex-start;
+    overflow-y: auto;
+    padding: 20px 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  .new-store-modal.open { display: flex; }
+  .new-store-content {
+    background: #fff;
+    width: 100%;
+    max-width: 480px;
+    border-radius: 16px;
+    margin: 20px;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .new-store-header {
+    background: #363859;
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .new-store-header h2 { margin: 0; font-size: 17px; font-weight: 700; }
+  .new-store-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    font-family: inherit;
+  }
+  .new-store-body {
+    padding: 14px 18px 18px;
+    max-height: 75vh;
+    overflow-y: auto;
+  }
+  .new-store-hint {
+    background: #F8F8F8;
+    color: #666;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-left: 3px solid #9E9E9E;
+  }
+  .ns-search-wrapper { position: relative; margin-bottom: 6px; }
+  .ns-search-wrapper input {
+    width: 100%;
+    padding: 11px 13px;
+    border: 2px solid #E5E5E7;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .ns-search-wrapper input:focus { outline: none; border-color: #F2AC57; }
+  .ns-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #DDD;
+    border-radius: 8px;
+    margin-top: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    display: none;
+  }
+  .ns-search-results.open { display: block; }
+  .ns-search-result-item {
+    padding: 9px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #F2F2F7;
+  }
+  .ns-search-result-item:last-child { border-bottom: none; }
+  .ns-search-result-item:hover { background: #F5F5F7; }
+  .ns-search-result-item .ns-place-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1C1C1E;
+  }
+  .ns-search-result-item .ns-place-address {
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+  }
+  .ns-search-results-empty {
+    padding: 14px;
+    text-align: center;
+    color: #888;
+    font-size: 12px;
+  }
+  .ns-form-group { margin-bottom: 11px; }
+  .ns-form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #363859;
+    margin-bottom: 4px;
+  }
+  .ns-form-group label .required { color: #E53935; margin-left: 2px; }
+  .ns-form-group input,
+  .ns-form-group select,
+  .ns-form-group textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid #DDD;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .ns-form-group input:focus,
+  .ns-form-group select:focus,
+  .ns-form-group textarea:focus { outline: none; border-color: #F2AC57; }
+  .ns-form-group textarea { resize: vertical; min-height: 56px; }
+  .ns-form-group .ns-helper {
+    font-size: 11px;
+    color: #888;
+    margin-top: 3px;
+  }
+  .ns-form-row { display: flex; gap: 8px; }
+  .ns-form-row .ns-form-group { flex: 1; }
+  .ns-admin-type-buttons { display: flex; gap: 6px; }
+  .ns-admin-type-buttons button {
+    flex: 1;
+    padding: 9px;
+    border: 1px solid #DDD;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .ns-admin-type-buttons button.active {
+    background: #363859;
+    color: #fff;
+    border-color: #363859;
+    font-weight: 700;
+  }
+  .ns-outcome-buttons { display: flex; gap: 6px; }
+  .ns-outcome-buttons button {
+    flex: 1;
+    padding: 9px;
+    border: 1px solid #DDD;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .ns-outcome-buttons button.active.default { background: #363859; color: #fff; border-color: #363859; font-weight: 700; }
+  .ns-outcome-buttons button.active.success { background: #F5B800; color: #fff; border-color: #F5B800; font-weight: 700; }
+  .ns-outcome-buttons button.active.fail { background: #E53935; color: #fff; border-color: #E53935; font-weight: 700; }
+  .ns-outcome-buttons button.active.closed { background: #616161; color: #fff; border-color: #616161; font-weight: 700; }
+  .ns-submit-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #F2F2F7;
+  }
+  .ns-submit-row button {
+    flex: 1;
+    padding: 13px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+  }
+  .ns-btn-cancel { background: #F2F2F7; color: #1C1C1E; }
+  .ns-btn-submit { background: #F2AC57; color: #fff; }
+  .ns-btn-submit:disabled { background: #E0BC9C; cursor: not-allowed; }
+  .ns-selected-place {
+    background: #FFF3E0;
+    border: 1px solid #F2AC57;
+    border-radius: 6px;
+    padding: 9px 11px;
+    margin-bottom: 11px;
+    font-size: 12px;
+    display: none;
+    position: relative;
+  }
+  .ns-selected-place.show { display: block; }
+  .ns-selected-place .ns-sp-label {
+    color: #F2AC57;
+    font-weight: 700;
+    font-size: 10px;
+    margin-bottom: 3px;
+  }
+  .ns-selected-place .ns-sp-name { font-weight: 700; color: #1C1C1E; font-size: 13px; }
+  .ns-selected-place .ns-sp-addr { color: #666; font-size: 11px; margin-top: 2px; }
+  .ns-selected-place .ns-sp-clear {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: transparent;
+    border: none;
+    color: #F2AC57;
+    cursor: pointer;
+    font-size: 11px;
+    text-decoration: underline;
+    font-family: inherit;
+  }
+  .ns-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1C1C1E;
+    color: #fff;
+    padding: 13px 22px;
+    border-radius: 12px;
+    font-size: 13px;
+    z-index: 20000;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.3s;
+    max-width: 90%;
+    text-align: center;
+    font-family: inherit;
+  }
+  .ns-toast.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -344,6 +589,136 @@
   </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- v49.0 신규업장추가 모달 (D 작업) -->
+<!-- ============================================================ -->
+<div id="newStoreModal" class="new-store-modal">
+  <div class="new-store-content">
+    <div class="new-store-header">
+      <h2>＋ 신규업장 등록</h2>
+      <button class="new-store-close" onclick="closeNewStoreModal()" type="button">✕</button>
+    </div>
+    <div class="new-store-body">
+      <div class="new-store-hint">
+        <span>📍</span>
+        <span>신규업장은 가급적 현장에서 등록해주세요</span>
+      </div>
+
+      <div class="ns-form-group">
+        <label>사업장 검색 <span class="required">*</span></label>
+        <div class="ns-search-wrapper">
+          <input type="text" id="nsSearchInput" placeholder="사업장명을 입력하세요 (예: 강남교자, 더본스시)" autocomplete="off" oninput="onNsSearchInput()">
+          <div id="nsSearchResults" class="ns-search-results"></div>
+        </div>
+        <div class="ns-helper">검색 결과가 없으면 아래 사업장명/주소를 직접 입력하세요</div>
+      </div>
+
+      <div id="nsSelectedPlace" class="ns-selected-place">
+        <button class="ns-sp-clear" onclick="clearSelectedPlace()" type="button">변경</button>
+        <div class="ns-sp-label">선택된 장소</div>
+        <div class="ns-sp-name" id="nsSelectedName"></div>
+        <div class="ns-sp-addr" id="nsSelectedAddr"></div>
+      </div>
+
+      <div class="ns-form-group">
+        <label>사업장명 <span class="required">*</span></label>
+        <input type="text" id="nsStoreName" placeholder="검색 시 자동 입력 / 직접 입력 가능">
+      </div>
+
+      <div class="ns-form-group">
+        <label>주소 <span class="required">*</span></label>
+        <input type="text" id="nsAddress" placeholder="검색 시 자동 입력 / 직접 입력 가능">
+      </div>
+
+      <div class="ns-form-group">
+        <label>행정신고구분</label>
+        <div class="ns-admin-type-buttons">
+          <button type="button" data-admintype="다량배출사업장" onclick="selectAdminType(this)">다량배출사업장</button>
+          <button type="button" data-admintype="일반사업장" onclick="selectAdminType(this)">일반사업장</button>
+        </div>
+      </div>
+
+      <div class="ns-form-group">
+        <label>현재 업체명</label>
+        <input type="text" id="nsCurrentStoreName" placeholder="이미 거래 중인 업체가 있다면">
+      </div>
+
+      <div class="ns-form-group">
+        <label>담당자 연락처</label>
+        <input type="tel" id="nsContact" inputmode="numeric" placeholder="010-0000-0000" maxlength="13">
+      </div>
+
+      <div class="ns-form-row">
+        <div class="ns-form-group">
+          <label>월 예상배출량 (L)</label>
+          <input type="text" id="nsAmount" inputmode="numeric" placeholder="예: 500">
+        </div>
+        <div class="ns-form-group">
+          <label>주 수거횟수</label>
+          <input type="text" id="nsFreq" inputmode="numeric" placeholder="예: 3">
+        </div>
+      </div>
+
+      <div class="ns-form-row">
+        <div class="ns-form-group">
+          <label>현재 단가 (원/L)</label>
+          <input type="text" id="nsPrice" inputmode="numeric" placeholder="예: 180">
+        </div>
+        <div class="ns-form-group">
+          <label>제안 단가 (원/L)</label>
+          <input type="text" id="nsSuggestedPrice" inputmode="numeric" placeholder="예: 170">
+        </div>
+      </div>
+
+      <div class="ns-form-row">
+        <div class="ns-form-group">
+          <label>현재 통 갯수</label>
+          <input type="text" id="nsBins" inputmode="numeric" placeholder="예: 4">
+        </div>
+        <div class="ns-form-group">
+          <label>비닐 사용여부</label>
+          <select id="nsVinyl">
+            <option value="">선택</option>
+            <option value="사용">사용</option>
+            <option value="미사용">미사용</option>
+            <option value="지자체">지자체</option>
+            <option value="처리기">처리기</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ns-form-group">
+        <label>5톤 차량 진입 가능여부</label>
+        <select id="nsTruck">
+          <option value="">선택</option>
+          <option value="가능">가능</option>
+          <option value="불가능">불가능</option>
+        </select>
+      </div>
+
+      <div class="ns-form-group">
+        <label>상세 상담내용</label>
+        <textarea id="nsNote" placeholder="상담 내용을 기록하세요"></textarea>
+      </div>
+
+      <div class="ns-form-group">
+        <label>최종영업결과</label>
+        <div class="ns-outcome-buttons">
+          <button type="button" data-outcome="" class="default active" onclick="selectOutcome(this)">기록만</button>
+          <button type="button" data-outcome="성사" class="success" onclick="selectOutcome(this)">성사</button>
+          <button type="button" data-outcome="실패" class="fail" onclick="selectOutcome(this)">실패</button>
+          <button type="button" data-outcome="폐업" class="closed" onclick="selectOutcome(this)">폐업</button>
+        </div>
+      </div>
+
+      <div class="ns-submit-row">
+        <button class="ns-btn-cancel" onclick="closeNewStoreModal()" type="button">취소</button>
+        <button class="ns-btn-submit" id="nsSubmitBtn" onclick="submitNewStore()" type="button">등록</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const firebaseConfig = {
   databaseURL: "https://salespartners-map-67daf-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -353,6 +728,12 @@ const db = firebase.database();
 
 const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec';
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
+
+// ============================================================
+// v49.0 신규업장추가 Web App 엔드포인트
+// ⚠️ Apps Script 배포 후 받은 URL로 교체하세요
+// ============================================================
+const NEW_STORE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzSBmYw2I2NBTb8TwGtQe2r5hG0THf60eIROO7kbLWckHBGbYufoA8odWghYjs_sGJuNA/exec';
 
 const ADMIN_CODES = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'];
 const CLUSTER_MIN_LEVEL = 7;
@@ -489,6 +870,13 @@ let markerClusterer = null;
 let initialLocation = null;
 let suppressNextIdle = false;
 
+// v49.0: 신규업장추가 모달 상태
+let _placesSearchCache = null;
+let _placesSearchTimer = null;
+let _nsSelectedPlace = null;
+let _nsSelectedAdminType = '';
+let _nsSelectedOutcome = '';
+
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
 document.getElementById("logoutBtn").onclick = logout;
@@ -597,12 +985,10 @@ function bindAdminStatsFilters() {
       const filter = el.dataset.adminFilter;
 
       if (filter === 'all') {
-        // 전체 칩 클릭: 항상 'all'로 리셋 (재클릭해도 동일 동작)
         currentFilter = 'all';
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
       } else if (currentFilter === filter) {
-        // 같은 카테고리 칩 다시 클릭 → 해제 (전체로 복귀)
         currentFilter = 'all';
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
         const allChip = document.getElementById('adminStatAll');
@@ -637,7 +1023,6 @@ async function renderAdminView() {
     });
   }
 
-  // 줌인 시 기계약 동적 추가 (어떤 필터에서든 줌인하면 노출)
   let contractsAdded = 0;
   if (map && map.getLevel() <= ADMIN_CONTRACT_ZOOM_LEVEL) {
     try {
@@ -667,7 +1052,6 @@ async function fetchContractsInCurrentBounds() {
   const centerLat = center.getLat();
   const centerLng = center.getLng();
 
-  // v48.4: 캐시 확인 - 30초 이내 + 중심 2km 이내 이동이면 재사용
   if (contractsCache.center && contractsCache.data.length > 0) {
     const elapsed = Date.now() - contractsCache.ts;
     const moved = haversine(contractsCache.center.lat, contractsCache.center.lng, centerLat, centerLng);
@@ -683,7 +1067,6 @@ async function fetchContractsInCurrentBounds() {
   let latMin = sw.getLat(), latMax = ne.getLat();
   let lngMin = sw.getLng(), lngMax = ne.getLng();
 
-  // 화면 중심 + 반경 10km도 함께 커버
   const radiusKm = ADMIN_CONTRACT_RADIUS_KM;
   const radiusLatDeg = radiusKm / 111;
   const radiusLngDeg = radiusKm / (111 * Math.cos(centerLat * Math.PI / 180));
@@ -723,7 +1106,6 @@ async function fetchContractsInCurrentBounds() {
 
     console.log('[기계약 fetch 결과] 총 ' + contracts.length + '개 (제한 후 ' + limited.length + '개)');
 
-    // 캐시 갱신
     contractsCache = {
       center: { lat: centerLat, lng: centerLng },
       data: limited,
@@ -982,8 +1364,6 @@ function initMap() {
         const wasInContractZone = lastZoomLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
         const isInContractZone = currentLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
 
-        // v48.5: 줌인 영역에 있으면 무조건 재렌더링 (패닝/드래그도 포함)
-        // 줌아웃 영역으로 빠져나갔을 때도 한 번 재렌더링 (★ 제거 위해)
         if (isInContractZone || wasInContractZone) {
           console.log('[관리자 idle] level ' + lastZoomLevel + ' → ' + currentLevel + ' / 재렌더링');
           renderAdminView();
@@ -1003,9 +1383,17 @@ function initMap() {
   kakao.maps.event.addListener(map, "click", function() { closePanel(true); });
 
   document.getElementById("locBtn").onclick = moveToMyLocation;
-  document.getElementById("addBtn").onclick = function() {
-    window.open("https://walla.my/v/GEQSSOWtFYHulcSoAKC3", "_blank");
-  };
+
+  // v49.0: +업장추가 버튼을 신규업장추가 모달로 변경
+  document.getElementById("addBtn").onclick = openNewStoreModal;
+
+  // 모달 외부 클릭 시 닫기
+  const newStoreModal = document.getElementById('newStoreModal');
+  if (newStoreModal) {
+    newStoreModal.addEventListener('click', function(e) {
+      if (e.target === newStoreModal) closeNewStoreModal();
+    });
+  }
 
   document.querySelectorAll(".filter-chip").forEach(function(btn) {
     btn.onclick = function() {
@@ -1102,7 +1490,6 @@ function handleClusterClick(cluster) {
     if (ms.length === 1) {
       map.setCenter(ms[0].getPosition());
       map.setLevel(3);
-      // v48.5: 줌인 후 기계약 강제 갱신
       if (isAdminUser) setTimeout(function() { renderAdminView(); }, 400);
       return;
     }
@@ -1127,7 +1514,6 @@ function handleClusterClick(cluster) {
     map.setBounds(bounds, 80, 80, 80, 80);
     setTimeout(function() {
       if (map.getLevel() >= CLUSTER_MIN_LEVEL) map.setLevel(CLUSTER_MIN_LEVEL - 1);
-      // v48.5: bounds 적용 후 기계약 강제 갱신
       if (isAdminUser) setTimeout(function() { renderAdminView(); }, 250);
     }, 150);
   } catch(e) {
@@ -1466,17 +1852,12 @@ function renderMarkers() {
     const status = getEffectiveStatus(store);
     const isContract = isContractGrade(store.grade);
 
-    // v48.5: 필터링 로직 - 기계약은 카테고리 필터에서 예외 처리 (항상 통과)
     if (currentFilter === "project") {
-      // 프로젝트 필터: 기계약 제외, 배정된 업장만
       if (isContract || !amIAssignedToProject(store, currentUser.key)) continue;
     } else if (currentFilter !== "all") {
-      // 카테고리 필터(visit/lead/success/fail/contract): 기계약은 항상 통과, 영업활동은 status 매칭
       if (!isContract && status !== currentFilter) continue;
-      // 'contract' 필터일 땐 기계약만 통과
       if (currentFilter === "contract" && !isContract) continue;
     }
-    // 'all' 필터: 모두 통과
 
     const isSelected = selectedStore && selectedStore._key === store._key;
     if (isSelected) selectedRendered = true;
@@ -1484,7 +1865,6 @@ function renderMarkers() {
     markers.push(marker);
     markerByKey[store._key] = marker;
     shown++;
-    // 관리자뷰의 기계약은 클러스터링 X (B안)
     if (isSelected || (isAdminUser && adminViewActive && isContract)) {
       directMarkers.push(marker);
     } else {
@@ -1548,13 +1928,11 @@ function createMarker(store, status, isSelected) {
   marker._upboxStoreKey = store._key;
   marker._upboxIsContract = isContractGrade(store.grade);
   kakao.maps.event.addListener(marker, "click", function() {
-    // 핀 클릭 시 충분히 줌아웃된 상태면 자연스럽게 줌인
     if (map.getLevel() >= CLUSTER_MIN_LEVEL) {
       map.setCenter(position);
       map.setLevel(4);
       setTimeout(function() {
         openPanel(store);
-        // v48.5: 핀 클릭 줌인 후 기계약 강제 갱신
         if (isAdminUser) renderAdminView();
       }, 300);
     } else {
@@ -1598,14 +1976,12 @@ function formatPartnerNameForPin(name) {
     const firstTwo = clean.substring(0, 2);
     if (surnamesDouble.indexOf(firstTwo) !== -1) return [clean.substring(2)];
     if (surnamesSingle.indexOf(clean[0]) !== -1) return [clean.substring(2)];
-    // 회사명 4글자: 2글자씩 줄바꿈
     return [clean.substring(0, 2), clean.substring(2)];
   }
   if (clean.length === 3) {
     if (surnamesSingle.indexOf(clean[0]) !== -1) return [clean.substring(1)];
     return [clean];
   }
-  // 5글자 이상
   return [clean.substring(0, 2)];
 }
 
@@ -1729,7 +2105,6 @@ async function openPanel(store) {
 }
 
 function refreshMarkerSelection(previousKey, newKey) {
-  // 단순화: 다음 renderMarkers()에서 자동으로 selection 반영됨
   if (isAdminUser) {
     renderAdminView();
   } else {
@@ -2038,6 +2413,238 @@ function formatDate(ts) {
 function escapeHtml(s) {
   if (s === null || s === undefined) return "";
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// ============================================================
+// v49.0 신규업장추가 모달 (D 작업)
+// ============================================================
+
+function openNewStoreModal() {
+  if (!currentUser || !currentUser.code) {
+    showNsToast('로그인 후 이용 가능합니다');
+    return;
+  }
+  resetNewStoreForm();
+  document.getElementById('newStoreModal').classList.add('open');
+}
+
+function closeNewStoreModal() {
+  document.getElementById('newStoreModal').classList.remove('open');
+  resetNewStoreForm();
+}
+
+function resetNewStoreForm() {
+  document.getElementById('nsSearchInput').value = '';
+  document.getElementById('nsSearchResults').classList.remove('open');
+  document.getElementById('nsSearchResults').innerHTML = '';
+  _nsSelectedPlace = null;
+  document.getElementById('nsSelectedPlace').classList.remove('show');
+
+  ['nsStoreName', 'nsAddress', 'nsCurrentStoreName', 'nsContact',
+   'nsAmount', 'nsFreq', 'nsPrice', 'nsSuggestedPrice',
+   'nsBins', 'nsNote'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  ['nsVinyl', 'nsTruck'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  _nsSelectedAdminType = '';
+  document.querySelectorAll('.ns-admin-type-buttons button').forEach(function(b) { b.classList.remove('active'); });
+
+  _nsSelectedOutcome = '';
+  document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
+  const defaultOutcomeBtn = document.querySelector('.ns-outcome-buttons button[data-outcome=""]');
+  if (defaultOutcomeBtn) defaultOutcomeBtn.classList.add('active');
+
+  const btn = document.getElementById('nsSubmitBtn');
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = '등록';
+  }
+}
+
+function onNsSearchInput() {
+  const query = document.getElementById('nsSearchInput').value.trim();
+  if (_placesSearchTimer) clearTimeout(_placesSearchTimer);
+
+  if (!query || query.length < 2) {
+    document.getElementById('nsSearchResults').classList.remove('open');
+    return;
+  }
+
+  _placesSearchTimer = setTimeout(function() {
+    runKakaoPlacesSearch(query);
+  }, 300);
+}
+
+function runKakaoPlacesSearch(query) {
+  if (typeof kakao === 'undefined' || !kakao.maps || !kakao.maps.services) {
+    console.error('Kakao services library not loaded');
+    return;
+  }
+
+  const ps = new kakao.maps.services.Places();
+  const options = {};
+  if (typeof map !== 'undefined' && map) {
+    const center = map.getCenter();
+    options.location = center;
+    options.radius = 20000;
+  }
+
+  ps.keywordSearch(query, function(data, status) {
+    const resultsEl = document.getElementById('nsSearchResults');
+    if (status === kakao.maps.services.Status.OK && data && data.length > 0) {
+      const items = data.slice(0, 10);
+      resultsEl.innerHTML = items.map(function(p, idx) {
+        const addr = p.road_address_name || p.address_name || '';
+        return '<div class="ns-search-result-item" onclick="selectKakaoPlace(' + idx + ')">' +
+               '<div class="ns-place-name">' + escapeHtml(p.place_name) + '</div>' +
+               '<div class="ns-place-address">' + escapeHtml(addr) + '</div></div>';
+      }).join('');
+      _placesSearchCache = items;
+      resultsEl.classList.add('open');
+    } else {
+      resultsEl.innerHTML = '<div class="ns-search-results-empty">검색 결과 없음 — 아래에 직접 입력해주세요</div>';
+      _placesSearchCache = null;
+      resultsEl.classList.add('open');
+    }
+  }, options);
+}
+
+function selectKakaoPlace(idx) {
+  if (!_placesSearchCache || !_placesSearchCache[idx]) return;
+  const p = _placesSearchCache[idx];
+  const addr = p.road_address_name || p.address_name || '';
+
+  _nsSelectedPlace = {
+    name: p.place_name,
+    address: addr,
+    lat: parseFloat(p.y),
+    lng: parseFloat(p.x)
+  };
+
+  document.getElementById('nsSelectedName').textContent = p.place_name;
+  document.getElementById('nsSelectedAddr').textContent = addr;
+  document.getElementById('nsSelectedPlace').classList.add('show');
+
+  document.getElementById('nsStoreName').value = p.place_name;
+  document.getElementById('nsAddress').value = addr;
+
+  document.getElementById('nsSearchInput').value = '';
+  document.getElementById('nsSearchResults').classList.remove('open');
+}
+
+function clearSelectedPlace() {
+  _nsSelectedPlace = null;
+  document.getElementById('nsSelectedPlace').classList.remove('show');
+}
+
+function selectAdminType(btn) {
+  document.querySelectorAll('.ns-admin-type-buttons button').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  _nsSelectedAdminType = btn.dataset.admintype;
+}
+
+function selectOutcome(btn) {
+  document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  _nsSelectedOutcome = btn.dataset.outcome;
+}
+
+async function submitNewStore() {
+  const storeName = document.getElementById('nsStoreName').value.trim();
+  const address = document.getElementById('nsAddress').value.trim();
+
+  if (!storeName) {
+    showNsToast('사업장명을 입력해주세요');
+    document.getElementById('nsStoreName').focus();
+    return;
+  }
+  if (!address) {
+    showNsToast('주소를 입력해주세요');
+    document.getElementById('nsAddress').focus();
+    return;
+  }
+  if (!currentUser || !currentUser.code) {
+    showNsToast('로그인 정보가 없습니다');
+    return;
+  }
+
+  const usedSearch = !!_nsSelectedPlace;
+  const lat = _nsSelectedPlace ? _nsSelectedPlace.lat : '';
+  const lng = _nsSelectedPlace ? _nsSelectedPlace.lng : '';
+
+  const payload = {
+    partnerName: currentUser.name || '',
+    partnerCode: currentUser.code,
+    storeName: storeName,
+    address: address,
+    lat: lat,
+    lng: lng,
+    usedSearch: usedSearch,
+    adminType: _nsSelectedAdminType,
+    currentStoreName: document.getElementById('nsCurrentStoreName').value.trim(),
+    contact: document.getElementById('nsContact').value.trim(),
+    amount: document.getElementById('nsAmount').value.trim(),
+    price: document.getElementById('nsPrice').value.trim(),
+    suggestedPrice: document.getElementById('nsSuggestedPrice').value.trim(),
+    freq: document.getElementById('nsFreq').value.trim(),
+    bins: document.getElementById('nsBins').value.trim(),
+    vinyl: document.getElementById('nsVinyl').value,
+    truck: document.getElementById('nsTruck').value,
+    note: document.getElementById('nsNote').value.trim(),
+    outcome: _nsSelectedOutcome
+  };
+
+  const btn = document.getElementById('nsSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = '등록 중...';
+
+  try {
+    const response = await fetch(NEW_STORE_ENDPOINT, {
+      method: 'POST',
+      mode: 'cors',
+      cache: 'no-cache',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      redirect: 'follow'
+    });
+
+    const result = await response.json();
+
+    if (result.ok) {
+      closeNewStoreModal();
+      showNsToast('신규 등록 업장은 검토 후 지도에 반영됩니다.', 4000);
+    } else {
+      console.error('Submit failed:', result);
+      showNsToast('등록 실패: ' + (result.error || '알 수 없는 오류'));
+      btn.disabled = false;
+      btn.textContent = '등록';
+    }
+  } catch(err) {
+    console.error('Submit error:', err);
+    showNsToast('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
+    btn.disabled = false;
+    btn.textContent = '등록';
+  }
+}
+
+function showNsToast(message, duration) {
+  duration = duration || 2500;
+  let toast = document.getElementById('nsToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'nsToast';
+    toast.className = 'ns-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(function() { toast.classList.remove('show'); }, duration);
 }
 </script>
 </body>
