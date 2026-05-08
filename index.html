@@ -982,7 +982,8 @@ function initMap() {
         const wasInContractZone = lastZoomLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
         const isInContractZone = currentLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
 
-        // 줌인 영역에 있거나, 막 진입/이탈했을 때 다시 그리기
+        // v48.5: 줌인 영역에 있으면 무조건 재렌더링 (패닝/드래그도 포함)
+        // 줌아웃 영역으로 빠져나갔을 때도 한 번 재렌더링 (★ 제거 위해)
         if (isInContractZone || wasInContractZone) {
           console.log('[관리자 idle] level ' + lastZoomLevel + ' → ' + currentLevel + ' / 재렌더링');
           renderAdminView();
@@ -1101,33 +1102,33 @@ function handleClusterClick(cluster) {
     if (ms.length === 1) {
       map.setCenter(ms[0].getPosition());
       map.setLevel(3);
+      // v48.5: 줌인 후 기계약 강제 갱신
+      if (isAdminUser) setTimeout(function() { renderAdminView(); }, 400);
       return;
     }
 
-    // 멤버들의 거리 분석: 너무 멀면 첫 번째 위치로 이동
     const positions = ms.map(function(m) { return m.getPosition(); });
     const lats = positions.map(function(p) { return p.getLat(); });
     const lngs = positions.map(function(p) { return p.getLng(); });
     const latRange = Math.max.apply(null, lats) - Math.min.apply(null, lats);
     const lngRange = Math.max.apply(null, lngs) - Math.min.apply(null, lngs);
 
-    // 위/경도 범위가 1도 이상이면 (대략 100km+) 너무 멀어서 fit이 의미 없음
-    // → 클러스터 중심 위치로 이동하되 충분히 줌인
     if (latRange > 1 || lngRange > 1) {
-      console.log('[클러스터 클릭] 멤버 거리 너무 멈 (lat ' + latRange.toFixed(2) + ', lng ' + lngRange.toFixed(2) + ') → 중심으로 줌인');
-      // 클러스터 자체 중심 (averageCenter: true이므로 평균 좌표)
+      console.log('[클러스터 클릭] 멤버 거리 너무 멈 → 중심으로 줌인');
       const center = cluster.getCenter ? cluster.getCenter() : positions[0];
       map.setCenter(center);
-      map.setLevel(6);  // 시/도 단위 정도, 멀어도 한 핀은 보임
+      map.setLevel(6);
+      if (isAdminUser) setTimeout(function() { renderAdminView(); }, 400);
       return;
     }
 
-    // 가까운 거리: bounds로 fit
     const bounds = new kakao.maps.LatLngBounds();
     positions.forEach(function(p) { bounds.extend(p); });
     map.setBounds(bounds, 80, 80, 80, 80);
     setTimeout(function() {
       if (map.getLevel() >= CLUSTER_MIN_LEVEL) map.setLevel(CLUSTER_MIN_LEVEL - 1);
+      // v48.5: bounds 적용 후 기계약 강제 갱신
+      if (isAdminUser) setTimeout(function() { renderAdminView(); }, 250);
     }, 150);
   } catch(e) {
     console.warn('[클러스터 클릭] 처리 실패:', e);
@@ -1463,11 +1464,20 @@ function renderMarkers() {
 
   for (const store of allStoresInView) {
     const status = getEffectiveStatus(store);
+    const isContract = isContractGrade(store.grade);
+
+    // v48.5: 필터링 로직 - 기계약은 카테고리 필터에서 예외 처리 (항상 통과)
     if (currentFilter === "project") {
-      if (!amIAssignedToProject(store, currentUser.key)) continue;
-    } else if (currentFilter !== "all" && status !== currentFilter) {
-      continue;
+      // 프로젝트 필터: 기계약 제외, 배정된 업장만
+      if (isContract || !amIAssignedToProject(store, currentUser.key)) continue;
+    } else if (currentFilter !== "all") {
+      // 카테고리 필터(visit/lead/success/fail/contract): 기계약은 항상 통과, 영업활동은 status 매칭
+      if (!isContract && status !== currentFilter) continue;
+      // 'contract' 필터일 땐 기계약만 통과
+      if (currentFilter === "contract" && !isContract) continue;
     }
+    // 'all' 필터: 모두 통과
+
     const isSelected = selectedStore && selectedStore._key === store._key;
     if (isSelected) selectedRendered = true;
     const marker = createMarker(store, status, isSelected);
@@ -1475,7 +1485,7 @@ function renderMarkers() {
     markerByKey[store._key] = marker;
     shown++;
     // 관리자뷰의 기계약은 클러스터링 X (B안)
-    if (isSelected || (isAdminUser && adminViewActive && isContractGrade(store.grade))) {
+    if (isSelected || (isAdminUser && adminViewActive && isContract)) {
       directMarkers.push(marker);
     } else {
       clusterMarkers.push(marker);
@@ -1542,8 +1552,11 @@ function createMarker(store, status, isSelected) {
     if (map.getLevel() >= CLUSTER_MIN_LEVEL) {
       map.setCenter(position);
       map.setLevel(4);
-      // 약간 딜레이 후 패널 열기 (줌 애니메이션 자연스럽게)
-      setTimeout(function() { openPanel(store); }, 300);
+      setTimeout(function() {
+        openPanel(store);
+        // v48.5: 핀 클릭 줌인 후 기계약 강제 갱신
+        if (isAdminUser) renderAdminView();
+      }, 300);
     } else {
       openPanel(store);
     }
