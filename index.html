@@ -603,20 +603,29 @@ async function renderAdminView() {
   }
 
   // 줌인 시 기계약 동적 추가 (전체 필터일 때만)
+  let contractsAdded = 0;
   if (map && map.getLevel() <= ADMIN_CONTRACT_ZOOM_LEVEL && currentFilter === 'all') {
     try {
       const contracts = await fetchContractsInCurrentBounds();
       const seenKeys = {};
       filtered.forEach(function(s) { seenKeys[s._key] = true; });
-      contracts.forEach(function(c) { if (!seenKeys[c._key]) filtered.push(c); });
+      contracts.forEach(function(c) {
+        if (!seenKeys[c._key]) {
+          filtered.push(c);
+          contractsAdded++;
+        }
+      });
+      console.log('[기계약 추가됨] ' + contractsAdded + '개 (중복 ' + (contracts.length - contractsAdded) + '개 제외)');
     } catch(e) { console.warn('[기계약 동적 로드] 실패:', e); }
+  } else {
+    console.log('[기계약 미로드] level=' + (map ? map.getLevel() : '?') + ', filter=' + currentFilter + ' (level<=' + ADMIN_CONTRACT_ZOOM_LEVEL + ' 그리고 filter=all 이어야 로드)');
   }
 
   filtered = removeContractDuplicates(filtered);
   allStoresInView = filtered;
   renderMarkers();
 
-  console.log('[관리자뷰] filter=' + currentFilter + ', level=' + (map ? map.getLevel() : '?') + ', ' + filtered.length + '개');
+  console.log('[관리자뷰] filter=' + currentFilter + ', level=' + (map ? map.getLevel() : '?') + ', 총 ' + filtered.length + '개 (기계약 추가 ' + contractsAdded + '개)');
 }
 
 async function fetchContractsInCurrentBounds() {
@@ -627,22 +636,42 @@ async function fetchContractsInCurrentBounds() {
   const latMin = sw.getLat(), latMax = ne.getLat();
   const lngMin = sw.getLng(), lngMax = ne.getLng();
 
+  console.log('[기계약 fetch 시작] level=' + map.getLevel() + ', bounds=', { latMin, latMax, lngMin, lngMax });
+
   try {
     const snap = await db.ref('stores_light').orderByChild('lat').startAt(latMin).endAt(latMax).once('value');
     const raw = snap.val() || {};
+    const allInRange = [];
     const contracts = [];
+    const gradeSamples = {};
+
     for (const k in raw) {
       const s = raw[k];
       if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
       if (s.lng < lngMin || s.lng > lngMax) continue;
+      allInRange.push(s);
+
+      // grade 값 분포 샘플링 (디버깅용)
+      const g = s.grade || '(없음)';
+      gradeSamples[g] = (gradeSamples[g] || 0) + 1;
+
       if (!isContractGrade(s.grade)) continue;
       s._key = k;
       s._isContract = true;
       contracts.push(s);
     }
-    console.log('[기계약 bounds] ' + contracts.length + '개');
+
+    console.log('[기계약 fetch 결과] bounds 안 총 ' + allInRange.length + '개, 기계약 ' + contracts.length + '개');
+    console.log('[grade 분포]', gradeSamples);
+    if (contracts.length > 0) {
+      console.log('[기계약 샘플 3개]', contracts.slice(0, 3).map(c => ({ name: c.name, grade: c.grade, lat: c.lat, lng: c.lng })));
+    }
+
     return contracts;
-  } catch(e) { return []; }
+  } catch(e) {
+    console.error('[기계약 fetch 실패]', e);
+    return [];
+  }
 }
 
 async function loadVisitsAggregate() {
@@ -889,7 +918,10 @@ function initMap() {
         const currentLevel = map.getLevel();
         const wasInContractZone = lastZoomLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
         const isInContractZone = currentLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
+
+        // 줌인 영역에 있거나, 막 진입/이탈했을 때 다시 그리기
         if (isInContractZone || wasInContractZone) {
+          console.log('[관리자 idle] level ' + lastZoomLevel + ' → ' + currentLevel + ' / 재렌더링');
           renderAdminView();
         }
         lastZoomLevel = currentLevel;
@@ -1384,6 +1416,7 @@ function renderMarkers() {
   }
   directMarkers.forEach(function(m) { m.setMap(map); });
 
+  console.log('[renderMarkers] 클러스터 ' + clusterMarkers.length + '개 + 직접표시 ' + directMarkers.length + '개');
   document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
 }
 
