@@ -1040,13 +1040,35 @@ function handleClusterClick(cluster) {
       map.setLevel(3);
       return;
     }
+
+    // 멤버들의 거리 분석: 너무 멀면 첫 번째 위치로 이동
+    const positions = ms.map(function(m) { return m.getPosition(); });
+    const lats = positions.map(function(p) { return p.getLat(); });
+    const lngs = positions.map(function(p) { return p.getLng(); });
+    const latRange = Math.max.apply(null, lats) - Math.min.apply(null, lats);
+    const lngRange = Math.max.apply(null, lngs) - Math.min.apply(null, lngs);
+
+    // 위/경도 범위가 1도 이상이면 (대략 100km+) 너무 멀어서 fit이 의미 없음
+    // → 클러스터 중심 위치로 이동하되 충분히 줌인
+    if (latRange > 1 || lngRange > 1) {
+      console.log('[클러스터 클릭] 멤버 거리 너무 멈 (lat ' + latRange.toFixed(2) + ', lng ' + lngRange.toFixed(2) + ') → 중심으로 줌인');
+      // 클러스터 자체 중심 (averageCenter: true이므로 평균 좌표)
+      const center = cluster.getCenter ? cluster.getCenter() : positions[0];
+      map.setCenter(center);
+      map.setLevel(6);  // 시/도 단위 정도, 멀어도 한 핀은 보임
+      return;
+    }
+
+    // 가까운 거리: bounds로 fit
     const bounds = new kakao.maps.LatLngBounds();
-    ms.forEach(function(m) { bounds.extend(m.getPosition()); });
+    positions.forEach(function(p) { bounds.extend(p); });
     map.setBounds(bounds, 80, 80, 80, 80);
     setTimeout(function() {
       if (map.getLevel() >= CLUSTER_MIN_LEVEL) map.setLevel(CLUSTER_MIN_LEVEL - 1);
     }, 150);
-  } catch(e) {}
+  } catch(e) {
+    console.warn('[클러스터 클릭] 처리 실패:', e);
+  }
 }
 
 function applyClusterColors(clusters) {
@@ -1452,7 +1474,17 @@ function createMarker(store, status, isSelected) {
   marker._upboxStatus = status;
   marker._upboxStoreKey = store._key;
   marker._upboxIsContract = isContractGrade(store.grade);
-  kakao.maps.event.addListener(marker, "click", function() { openPanel(store); });
+  kakao.maps.event.addListener(marker, "click", function() {
+    // 핀 클릭 시 충분히 줌아웃된 상태면 자연스럽게 줌인
+    if (map.getLevel() >= CLUSTER_MIN_LEVEL) {
+      map.setCenter(position);
+      map.setLevel(4);
+      // 약간 딜레이 후 패널 열기 (줌 애니메이션 자연스럽게)
+      setTimeout(function() { openPanel(store); }, 300);
+    } else {
+      openPanel(store);
+    }
+  });
   return marker;
 }
 
