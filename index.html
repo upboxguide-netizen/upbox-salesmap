@@ -331,22 +331,18 @@ const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOp
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 
 /* ════════════════════════════════════════════
- * v48.1 변경사항 (2026-05-08)
- *   - 관리자 필터 클릭 시 누락 핀 버그 수정
- *     · 김포 + 대전처럼 멀리 떨어진 위치들 fit 시 일부 핀 누락되던 이슈
- *     · 원인: setBounds 후 idle 이벤트가 loadStoresInView()를 호출하면서 화면 bounds 안 핀만 다시 잡아 일부 누락
- *     · 해결: 관리자 필터는 loadStoresInView() 우회, 타겟 storeKey들을 직접 fetch해서 정확히 N개 핀 그림
- *     · setBounds()에 80px 패딩 추가 (가장자리 핀 보호)
+ * v48.2 변경사항 (2026-05-08)
+ *   - 관리자뷰 동작 방식 전면 개편
+ *     · 로그인 시 초기 줌 레벨 11 (전국 한눈에)
+ *     · 시작 시 visits_aggregate 전체 핀을 한 번에 fetch (관리자 마스터 데이터)
+ *     · 칩 클릭 시 줌아웃 유지 + 카테고리별 클러스터링
+ *     · idle 이벤트로 인한 데이터 덮어쓰기 차단 (관리자뷰 한정)
+ *     · 클러스터 클릭 시 줌인되어 개별 핀 노출 (카카오 기본 동작)
  *
- * v48.0 (2026-05-08)
- *   - 카카오 MarkerClusterer 도입 (레벨 7+ 클러스터링)
- *   - 시작 시 현재 위치 우선 로딩
- *   - 칩 클릭 시 자동 지도 이동 (관리자 + 일반 파트너 공통)
- *   - 클러스터 색상 = 카테고리 칩 색상과 얼라인
- *
- * v47.2 (2026-05-07): 관리자 필터 클릭 자동 이동
- * v47.0 (2026-05-07): 관리자 7명 전용 뷰
- * v46.0 (2026-05-07): 폐업 처리 + 30m 중복제거
+ * v48.1 (2026-05-08): 관리자 필터 누락 핀 1차 수정
+ * v48.0 (2026-05-08): 클러스터링 + 현재위치 + 칩 자동이동
+ * v47.x (2026-05-07): 관리자 7명 전용 뷰
+ * v46.0 (2026-05-07): 폐업 처리
  * ════════════════════════════════════════════ */
 
 const ADMIN_CODES = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'];
@@ -538,6 +534,11 @@ let markerClusterer = null;
 let initialLocation = null;          // 로그인 직후 받아둘 시작 위치
 let suppressNextIdle = false;        // v48.1: 관리자 필터 이동 직후 idle 한 번 무시
 
+// v48.2: 관리자 마스터 데이터 (visits_aggregate에 해당하는 stores_light 전체)
+//        시작 시 한 번 fetch하고 칩 필터링은 메모리에서 처리
+let adminMasterStores = [];          // [{lat, lng, name, grade, _key, ...}, ...]
+const ADMIN_INIT_LEVEL = 11;         // 전국 한눈에 (서울~제주 정도)
+
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
 document.getElementById("logoutBtn").onclick = logout;
@@ -637,6 +638,8 @@ async function startApp() {
       updateChipCounts();
       if (isAdminUser) {
         await loadVisitsAggregate();
+        // v48.2: 관리자 마스터 데이터 추가 fetch
+        await loadAdminMasterStores();
         updateAdminStatsBar();
         bindAdminStatsFilters();
       }
@@ -667,18 +670,54 @@ function bindAdminStatsFilters() {
     el.addEventListener('click', function() {
       const filter = el.dataset.adminFilter;
       if (currentFilter === filter) {
+        // 같은 칩 다시 클릭 → 해제 (전체 보기)
         currentFilter = 'all';
         el.classList.remove('active');
-        renderMarkers();
       } else {
         currentFilter = filter;
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
-        moveToFilteredStores(filter);
       }
       console.log('[관리자 필터]', currentFilter);
+      // v48.2: 줌 레벨 11로 강제 줌아웃 + 필터 적용된 클러스터 뷰
+      resetAdminViewZoom();
+      renderAdminView();
     });
   });
+}
+
+/* v48.2: 관리자 전국 뷰로 줌 리셋 */
+function resetAdminViewZoom() {
+  if (!map) return;
+  map.setCenter(new kakao.maps.LatLng(36.5, 127.8));
+  map.setLevel(ADMIN_INIT_LEVEL);
+}
+
+/* v48.2: 관리자뷰 마스터 데이터 → 현재 필터 적용 → 마커 렌더링
+ * - bounds 쿼리 일절 사용 안 함 (loadStoresInView 우회)
+ * - 모든 마스터 핀을 클러스터링 대상으로 넣음
+ * - 줌 레벨이 CLUSTER_MIN_LEVEL 이상이면 자동 클러스터링됨
+ */
+function renderAdminView() {
+  if (!isAdminUser) return;
+
+  let filtered = adminMasterStores.slice();
+
+  // 현재 필터 적용
+  if (currentFilter !== 'all' && currentFilter !== 'project') {
+    filtered = filtered.filter(function(s) {
+      const status = getEffectiveStatus(s);
+      return status === currentFilter;
+    });
+  }
+
+  // 기계약 중복 제거 룰 적용
+  filtered = removeContractDuplicates(filtered);
+
+  allStoresInView = filtered;
+  renderMarkers();
+
+  console.log('[관리자뷰 렌더] filter=' + currentFilter + ', ' + filtered.length + '개 핀');
 }
 
 /* v48.0: 일반 파트너용 칩 클릭 자동 이동 */
@@ -931,6 +970,51 @@ async function loadVisitsAggregate() {
   }
 }
 
+/* v48.2: 관리자 마스터 stores_light 데이터 fetch
+ * - visits_aggregate.stores의 모든 storeKey + 기계약 업장의 stores_light 정보를 메모리에 보관
+ * - 칩 필터링은 이 메모리에서 처리 → bounds 쿼리 누락 이슈 원천 차단
+ */
+async function loadAdminMasterStores() {
+  if (!visitsAggregate || !visitsAggregate.stores) {
+    console.warn('[관리자 마스터] visits_aggregate 없음. 빈 배열로 진행.');
+    adminMasterStores = [];
+    return;
+  }
+
+  const aggKeys = Object.keys(visitsAggregate.stores);
+  console.log('[관리자 마스터] visits_aggregate ' + aggKeys.length + '개 업장 stores_light fetch 시작');
+
+  try {
+    // 1) visits_aggregate에 있는 업장들 fetch
+    const fetchPromises = aggKeys.map(function(k) {
+      return db.ref('stores_light/' + k).once('value').then(function(snap) {
+        const v = snap.val();
+        if (v && !isNaN(v.lat) && !isNaN(v.lng)) {
+          v._key = k;
+          return v;
+        }
+        return null;
+      }).catch(function() { return null; });
+    });
+
+    const results = await Promise.all(fetchPromises);
+    let validStores = results.filter(function(s) { return s !== null; });
+
+    // 2) 폐업 필터: 폐업이지만 lead 상태인 것만 유지 (관리자뷰는 visits_aggregate.lastStatus 기준)
+    validStores = validStores.filter(function(s) {
+      if (!isClosed(s)) return true;
+      const aggData = visitsAggregate.stores[s._key];
+      return aggData && aggData.lastStatus === 'lead';
+    });
+
+    adminMasterStores = validStores;
+    console.log('[관리자 마스터] 메모리 적재 완료: ' + adminMasterStores.length + '개 업장');
+  } catch(e) {
+    console.error('[관리자 마스터] 로드 실패:', e);
+    adminMasterStores = [];
+  }
+}
+
 function updateAdminStatsBar() {
   if (!isAdminUser || !adminViewActive || !visitsAggregate) {
     document.getElementById('adminStatsBar').classList.remove('visible');
@@ -1146,48 +1230,66 @@ function updateChipCounts() {
 function initMap() {
   const container = document.getElementById("map");
 
-  // v48.0: 초기 위치 결정 - initialLocation 있으면 그곳, 없으면 서울 중구
+  // v48.0: 초기 위치 결정
+  // v48.2: 관리자는 전국 줌아웃, 일반 파트너는 현재 위치 줌인
   let initialCenter, initialLevel;
-  if (initialLocation) {
+  if (isAdminUser) {
+    // 관리자: 한국 중심부 줌아웃 (대전 근처)
+    initialCenter = new kakao.maps.LatLng(36.5, 127.8);
+    initialLevel = ADMIN_INIT_LEVEL;
+    console.log('[지도 초기화] 관리자 모드 - 전국 뷰 (level ' + ADMIN_INIT_LEVEL + ')');
+  } else if (initialLocation) {
     initialCenter = new kakao.maps.LatLng(initialLocation.lat, initialLocation.lng);
     initialLevel = 4;
     console.log('[지도 초기화] 현재 위치 기준:', initialLocation);
   } else {
     initialCenter = new kakao.maps.LatLng(37.5665, 126.9780);
     initialLevel = 4;
-    console.log('[지도 초기화] 서울 중구 fallback (현재 위치 못 받음)');
+    console.log('[지도 초기화] 서울 중구 fallback');
   }
 
   const options = { center: initialCenter, level: initialLevel };
   map = new kakao.maps.Map(container, options);
 
-  // v48.0: 클러스터러는 renderMarkers()에서 매번 재생성하는 방식이 아니라,
-  //        하나만 만들고 색상은 markers의 status 분포 분석해서 동적 결정
+  // v48.0: 클러스터러 초기화
   markerClusterer = createClusterer();
 
   startLocationTracking();
 
-  // 초기 위치가 이미 있으면 마커 표시
   if (initialLocation) {
     updateMyLocationMarker(initialLocation.lat, initialLocation.lng);
   }
 
-  let moveDebounce;
-  kakao.maps.event.addListener(map, "idle", function() {
-    // v48.1: 관리자 필터 이동 직후 idle 한 번은 무시 (allStoresInView 보존)
-    if (suppressNextIdle) {
-      suppressNextIdle = false;
-      console.log('[idle] 무시 (관리자 필터 이동 직후)');
-      // 라벨 가시성만 갱신
-      updateAdminLabelVisibility();
-      return;
-    }
-    clearTimeout(moveDebounce);
-    moveDebounce = setTimeout(function() {
-      loadStoresInView();
-      updateAdminLabelVisibility();
-    }, 400);
-  });
+  // v48.2: 관리자뷰는 idle 이벤트로 loadStoresInView() 호출하지 않음
+  //        대신 마스터 데이터 + 현재 필터로 renderMarkers만 다시 그림
+  if (isAdminUser) {
+    // 초기 렌더링 한 번
+    setTimeout(function() { renderAdminView(); }, 100);
+
+    // 라벨 가시성 갱신용으로만 idle 사용
+    let adminIdleDebounce;
+    kakao.maps.event.addListener(map, "idle", function() {
+      clearTimeout(adminIdleDebounce);
+      adminIdleDebounce = setTimeout(function() {
+        updateAdminLabelVisibility();
+      }, 200);
+    });
+  } else {
+    // 일반 파트너: 기존 동작 유지
+    let moveDebounce;
+    kakao.maps.event.addListener(map, "idle", function() {
+      if (suppressNextIdle) {
+        suppressNextIdle = false;
+        updateAdminLabelVisibility();
+        return;
+      }
+      clearTimeout(moveDebounce);
+      moveDebounce = setTimeout(function() {
+        loadStoresInView();
+        updateAdminLabelVisibility();
+      }, 400);
+    });
+  }
 
   kakao.maps.event.addListener(map, "click", function() {
     closePanel(true);
@@ -1480,6 +1582,8 @@ function updateMyLocationMarker(lat, lng) {
 }
 
 function moveToMyLocation() {
+  // v48.2: 관리자뷰에서는 현재 위치 버튼 클릭 시 본인 위치로 줌인 (level 4)
+  // 단, 마스터 데이터는 그대로 → 줌인되면 클러스터 풀려서 핀 보임
   if (currentUserLocation) {
     map.setCenter(new kakao.maps.LatLng(currentUserLocation.lat, currentUserLocation.lng));
     map.setLevel(4);
