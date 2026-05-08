@@ -103,6 +103,21 @@
     border-color: white;
     box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.4);
   }
+
+  /* 📊 전체 칩 - 다른 칩보다 살짝 강조 */
+  .admin-stat-all {
+    background: rgba(242, 172, 87, 0.2);
+    font-weight: 700;
+    color: #F2AC57;
+  }
+  .admin-stat-all .admin-stat-name { color: #F2AC57; font-weight: 700; }
+  .admin-stat-all.active {
+    background: rgba(242, 172, 87, 0.45);
+    border-color: #F2AC57;
+    box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5);
+  }
+  .admin-stat-all.active .admin-stat-name { color: white; }
+  .admin-stats-label-icon { font-size: 13px; }
   .admin-stat-dot {
     width: 7px;
     height: 7px;
@@ -249,7 +264,10 @@
   </div>
 
   <div id="adminStatsBar">
-    <span class="admin-stats-label">📊 전체</span>
+    <span class="admin-stat-item admin-stat-all active" data-admin-filter="all" id="adminStatAll">
+      <span class="admin-stats-label-icon">📊</span>
+      <span class="admin-stat-name">전체</span>
+    </span>
     <span class="admin-stat-item" data-admin-filter="visit">
       <span class="admin-stat-dot" style="background:#4d4678;"></span>
       <span class="admin-stat-name">단순방문</span>
@@ -570,14 +588,24 @@ function bindAdminStatsFilters() {
   document.querySelectorAll('.admin-stat-item[data-admin-filter]').forEach(function(el) {
     el.addEventListener('click', function() {
       const filter = el.dataset.adminFilter;
-      if (currentFilter === filter) {
+
+      if (filter === 'all') {
+        // 전체 칩 클릭: 항상 'all'로 리셋 (재클릭해도 동일 동작)
         currentFilter = 'all';
-        el.classList.remove('active');
+        document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
+        el.classList.add('active');
+      } else if (currentFilter === filter) {
+        // 같은 카테고리 칩 다시 클릭 → 해제 (전체로 복귀)
+        currentFilter = 'all';
+        document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
+        const allChip = document.getElementById('adminStatAll');
+        if (allChip) allChip.classList.add('active');
       } else {
         currentFilter = filter;
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
       }
+
       console.log('[관리자 필터]', currentFilter);
       resetAdminViewZoom();
       renderAdminView();
@@ -602,9 +630,9 @@ async function renderAdminView() {
     });
   }
 
-  // 줌인 시 기계약 동적 추가 (전체 필터일 때만)
+  // 줌인 시 기계약 동적 추가 (어떤 필터에서든 줌인하면 노출)
   let contractsAdded = 0;
-  if (map && map.getLevel() <= ADMIN_CONTRACT_ZOOM_LEVEL && currentFilter === 'all') {
+  if (map && map.getLevel() <= ADMIN_CONTRACT_ZOOM_LEVEL) {
     try {
       const contracts = await fetchContractsInCurrentBounds();
       const seenKeys = {};
@@ -617,8 +645,6 @@ async function renderAdminView() {
       });
       console.log('[기계약 추가됨] ' + contractsAdded + '개 (중복 ' + (contracts.length - contractsAdded) + '개 제외)');
     } catch(e) { console.warn('[기계약 동적 로드] 실패:', e); }
-  } else {
-    console.log('[기계약 미로드] level=' + (map ? map.getLevel() : '?') + ', filter=' + currentFilter + ' (level<=' + ADMIN_CONTRACT_ZOOM_LEVEL + ' 그리고 filter=all 이어야 로드)');
   }
 
   filtered = removeContractDuplicates(filtered);
