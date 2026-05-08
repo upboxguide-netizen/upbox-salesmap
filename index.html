@@ -12,7 +12,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services"></script>
+<!-- v48.0: clusterer 라이브러리 추가 -->
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services,clusterer"></script>
 
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -58,8 +59,6 @@
   .chip-count { margin-left: 3px; font-weight: 600; opacity: 0.9; }
   .chip-count:empty { display: none; }
 
-  /* v47.0: 관리자 전용 전체 통계 영역 (한 줄 고정, 스크롤 없음) */
-  /* v47.1: 클릭 가능한 필터로도 동작 */
   #adminStatsBar {
     display: none;
     padding: 8px 10px;
@@ -135,7 +134,6 @@
   #panelContent .badge-contract { background: #FFF3E0; color: #F2AC57; font-weight: 700; }
   #panelContent .badge-closed { background: #E0E0E0; color: #424242; font-weight: 600; }
 
-  /* v47.0: 관리자 전용 패널 정보 박스 */
   .admin-info-box {
     background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%);
     color: white;
@@ -202,6 +200,30 @@
   .notice-btn-primary:hover { background: #e89a3e; }
   .notice-btn-secondary { background: #EEE; color: #555; }
   .notice-btn-secondary:hover { background: #DDD; }
+
+  /* v48.0: 클러스터 핀 디자인 (색상은 JS에서 동적 결정) */
+
+  /* v48.0: 초기 로딩 화면 */
+  #initLoading {
+    position: fixed; inset: 0; z-index: 9997;
+    background: rgba(54, 56, 89, 0.95);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: white;
+    transition: opacity 0.3s;
+  }
+  #initLoading.hide { opacity: 0; pointer-events: none; }
+  .init-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top-color: #F2AC57;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .init-text { font-size: 14px; color: #EEE; }
+  .init-subtext { font-size: 11px; color: #AAA; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -221,7 +243,6 @@
     <div id="searchResults"></div>
   </div>
 
-  <!-- v47.1: 관리자 전용 전체 통계 + 필터 (폐업 칩 제거, 클릭 가능) -->
   <div id="adminStatsBar">
     <span class="admin-stats-label">📊 전체</span>
     <span class="admin-stat-item" data-admin-filter="visit">
@@ -264,7 +285,13 @@
   </div>
 </div>
 
-<div id="loginScreen">
+<div id="initLoading">
+  <div class="init-spinner"></div>
+  <div class="init-text" id="initText">현재 위치 확인 중...</div>
+  <div class="init-subtext" id="initSubtext">위치 권한을 허용해주세요</div>
+</div>
+
+<div id="loginScreen" style="display:none;">
   <div class="login-box">
     <h1>업박스 영업 지도</h1>
     <p>파트너 전용 CRM</p>
@@ -304,37 +331,32 @@ const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOp
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 
 /* ════════════════════════════════════════════
- * v47.0 변경사항 (2026-05-07)
- *   - 관리자 7명 전용 뷰 추가 (박성철0001 ~ 김시연0007)
- *   - 관리자 로그인 시 자동으로 관리자 뷰 활성화 (토글 없음)
- *   - 전체 통계 바 (필터바 위, 그라데이션 배경)
- *   - 관리자 모드에서 핀 색상 = visits_aggregate.lastStatus 기준
- *   - 핀 옆 라벨로 lastPartnerName 표시 (줌 레벨 5+ 노출)
- *   - 패널에 "최신 접촉" 정보 박스 표시
- *   - visits_aggregate 캐시 (12시간 TTL)
+ * v48.0 변경사항 (2026-05-08)
+ *   - 카카오 MarkerClusterer 도입 (레벨 7+ 클러스터링)
+ *   - 시작 시 현재 위치 우선 로딩 (로그인 → 위치 확인 → 지도 초기화)
+ *   - 칩 클릭 시 자동 지도 이동 (관리자 + 일반 파트너 공통)
+ *   - 클러스터 색상 = 카테고리 칩 색상과 얼라인:
+ *      · 단일 칩 활성: 해당 카테고리 색상으로 통일
+ *      · 전체뷰: 클러스터 내 1위 카테고리 색상 (success>lead>visit>fail>contract 우선순위)
  *
- * v46.0 (2026-05-07):
- *   - 폐업 처리 + 30m 중복제거
+ * v47.2 (2026-05-07): 관리자 필터 클릭 자동 이동
+ * v47.0 (2026-05-07): 관리자 7명 전용 뷰
+ * v46.0 (2026-05-07): 폐업 처리 + 30m 중복제거
  * ════════════════════════════════════════════ */
 
-/* ════════════════════════════════════════════
- * 관리자 코드 7명 (하드코딩)
- * 향후 변경 시 권한관리 시트에 isAdmin 컬럼 추가하는 것을 검토
- * ════════════════════════════════════════════ */
 const ADMIN_CODES = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'];
-const ADMIN_LABEL_MIN_LEVEL = 5;  // 줌 레벨 5 이하(=확대)에서만 라벨 노출
+const ADMIN_LABEL_MIN_LEVEL = 5;
+const CLUSTER_MIN_LEVEL = 7;            // v48.0: 줌 레벨 7+ 부터 클러스터링
+const FILTER_MOVE_MAX_PINS = 500;       // v48.0: 칩 클릭 자동이동 시 최대 핀 수
 
 function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
 }
 
-/* ════════════════════════════════════════════
- * 캐싱 시스템
- * ════════════════════════════════════════════ */
 const CACHE = {
-  OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },        // 24시간
-  MY_PROJECTS:     { key: 'cache_my_projects_v2',      ttlMs: 30 * 24 * 60 * 60 * 1000 },   // 30일
-  ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v1',  ttlMs: 12 * 60 * 60 * 1000 }         // 12시간
+  OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },
+  MY_PROJECTS:     { key: 'cache_my_projects_v2',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
+  ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v1',  ttlMs: 12 * 60 * 60 * 1000 }
 };
 
 function getCache(cacheConfig) {
@@ -395,9 +417,6 @@ function clearAllCaches() {
   if (removed > 0) console.log('[마이그레이션] 옛 캐시 ' + removed + '개 자동 삭제');
 })();
 
-/* ════════════════════════════════════════════
- * 공지 시스템
- * ════════════════════════════════════════════ */
 const NOTICE_TYPES = {
   projectAssignments: {
     icon: '🎯',
@@ -484,8 +503,8 @@ function showNoticeModal(type, notice, onClose) {
 let map, currentUser = null;
 let markers = [];
 let markerByKey = {};
-let labelOverlays = [];          // v47.0: 관리자 라벨용
-let labelByKey = {};             // v47.0
+let labelOverlays = [];
+let labelByKey = {};
 let allStoresInView = [];
 let currentFilter = "all";
 let selectedStore = null;
@@ -505,10 +524,13 @@ let myVisitedStoreData = {};
 let hasMyProjects = false;
 let myProjectStores = [];
 
-// v47.0 신규 상태
 let isAdminUser = false;
-let adminViewActive = false;     // 관리자면 startApp에서 자동 true
-let visitsAggregate = null;      // { stores: {}, summary: {}, version, updatedAt }
+let adminViewActive = false;
+let visitsAggregate = null;
+
+// v48.0: 클러스터러 + 초기 위치
+let markerClusterer = null;
+let initialLocation = null;          // 로그인 직후 받아둘 시작 위치
 
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
@@ -552,45 +574,92 @@ function logout() {
     } catch(e) {
       localStorage.removeItem("upboxPartner");
     }
+  } else {
+    // 자동 로그인 없으면 로딩 숨기고 로그인 화면 표시
+    document.getElementById("initLoading").classList.add("hide");
+    document.getElementById("loginScreen").style.display = "flex";
   }
 })();
 
+/* v48.0: 시작 시 현재 위치를 먼저 받아둠 */
+async function fetchInitialLocation() {
+  return new Promise(function(resolve) {
+    if (!navigator.geolocation) {
+      console.warn('[초기 위치] geolocation 미지원');
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        console.log('[초기 위치] 획득:', loc);
+        resolve(loc);
+      },
+      function(err) {
+        console.warn('[초기 위치] 실패:', err.message);
+        resolve(null);
+      },
+      { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 }
+    );
+  });
+}
+
 async function startApp() {
   document.getElementById("loginScreen").style.display = "none";
+
+  // v48.0: 초기 로딩 화면 표시
+  const initLoading = document.getElementById("initLoading");
+  const initText = document.getElementById("initText");
+  initLoading.classList.remove("hide");
+  initText.textContent = "현재 위치 확인 중...";
+
   document.getElementById("userInfo").textContent = currentUser.name;
 
-  // v47.0: 관리자 판정 - 관리자면 자동으로 관리자 뷰 활성화
   isAdminUser = isAdmin(currentUser.code);
   if (isAdminUser) {
     adminViewActive = true;
     document.getElementById('adminBadge').style.display = 'inline-block';
-    // v47.1: 관리자는 하단 필터칩 바 숨김 (통계바가 필터 역할)
     document.getElementById('filterBar').style.display = 'none';
     console.log('[관리자 모드] 자동 활성화 - ' + currentUser.name + ' (' + currentUser.code + ')');
   }
 
-  await loadOtherPartnerContacts();
-  await loadMyVisits();
-  updateChipCounts();
+  // v48.0: 위치 먼저 받기 (병렬로 데이터 로딩)
+  const [_, location] = await Promise.all([
+    (async function() {
+      await loadOtherPartnerContacts();
+      await loadMyVisits();
+      updateChipCounts();
+      if (isAdminUser) {
+        await loadVisitsAggregate();
+        updateAdminStatsBar();
+        bindAdminStatsFilters();
+      }
+      await checkMyProjectAssignment();
+    })(),
+    fetchInitialLocation()
+  ]);
 
-  // v47.0: 관리자면 집계 데이터 미리 로드
-  if (isAdminUser) {
-    await loadVisitsAggregate();
-    updateAdminStatsBar();
-    bindAdminStatsFilters();
+  initialLocation = location;
+  if (location) {
+    currentUserLocation = location;
+    initText.textContent = "지도 준비 중...";
+  } else {
+    initText.textContent = "지도 준비 중... (현재 위치 못 받음)";
   }
 
-  await checkMyProjectAssignment();
   initMap();
   checkNotices();
+
+  // 초기 로딩 화면 페이드아웃
+  setTimeout(function() {
+    initLoading.classList.add("hide");
+  }, 500);
 }
 
-// v47.1: 통계바 칩 클릭으로 필터링 + 해당 상태 핀들이 보이는 범위로 자동 이동
 function bindAdminStatsFilters() {
   document.querySelectorAll('.admin-stat-item[data-admin-filter]').forEach(function(el) {
     el.addEventListener('click', function() {
       const filter = el.dataset.adminFilter;
-      // 같은 칩 다시 클릭 → 해제 (전체 보기)
       if (currentFilter === filter) {
         currentFilter = 'all';
         el.classList.remove('active');
@@ -599,7 +668,6 @@ function bindAdminStatsFilters() {
         currentFilter = filter;
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
-        // v47.2: 해당 상태 핀들이 모두 보이는 범위로 지도 이동
         moveToFilteredStores(filter);
       }
       console.log('[관리자 필터]', currentFilter);
@@ -607,7 +675,86 @@ function bindAdminStatsFilters() {
   });
 }
 
-// v47.2: visits_aggregate 기준으로 해당 상태인 모든 업장의 좌표를 모아 bounds fit
+/* v48.0: 일반 파트너용 칩 클릭 자동 이동 */
+async function moveToFilteredStoresForPartner(filter) {
+  const statusBar = document.getElementById('statusBar');
+  if (statusBar) statusBar.textContent = '필터 적용 중...';
+
+  // 'all'은 그냥 현재 화면 그대로 렌더링
+  if (filter === 'all') {
+    renderMarkers();
+    return;
+  }
+
+  // 'contract'는 stores_light에서 grade 기반으로 위치 모음
+  if (filter === 'contract') {
+    await moveToContractStores();
+    return;
+  }
+
+  // visit/lead/success/fail은 myVisitedStoreData 기반으로 위치 모음
+  const targetKeys = [];
+  for (const storeKey in myVisitedStoreData) {
+    const rec = myVisitedStoreData[storeKey];
+    const cur = rec.current || {};
+    const outcome = String(cur.outcome || "").trim();
+
+    let status = 'visit';
+    if (outcome === '성사') status = 'success';
+    else if (outcome === '실패') status = 'fail';
+    else {
+      const leadFields = [cur.currentStoreName, cur.contact, cur.amount,
+                          cur.suggestedPrice, cur.bins, cur.vinyl, cur.truck, cur.note];
+      const allLeadFilled = leadFields.every(v => String(v || "").trim().length > 0);
+      if (allLeadFilled) status = 'lead';
+      else if (outcome === '폐업') status = 'closedByMe';
+    }
+
+    if (status === filter) targetKeys.push(storeKey);
+  }
+
+  if (targetKeys.length === 0) {
+    console.log('[필터 이동] 해당 상태 업장 없음:', filter);
+    if (statusBar) statusBar.textContent = '해당 상태 업장 없음';
+    renderMarkers();
+    return;
+  }
+
+  await fitMapToStoreKeys(targetKeys, filter);
+}
+
+async function moveToContractStores() {
+  const statusBar = document.getElementById('statusBar');
+  try {
+    const snap = await db.ref('stores_light').once('value');
+    const all = snap.val() || {};
+    const coords = [];
+    for (const k in all) {
+      const s = all[k];
+      if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
+      if (!isContractGrade(s.grade)) continue;
+      // 현재 위치 반경 필터 (기계약은 3km 룰 유지)
+      if (currentUserLocation) {
+        const dist = haversine(currentUserLocation.lat, currentUserLocation.lng, s.lat, s.lng);
+        if (dist > CONTRACT_RADIUS_KM) continue;
+      }
+      coords.push({ lat: s.lat, lng: s.lng });
+      if (coords.length >= FILTER_MOVE_MAX_PINS) break;
+    }
+
+    if (coords.length === 0) {
+      if (statusBar) statusBar.textContent = '근처 기계약 업장 없음';
+      renderMarkers();
+      return;
+    }
+
+    fitToCoords(coords);
+  } catch(e) {
+    console.error('[기계약 이동] 실패:', e);
+    renderMarkers();
+  }
+}
+
 async function moveToFilteredStores(filter) {
   if (!visitsAggregate || !visitsAggregate.stores) {
     console.warn('[필터 이동] visits_aggregate 없음. 단순 필터링만 진행.');
@@ -615,7 +762,6 @@ async function moveToFilteredStores(filter) {
     return;
   }
 
-  // 1. visits_aggregate에서 해당 상태인 storeKey 목록 수집
   const targetKeys = [];
   for (const storeKey in visitsAggregate.stores) {
     if (visitsAggregate.stores[storeKey].lastStatus === filter) {
@@ -629,14 +775,19 @@ async function moveToFilteredStores(filter) {
     return;
   }
 
-  console.log('[필터 이동] ' + filter + ' 상태 업장 ' + targetKeys.length + '개 좌표 조회 중...');
+  await fitMapToStoreKeys(targetKeys, filter);
+}
 
-  // 2. stores_light에서 좌표 조회 (병렬)
+/* v48.0: 공통 유틸 - 업장 키 목록 → 좌표 조회 → bounds fit */
+async function fitMapToStoreKeys(targetKeys, filterLabel) {
   const statusBar = document.getElementById('statusBar');
-  if (statusBar) statusBar.textContent = '필터 적용 중...';
+  if (statusBar) statusBar.textContent = '필터 적용 중... (' + targetKeys.length + '개)';
+
+  // 너무 많으면 일부만
+  const limited = targetKeys.slice(0, FILTER_MOVE_MAX_PINS);
 
   try {
-    const fetchPromises = targetKeys.map(function(k) {
+    const fetchPromises = limited.map(function(k) {
       return db.ref('stores_light/' + k).once('value').then(function(snap) {
         const v = snap.val();
         if (v && !isNaN(v.lat) && !isNaN(v.lng)) {
@@ -651,35 +802,36 @@ async function moveToFilteredStores(filter) {
 
     if (validCoords.length === 0) {
       console.warn('[필터 이동] 유효한 좌표 없음');
+      if (statusBar) statusBar.textContent = '좌표 없음';
       renderMarkers();
       return;
     }
 
-    // 3. 단일 좌표면 그 위치로, 여러 좌표면 bounds fit
-    if (validCoords.length === 1) {
-      map.setCenter(new kakao.maps.LatLng(validCoords[0].lat, validCoords[0].lng));
-      map.setLevel(4);
-    } else {
-      const bounds = new kakao.maps.LatLngBounds();
-      validCoords.forEach(function(c) {
-        bounds.extend(new kakao.maps.LatLng(c.lat, c.lng));
-      });
-      map.setBounds(bounds);
-      // 너무 줌인되면 보기 불편하니 최소 레벨 4 보장
-      setTimeout(function() {
-        if (map.getLevel() < 4) map.setLevel(4);
-      }, 100);
-    }
-
-    console.log('[필터 이동] ' + validCoords.length + '개 핀 보이도록 이동 완료');
-    // map의 idle 이벤트가 자동으로 loadStoresInView() 호출 → renderMarkers()
+    fitToCoords(validCoords);
+    console.log('[필터 이동] ' + filterLabel + ' ' + validCoords.length + '개 핀 보이도록 이동 완료');
   } catch(e) {
     console.error('[필터 이동] 좌표 조회 실패:', e);
     renderMarkers();
   }
 }
 
-/* v47.0: 관리자 통계 집계 데이터 로드 */
+function fitToCoords(coords) {
+  if (!coords || coords.length === 0) return;
+  if (coords.length === 1) {
+    map.setCenter(new kakao.maps.LatLng(coords[0].lat, coords[0].lng));
+    map.setLevel(4);
+  } else {
+    const bounds = new kakao.maps.LatLngBounds();
+    coords.forEach(function(c) {
+      bounds.extend(new kakao.maps.LatLng(c.lat, c.lng));
+    });
+    map.setBounds(bounds);
+    setTimeout(function() {
+      if (map.getLevel() < 4) map.setLevel(4);
+    }, 100);
+  }
+}
+
 async function loadVisitsAggregate() {
   const cached = getCache(CACHE.ADMIN_AGGREGATE);
   if (cached) {
@@ -693,7 +845,7 @@ async function loadVisitsAggregate() {
     const snap = await db.ref('visits_aggregate').once('value');
     const data = snap.val();
     if (!data) {
-      console.warn('[관리자 집계] visits_aggregate 노드 없음. 시연님이 시트에서 "관리자 통계 즉시 집계" 실행 필요.');
+      console.warn('[관리자 집계] visits_aggregate 노드 없음.');
       visitsAggregate = { stores: {}, summary: {}, version: '미집계', updatedAt: 0 };
       return;
     }
@@ -717,7 +869,6 @@ function updateAdminStatsBar() {
   document.getElementById('adminStat-lead').textContent = summary.lead || 0;
   document.getElementById('adminStat-success').textContent = summary.success || 0;
   document.getElementById('adminStat-fail').textContent = summary.fail || 0;
-  // v47.1: 폐업 칩 제거됨
 
   const v = visitsAggregate.version || '미집계';
   const ts = visitsAggregate.updatedAt;
@@ -802,7 +953,6 @@ async function checkMyProjectAssignment() {
       hasMyProjects: hasMyProjects,
       myProjectStores: myProjectStores
     });
-    console.log('[캐시 저장] 프로젝트 배정 (' + myProjectStores.length + '개 업장, 30일 유효)');
 
     if (hasMyProjects) {
       const showChip = function(retries) {
@@ -828,20 +978,7 @@ function moveToMyProjectStores() {
     console.warn('[프로젝트 자동 이동] 저장된 업장 좌표 없음');
     return;
   }
-
-  if (myProjectStores.length === 1) {
-    const s = myProjectStores[0];
-    map.setCenter(new kakao.maps.LatLng(s.lat, s.lng));
-    map.setLevel(4);
-    return;
-  }
-
-  const bounds = new kakao.maps.LatLngBounds();
-  myProjectStores.forEach(function(s) {
-    bounds.extend(new kakao.maps.LatLng(s.lat, s.lng));
-  });
-  map.setBounds(bounds);
-
+  fitToCoords(myProjectStores);
   setTimeout(function() {
     if (map.getLevel() > 10) map.setLevel(10);
   }, 100);
@@ -872,7 +1009,7 @@ async function loadOtherPartnerContacts() {
       }
     }
     setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
-    console.log('[캐시 저장] 타파트너 접촉일자 (' + Object.keys(otherPartnerLastContactMap).length + '개, 24시간 유효)');
+    console.log('[캐시 저장] 타파트너 접촉일자');
   } catch(e) {
     console.warn("타파트너 접촉일 로드 실패:", e);
   }
@@ -918,7 +1055,6 @@ function computeMyVisitCounts() {
 }
 
 function updateChipCounts() {
-  // v47.0: 관리자는 본인 카운트 숨김 (전체 통계 바만 사용)
   if (isAdminUser) {
     document.querySelectorAll('.chip-count').forEach(el => {
       el.textContent = '';
@@ -937,18 +1073,38 @@ function updateChipCounts() {
 
 function initMap() {
   const container = document.getElementById("map");
-  const options = { center: new kakao.maps.LatLng(37.5665, 126.9780), level: 4 };
+
+  // v48.0: 초기 위치 결정 - initialLocation 있으면 그곳, 없으면 서울 중구
+  let initialCenter, initialLevel;
+  if (initialLocation) {
+    initialCenter = new kakao.maps.LatLng(initialLocation.lat, initialLocation.lng);
+    initialLevel = 4;
+    console.log('[지도 초기화] 현재 위치 기준:', initialLocation);
+  } else {
+    initialCenter = new kakao.maps.LatLng(37.5665, 126.9780);
+    initialLevel = 4;
+    console.log('[지도 초기화] 서울 중구 fallback (현재 위치 못 받음)');
+  }
+
+  const options = { center: initialCenter, level: initialLevel };
   map = new kakao.maps.Map(container, options);
 
+  // v48.0: 클러스터러는 renderMarkers()에서 매번 재생성하는 방식이 아니라,
+  //        하나만 만들고 색상은 markers의 status 분포 분석해서 동적 결정
+  markerClusterer = createClusterer();
+
   startLocationTracking();
-  moveToMyLocation();
+
+  // 초기 위치가 이미 있으면 마커 표시
+  if (initialLocation) {
+    updateMyLocationMarker(initialLocation.lat, initialLocation.lng);
+  }
 
   let moveDebounce;
   kakao.maps.event.addListener(map, "idle", function() {
     clearTimeout(moveDebounce);
     moveDebounce = setTimeout(function() {
       loadStoresInView();
-      // v47.0: 줌 변경 시 라벨 표시/숨김 갱신
       updateAdminLabelVisibility();
     }, 400);
   });
@@ -974,10 +1130,13 @@ function initMap() {
       }
       currentFilter = btn.dataset.filter;
 
+      // v48.0: 일반 파트너도 칩 클릭 시 자동 지도 이동
       if (btn.dataset.filter === "project") {
         moveToMyProjectStores();
+      } else if (btn.dataset.filter === "all") {
+        renderMarkers();  // all은 이동 없이 현재 화면 그대로
       } else {
-        renderMarkers();
+        moveToFilteredStoresForPartner(btn.dataset.filter);
       }
     };
   });
@@ -1040,9 +1199,143 @@ function getFilterColor(f) {
   return { all:"#363859", visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935", contract:"#F2AC57" }[f] || "#363859";
 }
 
-/* ════════════════════════════════════════════
- *  현재 위치 추적
- * ════════════════════════════════════════════ */
+/* v48.0: 클러스터 인스턴스 생성 헬퍼
+ * - 기본 스타일은 placeholder, 실제 색상은 clusterover 이벤트에서 동적 결정
+ * - 크기는 멤버 수에 따라 3단계 (< 10 / 10-99 / 100+)
+ */
+function createClusterer() {
+  const baseStyle = {
+    color: 'white',
+    border: '3px solid white',
+    borderRadius: '50%',
+    textAlign: 'center',
+    fontWeight: '700',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.25)'
+  };
+
+  const clusterer = new kakao.maps.MarkerClusterer({
+    map: map,
+    averageCenter: true,
+    minLevel: CLUSTER_MIN_LEVEL,
+    minClusterSize: 2,
+    disableClickZoom: false,
+    gridSize: 60,
+    calculator: [10, 100],
+    styles: [
+      Object.assign({}, baseStyle, {
+        width: '44px', height: '44px',
+        lineHeight: '38px', fontSize: '13px',
+        background: '#363859'   // placeholder, 실제 색은 동적 결정
+      }),
+      Object.assign({}, baseStyle, {
+        width: '52px', height: '52px',
+        lineHeight: '46px', fontSize: '14px',
+        background: '#363859'
+      }),
+      Object.assign({}, baseStyle, {
+        width: '60px', height: '60px',
+        lineHeight: '54px', fontSize: '15px',
+        background: '#363859'
+      })
+    ]
+  });
+
+  // 클러스터 생성/갱신될 때마다 동적 색상 적용
+  kakao.maps.event.addListener(clusterer, 'clustered', function(clusters) {
+    applyClusterColors(clusters);
+  });
+
+  return clusterer;
+}
+
+/* v48.0: 클러스터 색상 결정 + DOM 직접 적용
+ * - 단일 카테고리 필터 활성: 해당 카테고리 색상으로 통일
+ * - 'all' 또는 'project': 클러스터 멤버들의 status 분포에서 1위 색상
+ */
+function applyClusterColors(clusters) {
+  if (!clusters || clusters.length === 0) return;
+
+  clusters.forEach(function(cluster) {
+    let bgColor;
+
+    // 단일 카테고리 필터인 경우 → 그 색상으로 통일
+    const filterColorMap = {
+      visit: '#4d4678',
+      lead: '#43A047',
+      success: '#F5B800',
+      fail: '#E53935',
+      contract: '#F2AC57'
+    };
+
+    if (filterColorMap[currentFilter]) {
+      bgColor = filterColorMap[currentFilter];
+    } else if (currentFilter === 'project') {
+      // 프로젝트뷰는 업박스 메인 그라데이션 톤
+      bgColor = '#363859';
+    } else {
+      // 'all' → 클러스터 내 status 분포 분석
+      bgColor = computeDominantClusterColor(cluster);
+    }
+
+    // DOM에 직접 적용
+    try {
+      const markers = cluster.getMarkers();
+      // CustomOverlay 내부 div에 접근
+      const clusterEl = cluster.getClusterMarker && cluster.getClusterMarker();
+      // 카카오 SDK 내부 구조: cluster._markers, cluster._clusterMarker
+      // _clusterMarker는 CustomOverlay 인스턴스
+      const overlay = cluster._clusterMarker;
+      if (overlay && overlay.getContent) {
+        const content = overlay.getContent();
+        // content는 string(HTML) 또는 HTMLElement
+        if (typeof content === 'string') {
+          // 문자열이면 직접 조작 불가 → DOM 새로 만들어서 setContent
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = content;
+          const innerDiv = tempDiv.firstElementChild;
+          if (innerDiv && innerDiv.style) {
+            innerDiv.style.background = bgColor;
+            overlay.setContent(tempDiv.innerHTML);
+          }
+        } else if (content && content.style) {
+          content.style.background = bgColor;
+        }
+      }
+    } catch(e) {
+      // DOM 조작 실패해도 기본 색상으로 표시는 됨 (치명적 X)
+      console.warn('[클러스터 색상 적용 실패]', e);
+    }
+  });
+}
+
+/* v48.0: 클러스터 내 핀들의 status 분포 → 1위 색상 결정 */
+function computeDominantClusterColor(cluster) {
+  const markers = cluster.getMarkers ? cluster.getMarkers() : [];
+  if (markers.length === 0) return '#363859';
+
+  const counts = { visit: 0, lead: 0, success: 0, fail: 0, contract: 0, closedByMe: 0, none: 0 };
+
+  markers.forEach(function(m) {
+    const status = m._upboxStatus || 'none';
+    if (counts[status] !== undefined) counts[status]++;
+  });
+
+  // 우선순위: success > lead > visit > fail > contract > closedByMe > none
+  // (계약 진행 중 핀이 시각적으로 더 먼저 눈에 띄도록)
+  const priorityOrder = ['success', 'lead', 'visit', 'fail', 'contract', 'closedByMe'];
+
+  let maxCount = 0;
+  let dominant = 'none';
+  for (const key of priorityOrder) {
+    if (counts[key] > maxCount) {
+      maxCount = counts[key];
+      dominant = key;
+    }
+  }
+
+  return getStatusColor(dominant);
+}
+
 function startLocationTracking() {
   if (!navigator.geolocation) {
     console.warn('[위치 추적] geolocation 미지원 브라우저');
@@ -1110,7 +1403,6 @@ function moveToMyLocation() {
   if (currentUserLocation) {
     map.setCenter(new kakao.maps.LatLng(currentUserLocation.lat, currentUserLocation.lng));
     map.setLevel(4);
-    loadStoresInView();
     return;
   }
 
@@ -1121,7 +1413,6 @@ function moveToMyLocation() {
     updateMyLocationMarker(lat, lng);
     map.setCenter(new kakao.maps.LatLng(lat, lng));
     map.setLevel(4);
-    loadStoresInView();
   }, function(err) {
     console.warn("위치 조회 실패:", err);
     alert("현재 위치를 가져올 수 없습니다.\n위치 권한을 허용해주세요.");
@@ -1255,15 +1546,10 @@ function nameSimilarity(a, b) {
   return matches / longer.length;
 }
 
-/* v47.0: 관리자 모드용 효과적 상태 판정
- * - 관리자 뷰 ON일 때: visits_aggregate.stores[storeKey].lastStatus 우선
- * - 관리자 뷰 OFF / 일반 영업자: 기존 getVisitStatus (내 방문기록 기준)
- */
 function getEffectiveStatus(store) {
   if (isAdminUser && adminViewActive && visitsAggregate && visitsAggregate.stores) {
     const aggData = visitsAggregate.stores[store._key];
     if (aggData && aggData.lastStatus) {
-      // 기계약은 grade 기준이 우선 (집계엔 contract가 없음)
       if (isContractGrade(store.grade)) return "contract";
       return aggData.lastStatus;
     }
@@ -1271,18 +1557,22 @@ function getEffectiveStatus(store) {
   return getVisitStatus(store);
 }
 
+/* v48.0: 클러스터러 사용으로 마커 추가 방식 변경 */
 function renderMarkers() {
+  // 기존 마커 제거
+  if (markerClusterer) markerClusterer.clear();
   markers.forEach(m => m.setMap(null));
   markers = [];
   markerByKey = {};
 
-  // v47.0: 라벨도 함께 정리
   labelOverlays.forEach(o => o.setMap(null));
   labelOverlays = [];
   labelByKey = {};
 
   let shown = 0;
   let selectedRendered = false;
+  const newMarkers = [];
+
   for (const store of allStoresInView) {
     const status = getEffectiveStatus(store);
 
@@ -1296,13 +1586,11 @@ function renderMarkers() {
     if (isSelected) selectedRendered = true;
 
     const marker = createMarker(store, status, isSelected);
-    marker.setMap(map);
+    newMarkers.push(marker);
     markers.push(marker);
     markerByKey[store._key] = marker;
     shown++;
 
-    // v47.0: 관리자 뷰 활성 시 라벨 생성
-    // v47.2: 라벨 색상 = 핀 색상
     if (isAdminUser && adminViewActive) {
       const aggData = visitsAggregate && visitsAggregate.stores ? visitsAggregate.stores[store._key] : null;
       if (aggData && aggData.lastPartnerName) {
@@ -1316,20 +1604,28 @@ function renderMarkers() {
   if (selectedStore && !selectedRendered) {
     const status = getEffectiveStatus(selectedStore);
     const marker = createMarker(selectedStore, status, true);
-    marker.setMap(map);
+    newMarkers.push(marker);
     markers.push(marker);
     markerByKey[selectedStore._key] = marker;
   }
 
-  // v47.0: 줌 레벨 따라 라벨 표시/숨김
+  // v48.0: 클러스터러에 일괄 추가
+  if (markerClusterer && newMarkers.length > 0) {
+    markerClusterer.addMarkers(newMarkers);
+    // 백업: clustered 이벤트가 동작 안 할 경우를 대비해 약간 딜레이 후 직접 색상 재적용
+    setTimeout(function() {
+      try {
+        const clusters = markerClusterer.getClusters ? markerClusterer.getClusters() : [];
+        if (clusters && clusters.length > 0) applyClusterColors(clusters);
+      } catch(e) { /* 무시 */ }
+    }, 100);
+  }
+
   updateAdminLabelVisibility();
 
   document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
 }
 
-/* v47.0: 핀 옆 라벨 (CustomOverlay)
- * v47.2: 라벨 배경색을 핀 상태 색상과 동일하게 매칭
- */
 function createAdminLabel(store, partnerName, status) {
   const bgColor = getStatusColor(status);
   const html = '<div style="' +
@@ -1363,7 +1659,8 @@ function updateAdminLabelVisibility() {
     return;
   }
   const level = map.getLevel();
-  const shouldShow = level <= ADMIN_LABEL_MIN_LEVEL;
+  // v48.0: 클러스터링 중일 땐 라벨도 숨김
+  const shouldShow = level <= ADMIN_LABEL_MIN_LEVEL && level < CLUSTER_MIN_LEVEL;
   labelOverlays.forEach(o => o.setMap(shouldShow ? map : null));
 }
 
@@ -1394,6 +1691,9 @@ function createMarker(store, status, isSelected) {
     image: markerImage,
     zIndex: zIdx
   });
+  // v48.0: 클러스터 색상 계산용 status 속성 박아두기
+  marker._upboxStatus = status;
+  marker._upboxStoreKey = store._key;
   kakao.maps.event.addListener(marker, "click", function() { openPanel(store); });
   return marker;
 }
@@ -1479,7 +1779,6 @@ async function openPanel(store) {
     }).join('') + '</div>';
   }
 
-  // v47.0: 관리자 정보 박스 (관리자 본인이 관리자뷰 ON일 때만)
   let adminInfoHtml = '';
   if (isAdminUser && adminViewActive && visitsAggregate && visitsAggregate.stores) {
     const aggData = visitsAggregate.stores[store._key];
@@ -1546,12 +1845,14 @@ async function openPanel(store) {
 function refreshMarkerSelection(previousKey, newKey) {
   if (previousKey && markerByKey[previousKey]) {
     const prevMarker = markerByKey[previousKey];
-    prevMarker.setMap(null);
     const prevStore = allStoresInView.find(s => s._key === previousKey);
     if (prevStore) {
+      // 클러스터러에서 제거
+      if (markerClusterer) markerClusterer.removeMarker(prevMarker);
+      prevMarker.setMap(null);
       const status = getEffectiveStatus(prevStore);
       const newMarker = createMarker(prevStore, status, false);
-      newMarker.setMap(map);
+      if (markerClusterer) markerClusterer.addMarker(newMarker);
       markerByKey[previousKey] = newMarker;
       const idx = markers.indexOf(prevMarker);
       if (idx !== -1) markers[idx] = newMarker;
@@ -1560,11 +1861,13 @@ function refreshMarkerSelection(previousKey, newKey) {
 
   if (newKey && markerByKey[newKey]) {
     const newSelMarker = markerByKey[newKey];
+    if (markerClusterer) markerClusterer.removeMarker(newSelMarker);
     newSelMarker.setMap(null);
     const newStore = allStoresInView.find(s => s._key === newKey) || selectedStore;
     if (newStore) {
       const status = getEffectiveStatus(newStore);
       const newMarker = createMarker(newStore, status, true);
+      // 선택된 마커는 클러스터러 안 거치고 직접 표시 (항상 보이게)
       newMarker.setMap(map);
       markerByKey[newKey] = newMarker;
       const idx = markers.indexOf(newSelMarker);
