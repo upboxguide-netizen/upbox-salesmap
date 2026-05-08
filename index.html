@@ -358,7 +358,9 @@ const ADMIN_CODES = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'];
 const CLUSTER_MIN_LEVEL = 7;
 const FILTER_MOVE_MAX_PINS = 500;
 const ADMIN_INIT_LEVEL = 11;
-const ADMIN_CONTRACT_ZOOM_LEVEL = 5;
+const ADMIN_CONTRACT_ZOOM_LEVEL = 8;       // v48.4: 줌 레벨 8 이하부터 기계약 노출 (시/구 단위)
+const ADMIN_CONTRACT_RADIUS_KM = 10;       // v48.4: 화면 중심 반경 10km 기계약
+const ADMIN_CONTRACT_MAX_PINS = 500;       // v48.4: 한 번에 표시할 기계약 최대치
 
 function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
@@ -477,6 +479,11 @@ let isAdminUser = false;
 let adminViewActive = false;
 let visitsAggregate = null;
 let adminMasterStores = [];
+
+// v48.4: 기계약 단기 캐시 (같은 위치 빠른 재방문 시 트래픽 절약)
+let contractsCache = { center: null, data: [], ts: 0 };
+const CONTRACTS_CACHE_TTL_MS = 30 * 1000;
+const CONTRACTS_CACHE_MOVE_THRESHOLD_KM = 2;
 
 let markerClusterer = null;
 let initialLocation = null;
@@ -656,44 +663,74 @@ async function renderAdminView() {
 
 async function fetchContractsInCurrentBounds() {
   if (!map) return [];
+  const center = map.getCenter();
+  const centerLat = center.getLat();
+  const centerLng = center.getLng();
+
+  // v48.4: 캐시 확인 - 30초 이내 + 중심 2km 이내 이동이면 재사용
+  if (contractsCache.center && contractsCache.data.length > 0) {
+    const elapsed = Date.now() - contractsCache.ts;
+    const moved = haversine(contractsCache.center.lat, contractsCache.center.lng, centerLat, centerLng);
+    if (elapsed < CONTRACTS_CACHE_TTL_MS && moved < CONTRACTS_CACHE_MOVE_THRESHOLD_KM) {
+      console.log('[기계약 캐시 적중] 이동 ' + moved.toFixed(2) + 'km, 경과 ' + Math.round(elapsed/1000) + 's');
+      return contractsCache.data;
+    }
+  }
+
   const bounds = map.getBounds();
   const sw = bounds.getSouthWest();
   const ne = bounds.getNorthEast();
-  const latMin = sw.getLat(), latMax = ne.getLat();
-  const lngMin = sw.getLng(), lngMax = ne.getLng();
+  let latMin = sw.getLat(), latMax = ne.getLat();
+  let lngMin = sw.getLng(), lngMax = ne.getLng();
 
-  console.log('[기계약 fetch 시작] level=' + map.getLevel() + ', bounds=', { latMin, latMax, lngMin, lngMax });
+  // 화면 중심 + 반경 10km도 함께 커버
+  const radiusKm = ADMIN_CONTRACT_RADIUS_KM;
+  const radiusLatDeg = radiusKm / 111;
+  const radiusLngDeg = radiusKm / (111 * Math.cos(centerLat * Math.PI / 180));
+
+  latMin = Math.min(latMin, centerLat - radiusLatDeg);
+  latMax = Math.max(latMax, centerLat + radiusLatDeg);
+  lngMin = Math.min(lngMin, centerLng - radiusLngDeg);
+  lngMax = Math.max(lngMax, centerLng + radiusLngDeg);
+
+  console.log('[기계약 fetch 시작] level=' + map.getLevel() + ', 중심=' + centerLat.toFixed(4) + ',' + centerLng.toFixed(4));
 
   try {
     const snap = await db.ref('stores_light').orderByChild('lat').startAt(latMin).endAt(latMax).once('value');
     const raw = snap.val() || {};
-    const allInRange = [];
     const contracts = [];
-    const gradeSamples = {};
 
     for (const k in raw) {
       const s = raw[k];
       if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
       if (s.lng < lngMin || s.lng > lngMax) continue;
-      allInRange.push(s);
-
-      // grade 값 분포 샘플링 (디버깅용)
-      const g = s.grade || '(없음)';
-      gradeSamples[g] = (gradeSamples[g] || 0) + 1;
-
       if (!isContractGrade(s.grade)) continue;
+
+      const dist = haversine(centerLat, centerLng, s.lat, s.lng);
+      const inRadius = dist <= radiusKm;
+      const inBounds = (s.lat >= sw.getLat() && s.lat <= ne.getLat() &&
+                        s.lng >= sw.getLng() && s.lng <= ne.getLng());
+      if (!inRadius && !inBounds) continue;
+
       s._key = k;
       s._isContract = true;
+      s._distFromCenter = dist;
       contracts.push(s);
     }
 
-    console.log('[기계약 fetch 결과] bounds 안 총 ' + allInRange.length + '개, 기계약 ' + contracts.length + '개');
-    console.log('[grade 분포]', gradeSamples);
-    if (contracts.length > 0) {
-      console.log('[기계약 샘플 3개]', contracts.slice(0, 3).map(c => ({ name: c.name, grade: c.grade, lat: c.lat, lng: c.lng })));
-    }
+    contracts.sort(function(a, b) { return a._distFromCenter - b._distFromCenter; });
+    const limited = contracts.slice(0, ADMIN_CONTRACT_MAX_PINS);
 
-    return contracts;
+    console.log('[기계약 fetch 결과] 총 ' + contracts.length + '개 (제한 후 ' + limited.length + '개)');
+
+    // 캐시 갱신
+    contractsCache = {
+      center: { lat: centerLat, lng: centerLng },
+      data: limited,
+      ts: Date.now()
+    };
+
+    return limited;
   } catch(e) {
     console.error('[기계약 fetch 실패]', e);
     return [];
