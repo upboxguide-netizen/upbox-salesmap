@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>업박스 영업 지도 v51.0</title>
+<title>업박스 영업 지도 v51.1</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,6 +47,16 @@
   .search-name { font-size: 13px; color: #333; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .search-status-label { font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex-shrink: 0; color: white; }
   .search-project-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 3px; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; font-size: 10px; font-weight: 600; flex-shrink: 0; }
+  /* v51.1: 검색 결과 주소 라인 */
+  .search-address {
+    font-size: 11px;
+    color: #999;
+    margin-top: 3px;
+    margin-left: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   #filterBar { display: flex; gap: 6px; padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; overflow-x: auto; white-space: nowrap; }
   .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
@@ -125,7 +135,6 @@
   .admin-stat-name { font-size: 11px; color: #EEE; }
   .admin-stat-value { font-size: 12px; font-weight: 700; color: white; }
 
-  /* v51.0: 파트너 필터 드롭다운 */
   .admin-partner-selector {
     display: inline-flex;
     align-items: center;
@@ -783,7 +792,6 @@ function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
 }
 
-// v51.0: 캐시 키 _v2 → _v3 (구조 변경)
 const CACHE = {
   OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },
   MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
@@ -927,7 +935,7 @@ let isAdminUser = false;
 let adminViewActive = false;
 let visitsAggregate = null;
 let adminMasterStores = [];
-let selectedAdminPartner = 'all';  // v51.0: 'all' or partnerKey
+let selectedAdminPartner = 'all';
 
 let contractsCache = { center: null, data: [], ts: 0 };
 const CONTRACTS_CACHE_TTL_MS = 30 * 1000;
@@ -987,7 +995,6 @@ function logout() {
   }
 })();
 
-// v51.0: 위치 fetch 최대 3초로 단축, 정확도 낮춰서 빠르게
 async function fetchInitialLocation() {
   return new Promise(function(resolve) {
     if (!navigator.geolocation) { resolve(null); return; }
@@ -999,14 +1006,12 @@ async function fetchInitialLocation() {
   });
 }
 
-// v51.0: partner_projects 인덱스 사용 (stores_light 전체 다운로드 회피)
 async function loadMyProjectsFromIndex() {
   try {
     const snap = await db.ref('partner_projects/' + currentUser.key).once('value');
     const data = snap.val();
 
     if (!data) {
-      // 인덱스 노드 없음 → fallback (시연 첫 배포 직후)
       console.warn('[partner_projects] 인덱스 없음 → fallback');
       await checkMyProjectAssignmentLegacy();
       return;
@@ -1038,7 +1043,6 @@ async function loadMyProjectsFromIndex() {
   }
 }
 
-// v51.0: 기존 로직 fallback용 (인덱스 노드 없을 때만 사용)
 async function checkMyProjectAssignmentLegacy() {
   try {
     const snap = await db.ref("stores_light").once("value");
@@ -1073,7 +1077,6 @@ async function checkMyProjectAssignmentLegacy() {
   } catch(e) { console.warn("프로젝트 배정 확인 실패:", e); }
 }
 
-// v51.0: 캐시 우선 빠른 시작 + 무거운 작업은 백그라운드
 async function startApp() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("userInfo").textContent = currentUser.name;
@@ -1086,10 +1089,8 @@ async function startApp() {
     console.log('[관리자 모드] 자동 활성화 - ' + currentUser.name);
   }
 
-  // ⚡ 위치 fetch는 백그라운드로
   const locationPromise = fetchInitialLocation();
 
-  // ⚡ 캐시 즉시 로드 (네트워크 X)
   const cachedOtherVisits = getCache(CACHE.OTHER_VISITS);
   const cachedMyProjects = getCache(CACHE.MY_PROJECTS);
   const cachedAggregate = isAdminUser ? getCache(CACHE.ADMIN_AGGREGATE) : null;
@@ -1105,11 +1106,9 @@ async function startApp() {
   }
   if (cachedAggregate) visitsAggregate = cachedAggregate;
 
-  // ⚡ 내 visits 로드 (필수, 작은 데이터)
   await loadMyVisits();
   updateChipCounts();
 
-  // ⚡ 관리자 - 캐시 있으면 즉시 화면 구성
   if (isAdminUser && cachedAggregate) {
     await loadAdminMasterStores();
     updateAdminStatsBar();
@@ -1117,17 +1116,14 @@ async function startApp() {
     buildAdminPartnerDropdown();
   }
 
-  // ⚡ 위치 - 최대 3초만 대기 (race)
   initialLocation = await Promise.race([
     locationPromise,
     new Promise(resolve => setTimeout(() => resolve(null), 3000))
   ]);
   if (initialLocation) currentUserLocation = initialLocation;
 
-  // ⚡ 지도 즉시 띄움
   initMap();
 
-  // ⚡ 무거운 백그라운드 작업
   setTimeout(async function() {
     const tasks = [];
 
@@ -1173,7 +1169,6 @@ function bindAdminStatsFilters() {
     });
   });
 
-  // 파트너 드롭다운 외부 클릭 시 닫기
   document.addEventListener('click', function(e) {
     const selector = document.getElementById('adminPartnerSelector');
     const dropdown = document.getElementById('adminPartnerDropdown');
@@ -1182,7 +1177,6 @@ function bindAdminStatsFilters() {
     }
   });
 
-  // 파트너 드롭다운 토글
   const selectorEl = document.getElementById('adminPartnerSelector');
   if (selectorEl) {
     selectorEl.addEventListener('click', function(e) {
@@ -1193,7 +1187,6 @@ function bindAdminStatsFilters() {
   }
 }
 
-// v51.0: 관리자 파트너 드롭다운 빌드
 function buildAdminPartnerDropdown() {
   if (!isAdminUser || !visitsAggregate) return;
 
@@ -1202,7 +1195,6 @@ function buildAdminPartnerDropdown() {
 
   const byPartner = visitsAggregate.byPartner || {};
 
-  // 파트너 목록 만들기 (totalUniqueStores 내림차순)
   const partnerList = Object.keys(byPartner).map(function(key) {
     const p = byPartner[key];
     return {
@@ -1241,7 +1233,6 @@ function buildAdminPartnerDropdown() {
 function selectAdminPartner(partnerKey) {
   selectedAdminPartner = partnerKey;
 
-  // 라벨 업데이트
   const labelEl = document.getElementById('adminPartnerLabel');
   const selectorEl = document.getElementById('adminPartnerSelector');
   if (partnerKey === 'all') {
@@ -1254,13 +1245,11 @@ function selectAdminPartner(partnerKey) {
     if (selectorEl) selectorEl.classList.add('active');
   }
 
-  // 드롭다운 selected 갱신
   document.querySelectorAll('.admin-partner-option').forEach(function(el) {
     if (el.dataset.partner === partnerKey) el.classList.add('selected');
     else el.classList.remove('selected');
   });
 
-  // 마스터 데이터 + 통계바 + 뷰 재구성
   loadAdminMasterStores().then(function() {
     updateAdminStatsBar();
     resetAdminViewZoom();
@@ -1274,7 +1263,6 @@ function resetAdminViewZoom() {
   map.setLevel(ADMIN_INIT_LEVEL);
 }
 
-// v51.0: 파트너 선택 모드에 따라 다른 stores 표시
 async function renderAdminView() {
   if (!isAdminUser) return;
 
@@ -1394,7 +1382,6 @@ async function loadVisitsAggregate() {
   }
 }
 
-// v51.0: 파트너 선택 모드에 따라 다른 데이터원 사용
 async function loadAdminMasterStores() {
   if (!visitsAggregate) {
     visitsAggregate = { stores: {}, summary: {}, byPartner: {} };
@@ -1441,7 +1428,6 @@ async function loadAdminMasterStores() {
   }
 }
 
-// v51.0: 파트너 선택 모드에 따라 summary 다르게 표시
 function updateAdminStatsBar() {
   if (!isAdminUser || !adminViewActive || !visitsAggregate) {
     document.getElementById('adminStatsBar').classList.remove('visible');
@@ -1560,7 +1546,7 @@ function initMap() {
     console.log('[지도 초기화] 관리자 - 전국 뷰');
   } else if (initialLocation) {
     initialCenter = new kakao.maps.LatLng(initialLocation.lat, initialLocation.lng);
-    initialLevel = 3;  // v51.0: 4→3 (반경 약 1km, 초기 bounds 축소)
+    initialLevel = 3;
   } else {
     initialCenter = new kakao.maps.LatLng(37.5665, 126.9780);
     initialLevel = 4;
@@ -2039,7 +2025,6 @@ function nameSimilarity(a, b) {
   return matches / longer.length;
 }
 
-// v51.0: 파트너 선택 모드에 따라 다른 데이터원에서 상태 가져옴
 function getEffectiveStatus(store) {
   if (isAdminUser && adminViewActive && visitsAggregate) {
     let targetStoresMap;
@@ -2125,7 +2110,6 @@ function createMarker(store, status, isSelected) {
 
   let labelLines;
   if (isAdminUser && adminViewActive && !isContractGrade(store.grade)) {
-    // v51.0: 파트너 선택 모드면 그 파트너의 storeKey 정보, 전체면 lastPartnerName
     let partnerName = '';
     if (selectedAdminPartner === 'all' && visitsAggregate && visitsAggregate.stores) {
       const aggData = visitsAggregate.stores[store._key];
@@ -2612,13 +2596,19 @@ function renderSearchResults(list) {
     const statusColor = getStatusColor(status);
     const statusLabel = getStatusLabel(status);
     const projectTag = amIAssignedToProject(s, currentUser.key) ? '<span class="search-project-tag">🎯</span>' : '';
+    // v51.1: 주소 라인 (있을 때만 표시)
+    const addressLine = s.address
+      ? '<div class="search-address">' + escapeHtml(s.address) + '</div>'
+      : '';
     return '<div class="search-item" data-idx="' + idx + '">' +
       '<div class="search-name-row">' +
       '<span class="search-status-dot" style="background:' + statusColor + ';"></span>' +
       '<span class="search-name">' + escapeHtml(s.name || '(이름 없음)') + '</span>' +
       projectTag +
       '<span class="search-status-label" style="background:' + statusColor + ';">' + statusLabel + '</span>' +
-      '</div></div>';
+      '</div>' +
+      addressLine +
+      '</div>';
   }).join('');
   resultsEl.querySelectorAll(".search-item").forEach(function(el) {
     el.onclick = function() {
