@@ -224,26 +224,7 @@
   .notice-btn-secondary { background: #EEE; color: #555; }
   .notice-btn-secondary:hover { background: #DDD; }
 
-  #initLoading {
-    position: fixed; inset: 0; z-index: 9997;
-    background: rgba(54, 56, 89, 0.95);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    color: white;
-    transition: opacity 0.3s;
-  }
-  #initLoading.hide { opacity: 0; pointer-events: none; }
-  .init-spinner {
-    width: 40px; height: 40px;
-    border: 3px solid rgba(255,255,255,0.3);
-    border-top-color: #F2AC57;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 16px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .init-text { font-size: 14px; color: #EEE; }
-  .init-subtext { font-size: 11px; color: #AAA; margin-top: 6px; }
+  /* v50.0: #initLoading 제거됨 */
 
   /* ============================================================ */
   /* v49.0 신규업장추가 모달 (D 작업) */
@@ -418,7 +399,6 @@
   .ns-outcome-buttons button.active.default { background: #363859; color: #fff; border-color: #363859; font-weight: 700; }
   .ns-outcome-buttons button.active.success { background: #F5B800; color: #fff; border-color: #F5B800; font-weight: 700; }
   .ns-outcome-buttons button.active.fail { background: #E53935; color: #fff; border-color: #E53935; font-weight: 700; }
-  .ns-outcome-buttons button.active.closed { background: #616161; color: #fff; border-color: #616161; font-weight: 700; }
   .ns-submit-row {
     display: flex;
     gap: 8px;
@@ -554,11 +534,7 @@
   </div>
 </div>
 
-<div id="initLoading">
-  <div class="init-spinner"></div>
-  <div class="init-text" id="initText">현재 위치 확인 중...</div>
-  <div class="init-subtext" id="initSubtext">위치 권한을 허용해주세요</div>
-</div>
+<!-- v50.0: #initLoading 제거 -->
 
 <div id="loginScreen" style="display:none;">
   <div class="login-box">
@@ -605,9 +581,9 @@
       </div>
 
       <div class="ns-form-group">
-        <label>사업장 검색 <span class="required">*</span></label>
+        <label>사업장명 / 주소 검색 <span class="required">*</span></label>
         <div class="ns-search-wrapper">
-          <input type="text" id="nsSearchInput" placeholder="사업장명을 입력하세요 (예: 강남교자, 더본스시)" autocomplete="off" oninput="onNsSearchInput()">
+          <input type="text" id="nsSearchInput" placeholder="사업장명 또는 주소를 검색하세요" autocomplete="off" oninput="onNsSearchInput()">
           <div id="nsSearchResults" class="ns-search-results"></div>
         </div>
         <div class="ns-helper">검색 결과가 없으면 아래 사업장명/주소를 직접 입력하세요</div>
@@ -707,7 +683,6 @@
           <button type="button" data-outcome="" class="default active" onclick="selectOutcome(this)">기록만</button>
           <button type="button" data-outcome="성사" class="success" onclick="selectOutcome(this)">성사</button>
           <button type="button" data-outcome="실패" class="fail" onclick="selectOutcome(this)">실패</button>
-          <button type="button" data-outcome="폐업" class="closed" onclick="selectOutcome(this)">폐업</button>
         </div>
       </div>
 
@@ -731,7 +706,6 @@ const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 
 // ============================================================
 // v49.0 신규업장추가 Web App 엔드포인트
-// ⚠️ Apps Script 배포 후 받은 URL로 교체하세요
 // ============================================================
 const NEW_STORE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzSBmYw2I2NBTb8TwGtQe2r5hG0THf60eIROO7kbLWckHBGbYufoA8odWghYjs_sGJuNA/exec';
 
@@ -739,9 +713,9 @@ const ADMIN_CODES = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'];
 const CLUSTER_MIN_LEVEL = 7;
 const FILTER_MOVE_MAX_PINS = 500;
 const ADMIN_INIT_LEVEL = 11;
-const ADMIN_CONTRACT_ZOOM_LEVEL = 8;       // v48.4: 줌 레벨 8 이하부터 기계약 노출 (시/구 단위)
-const ADMIN_CONTRACT_RADIUS_KM = 10;       // v48.4: 화면 중심 반경 10km 기계약
-const ADMIN_CONTRACT_MAX_PINS = 500;       // v48.4: 한 번에 표시할 기계약 최대치
+const ADMIN_CONTRACT_ZOOM_LEVEL = 8;
+const ADMIN_CONTRACT_RADIUS_KM = 10;
+const ADMIN_CONTRACT_MAX_PINS = 500;
 
 function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
@@ -823,11 +797,9 @@ function showNoticeModal(type, notice, onClose) {
 
   document.getElementById('noticeIcon').textContent = meta.icon;
 
-  // 자유 공지(general)는 시연님이 입력한 title을 우선 사용
   const displayTitle = (type === 'general' && notice.title) ? notice.title : meta.title;
   document.getElementById('noticeTitle').textContent = displayTitle;
 
-  // 자유 공지의 message는 \n 줄바꿈 보존을 위해 white-space: pre-line 적용
   const messageEl = document.getElementById('noticeMessage');
   messageEl.textContent = notice.message;
   if (type === 'general') {
@@ -842,7 +814,6 @@ function showNoticeModal(type, notice, onClose) {
   const applyBtn = document.getElementById('noticeBtnApply');
 
   if (type === 'general') {
-    // 자유 공지: "확인" 버튼 하나만 (캐시 클리어 X, 새로고침 X)
     laterBtn.style.display = 'none';
     applyBtn.textContent = '확인';
     applyBtn.onclick = function() {
@@ -851,7 +822,6 @@ function showNoticeModal(type, notice, onClose) {
       if (onClose) setTimeout(onClose, 200);
     };
   } else {
-    // 프로젝트/기계약 공지: 기존 동작 유지 (지금 갱신 / 나중에)
     laterBtn.style.display = '';
     applyBtn.textContent = '지금 갱신';
     applyBtn.onclick = function() {
@@ -895,7 +865,6 @@ let adminViewActive = false;
 let visitsAggregate = null;
 let adminMasterStores = [];
 
-// v48.4: 기계약 단기 캐시 (같은 위치 빠른 재방문 시 트래픽 절약)
 let contractsCache = { center: null, data: [], ts: 0 };
 const CONTRACTS_CACHE_TTL_MS = 30 * 1000;
 const CONTRACTS_CACHE_MOVE_THRESHOLD_KM = 2;
@@ -904,7 +873,6 @@ let markerClusterer = null;
 let initialLocation = null;
 let suppressNextIdle = false;
 
-// v49.0: 신규업장추가 모달 상태
 let _placesSearchCache = null;
 let _placesSearchTimer = null;
 let _nsSelectedPlace = null;
@@ -950,11 +918,11 @@ function logout() {
     try { currentUser = JSON.parse(saved); startApp(); }
     catch(e) { localStorage.removeItem("upboxPartner"); }
   } else {
-    document.getElementById("initLoading").classList.add("hide");
     document.getElementById("loginScreen").style.display = "flex";
   }
 })();
 
+// v50.0: 백그라운드 위치 fetch (UI 차단 없음)
 async function fetchInitialLocation() {
   return new Promise(function(resolve) {
     if (!navigator.geolocation) { resolve(null); return; }
@@ -968,11 +936,6 @@ async function fetchInitialLocation() {
 
 async function startApp() {
   document.getElementById("loginScreen").style.display = "none";
-  const initLoading = document.getElementById("initLoading");
-  const initText = document.getElementById("initText");
-  initLoading.classList.remove("hide");
-  initText.textContent = "현재 위치 확인 중...";
-
   document.getElementById("userInfo").textContent = currentUser.name;
 
   isAdminUser = isAdmin(currentUser.code);
@@ -983,34 +946,29 @@ async function startApp() {
     console.log('[관리자 모드] 자동 활성화 - ' + currentUser.name);
   }
 
-  const [_, location] = await Promise.all([
-    (async function() {
-      await loadOtherPartnerContacts();
-      await loadMyVisits();
-      updateChipCounts();
-      if (isAdminUser) {
-        await loadVisitsAggregate();
-        await loadAdminMasterStores();
-        updateAdminStatsBar();
-        bindAdminStatsFilters();
-      }
-      await checkMyProjectAssignment();
-    })(),
-    fetchInitialLocation()
-  ]);
+  // v50.0: 위치 fetch는 백그라운드로, 데이터 로딩과 병렬 진행
+  const dataPromise = (async function() {
+    await loadOtherPartnerContacts();
+    await loadMyVisits();
+    updateChipCounts();
+    if (isAdminUser) {
+      await loadVisitsAggregate();
+      await loadAdminMasterStores();
+      updateAdminStatsBar();
+      bindAdminStatsFilters();
+    }
+    await checkMyProjectAssignment();
+  })();
 
-  initialLocation = location;
-  if (location) {
-    currentUserLocation = location;
-    initText.textContent = "지도 준비 중...";
-  } else {
-    initText.textContent = "지도 준비 중... (현재 위치 못 받음)";
-  }
+  const locationPromise = fetchInitialLocation();
+
+  // 데이터 먼저 로드되면 즉시 지도 초기화 (위치 못 받았으면 일단 서울 중심)
+  await dataPromise;
+  initialLocation = await locationPromise;
+  if (initialLocation) currentUserLocation = initialLocation;
 
   initMap();
   checkNotices();
-
-  setTimeout(function() { initLoading.classList.add("hide"); }, 500);
 }
 
 function bindAdminStatsFilters() {
@@ -1381,7 +1339,10 @@ function initMap() {
   const options = { center: initialCenter, level: initialLevel };
   map = new kakao.maps.Map(container, options);
 
-  markerClusterer = createClusterer();
+  // v50.0: 관리자만 클러스터러 생성 (파트너는 핀 직접 표시)
+  if (isAdminUser) {
+    markerClusterer = createClusterer();
+  }
 
   startLocationTracking();
   if (initialLocation) updateMyLocationMarker(initialLocation.lat, initialLocation.lng);
@@ -1417,11 +1378,8 @@ function initMap() {
   kakao.maps.event.addListener(map, "click", function() { closePanel(true); });
 
   document.getElementById("locBtn").onclick = moveToMyLocation;
-
-  // v49.0: +업장추가 버튼을 신규업장추가 모달로 변경
   document.getElementById("addBtn").onclick = openNewStoreModal;
 
-  // 모달 외부 클릭 시 닫기
   const newStoreModal = document.getElementById('newStoreModal');
   if (newStoreModal) {
     newStoreModal.addEventListener('click', function(e) {
@@ -1871,6 +1829,7 @@ function getEffectiveStatus(store) {
   return getVisitStatus(store);
 }
 
+// v50.0: 파트너 모드는 클러스터링 없이 핀 직접 표시
 function renderMarkers() {
   if (markerClusterer) markerClusterer.clear();
   markers.forEach(m => m.setMap(null));
@@ -1899,7 +1858,11 @@ function renderMarkers() {
     markers.push(marker);
     markerByKey[store._key] = marker;
     shown++;
-    if (isSelected || (isAdminUser && adminViewActive && isContract)) {
+
+    // v50.0: 파트너 모드면 모두 directMarkers, 관리자 모드만 클러스터링
+    if (!isAdminUser) {
+      directMarkers.push(marker);
+    } else if (isSelected || (adminViewActive && isContract)) {
       directMarkers.push(marker);
     } else {
       clusterMarkers.push(marker);
@@ -1962,12 +1925,13 @@ function createMarker(store, status, isSelected) {
   marker._upboxStoreKey = store._key;
   marker._upboxIsContract = isContractGrade(store.grade);
   kakao.maps.event.addListener(marker, "click", function() {
-    if (map.getLevel() >= CLUSTER_MIN_LEVEL) {
+    // v50.0: 파트너 모드는 클러스터 없으니 바로 패널 열기
+    if (isAdminUser && map.getLevel() >= CLUSTER_MIN_LEVEL) {
       map.setCenter(position);
       map.setLevel(4);
       setTimeout(function() {
         openPanel(store);
-        if (isAdminUser) renderAdminView();
+        renderAdminView();
       }, 300);
     } else {
       openPanel(store);
