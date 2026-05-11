@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>업박스 영업 지도 v50.2</title>
+<title>업박스 영업 지도 v51.0</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,7 +104,6 @@
     box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.4);
   }
 
-  /* 📊 전체 칩 - 다른 칩보다 살짝 강조 */
   .admin-stat-all {
     background: rgba(242, 172, 87, 0.2);
     font-weight: 700;
@@ -125,6 +124,71 @@
   }
   .admin-stat-name { font-size: 11px; color: #EEE; }
   .admin-stat-value { font-size: 12px; font-weight: 700; color: white; }
+
+  /* v51.0: 파트너 필터 드롭다운 */
+  .admin-partner-selector {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.2);
+    border: 1.5px solid transparent;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    user-select: none;
+  }
+  .admin-partner-selector:hover { background: rgba(255,255,255,0.3); }
+  .admin-partner-selector.active {
+    background: rgba(242, 172, 87, 0.45);
+    border-color: #F2AC57;
+    box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5);
+  }
+  .admin-partner-selector .admin-partner-arrow {
+    font-size: 9px;
+    color: #FFF;
+    margin-left: 2px;
+  }
+  .admin-partner-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    min-width: 160px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 200;
+  }
+  .admin-partner-dropdown.show { display: block; }
+  .admin-partner-option {
+    padding: 8px 12px;
+    color: #333;
+    font-size: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #F2F2F7;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .admin-partner-option:last-child { border-bottom: none; }
+  .admin-partner-option:hover { background: #F5F5F7; }
+  .admin-partner-option.selected {
+    background: #FFF3E0;
+    color: #F2AC57;
+    font-weight: 600;
+  }
+  .admin-partner-option .partner-record-count {
+    color: #888;
+    font-size: 10px;
+  }
+  .admin-partner-option.selected .partner-record-count { color: #F2AC57; }
 
   .admin-stats-contract-hint {
     font-size: 11px;
@@ -224,11 +288,7 @@
   .notice-btn-secondary { background: #EEE; color: #555; }
   .notice-btn-secondary:hover { background: #DDD; }
 
-  /* v50.0: #initLoading 제거됨 */
-
-  /* ============================================================ */
-  /* v49.0 신규업장추가 모달 (D 작업) */
-  /* ============================================================ */
+  /* 신규업장추가 모달 */
   .new-store-modal {
     display: none;
     position: fixed;
@@ -489,9 +549,11 @@
   </div>
 
   <div id="adminStatsBar">
-    <span class="admin-stat-item admin-stat-all active" data-admin-filter="all" id="adminStatAll">
+    <span class="admin-partner-selector" id="adminPartnerSelector">
       <span class="admin-stats-label-icon">📊</span>
-      <span class="admin-stat-name">전체</span>
+      <span class="admin-stat-name" id="adminPartnerLabel">전체</span>
+      <span class="admin-partner-arrow">▼</span>
+      <div class="admin-partner-dropdown" id="adminPartnerDropdown"></div>
     </span>
     <span class="admin-stat-item" data-admin-filter="visit">
       <span class="admin-stat-dot" style="background:#4d4678;"></span>
@@ -534,8 +596,6 @@
   </div>
 </div>
 
-<!-- v50.0: #initLoading 제거 -->
-
 <div id="loginScreen" style="display:none;">
   <div class="login-box">
     <h1>업박스 영업 지도</h1>
@@ -565,9 +625,6 @@
   </div>
 </div>
 
-<!-- ============================================================ -->
-<!-- v49.0 신규업장추가 모달 (D 작업) -->
-<!-- ============================================================ -->
 <div id="newStoreModal" class="new-store-modal">
   <div class="new-store-content">
     <div class="new-store-header">
@@ -711,10 +768,6 @@ const db = firebase.database();
 
 const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec';
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
-
-// ============================================================
-// v49.0 신규업장추가 Web App 엔드포인트
-// ============================================================
 const NEW_STORE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzSBmYw2I2NBTb8TwGtQe2r5hG0THf60eIROO7kbLWckHBGbYufoA8odWghYjs_sGJuNA/exec';
 
 const ADMIN_CODES = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'];
@@ -729,10 +782,11 @@ function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
 }
 
+// v51.0: 캐시 키 _v2 → _v3 (구조 변경)
 const CACHE = {
   OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },
-  MY_PROJECTS:     { key: 'cache_my_projects_v2',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
-  ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v1',  ttlMs: 12 * 60 * 60 * 1000 }
+  MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
+  ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v2',  ttlMs: 12 * 60 * 60 * 1000 }
 };
 
 function getCache(c) {
@@ -751,7 +805,7 @@ function setCache(c, data) {
     localStorage.setItem(c.key, JSON.stringify({ t: Date.now(), d: data }));
   } catch(e) {
     try {
-      const keys = ['cache_other_visits_v2', 'cache_my_projects_v2', 'cache_admin_aggregate_v1', 'cache_other_visits', 'cache_my_projects'];
+      const keys = ['cache_other_visits_v2', 'cache_my_projects_v3', 'cache_admin_aggregate_v2', 'cache_my_projects_v2', 'cache_admin_aggregate_v1', 'cache_other_visits', 'cache_my_projects'];
       for (const k of keys) {
         if (k !== c.key && localStorage.getItem(k)) { localStorage.removeItem(k); break; }
       }
@@ -761,17 +815,17 @@ function setCache(c, data) {
 }
 
 function clearAllCaches() {
-  ['cache_other_visits_v2','cache_my_projects_v2','cache_admin_aggregate_v1','cache_other_visits','cache_my_projects'].forEach(k => localStorage.removeItem(k));
+  ['cache_other_visits_v2','cache_my_projects_v3','cache_my_projects_v2','cache_admin_aggregate_v2','cache_admin_aggregate_v1','cache_other_visits','cache_my_projects'].forEach(k => localStorage.removeItem(k));
 }
 
 (function migrateOldCaches() {
-  ['cache_other_visits','cache_my_projects'].forEach(k => {
+  ['cache_other_visits','cache_my_projects','cache_my_projects_v2','cache_admin_aggregate_v1'].forEach(k => {
     if (localStorage.getItem(k)) localStorage.removeItem(k);
   });
 })();
 
 const NOTICE_TYPES = {
-  projectAssignments: { icon: '🎯', title: '프로젝트 배정 변경', cacheKeysToClear: ['cache_my_projects_v2'] },
+  projectAssignments: { icon: '🎯', title: '프로젝트 배정 변경', cacheKeysToClear: ['cache_my_projects_v3'] },
   contractStores: { icon: '⭐', title: '기계약 업장 변경', cacheKeysToClear: [] },
   general: { icon: '📢', title: '공지사항', cacheKeysToClear: [] }
 };
@@ -872,6 +926,7 @@ let isAdminUser = false;
 let adminViewActive = false;
 let visitsAggregate = null;
 let adminMasterStores = [];
+let selectedAdminPartner = 'all';  // v51.0: 'all' or partnerKey
 
 let contractsCache = { center: null, data: [], ts: 0 };
 const CONTRACTS_CACHE_TTL_MS = 30 * 1000;
@@ -931,18 +986,93 @@ function logout() {
   }
 })();
 
-// v50.0: 백그라운드 위치 fetch (UI 차단 없음)
+// v51.0: 위치 fetch 최대 3초로 단축, 정확도 낮춰서 빠르게
 async function fetchInitialLocation() {
   return new Promise(function(resolve) {
     if (!navigator.geolocation) { resolve(null); return; }
     navigator.geolocation.getCurrentPosition(
       function(pos) { resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
       function(err) { resolve(null); },
-      { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 }
+      { enableHighAccuracy: false, maximumAge: 60000, timeout: 3000 }
     );
   });
 }
 
+// v51.0: partner_projects 인덱스 사용 (stores_light 전체 다운로드 회피)
+async function loadMyProjectsFromIndex() {
+  try {
+    const snap = await db.ref('partner_projects/' + currentUser.key).once('value');
+    const data = snap.val();
+
+    if (!data) {
+      // 인덱스 노드 없음 → fallback (시연 첫 배포 직후)
+      console.warn('[partner_projects] 인덱스 없음 → fallback');
+      await checkMyProjectAssignmentLegacy();
+      return;
+    }
+
+    hasMyProjects = data.hasAny === true;
+    myProjectStores = [];
+
+    if (hasMyProjects && data.stores) {
+      for (const k in data.stores) {
+        const s = data.stores[k];
+        if (s && !isNaN(s.lat) && !isNaN(s.lng)) {
+          myProjectStores.push({ lat: s.lat, lng: s.lng, key: k, projects: s.projects || [] });
+        }
+      }
+    }
+
+    setCache(CACHE.MY_PROJECTS, { hasMyProjects: hasMyProjects, myProjectStores: myProjectStores });
+
+    if (hasMyProjects) {
+      const projChip = document.getElementById('filterProject');
+      if (projChip) projChip.classList.add('visible');
+    }
+
+    console.log('[partner_projects] 인덱스 로드 완료: hasAny=' + hasMyProjects + ', stores=' + myProjectStores.length);
+  } catch(e) {
+    console.warn('[partner_projects] 로드 실패, fallback:', e);
+    await checkMyProjectAssignmentLegacy();
+  }
+}
+
+// v51.0: 기존 로직 fallback용 (인덱스 노드 없을 때만 사용)
+async function checkMyProjectAssignmentLegacy() {
+  try {
+    const snap = await db.ref("stores_light").once("value");
+    const all = snap.val() || {};
+    let foundCount = 0;
+    const myKey = String(currentUser.key).trim();
+    const myCode = String(currentUser.code).trim();
+    myProjectStores = [];
+    for (const k in all) {
+      const s = all[k];
+      if (!s || !s.projects) continue;
+      if (isClosed(s)) {
+        s._key = k;
+        if (getVisitStatus(s) !== "lead") continue;
+      }
+      const projectNames = Object.keys(s.projects);
+      for (const projectName of projectNames) {
+        const codes = String(s.projects[projectName]).split(';').map(x => x.trim());
+        if (codes.indexOf(myKey) !== -1 || codes.indexOf(myCode) !== -1) {
+          foundCount++;
+          if (!isNaN(s.lat) && !isNaN(s.lng)) myProjectStores.push({ lat: s.lat, lng: s.lng, key: k, projects: [projectName] });
+          break;
+        }
+      }
+    }
+    hasMyProjects = (foundCount > 0);
+    setCache(CACHE.MY_PROJECTS, { hasMyProjects: hasMyProjects, myProjectStores: myProjectStores });
+    if (hasMyProjects) {
+      const projChip = document.getElementById('filterProject');
+      if (projChip) projChip.classList.add('visible');
+    }
+  } catch(e) { console.warn("프로젝트 배정 확인 실패:", e); }
+}
+
+// v51.0: 캐시 우선 빠른 시작 + 무거운 작업은 백그라운드
 async function startApp() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("userInfo").textContent = currentUser.name;
@@ -955,29 +1085,71 @@ async function startApp() {
     console.log('[관리자 모드] 자동 활성화 - ' + currentUser.name);
   }
 
-  // v50.0: 위치 fetch는 백그라운드로, 데이터 로딩과 병렬 진행
-  const dataPromise = (async function() {
-    await loadOtherPartnerContacts();
-    await loadMyVisits();
-    updateChipCounts();
-    if (isAdminUser) {
-      await loadVisitsAggregate();
-      await loadAdminMasterStores();
-      updateAdminStatsBar();
-      bindAdminStatsFilters();
-    }
-    await checkMyProjectAssignment();
-  })();
-
+  // ⚡ 위치 fetch는 백그라운드로
   const locationPromise = fetchInitialLocation();
 
-  // 데이터 먼저 로드되면 즉시 지도 초기화 (위치 못 받았으면 일단 서울 중심)
-  await dataPromise;
-  initialLocation = await locationPromise;
+  // ⚡ 캐시 즉시 로드 (네트워크 X)
+  const cachedOtherVisits = getCache(CACHE.OTHER_VISITS);
+  const cachedMyProjects = getCache(CACHE.MY_PROJECTS);
+  const cachedAggregate = isAdminUser ? getCache(CACHE.ADMIN_AGGREGATE) : null;
+
+  if (cachedOtherVisits) otherPartnerLastContactMap = cachedOtherVisits;
+  if (cachedMyProjects) {
+    hasMyProjects = cachedMyProjects.hasMyProjects;
+    myProjectStores = cachedMyProjects.myProjectStores || [];
+    if (hasMyProjects) {
+      const projChip = document.getElementById('filterProject');
+      if (projChip) projChip.classList.add('visible');
+    }
+  }
+  if (cachedAggregate) visitsAggregate = cachedAggregate;
+
+  // ⚡ 내 visits 로드 (필수, 작은 데이터)
+  await loadMyVisits();
+  updateChipCounts();
+
+  // ⚡ 관리자 - 캐시 있으면 즉시 화면 구성
+  if (isAdminUser && cachedAggregate) {
+    await loadAdminMasterStores();
+    updateAdminStatsBar();
+    bindAdminStatsFilters();
+    buildAdminPartnerDropdown();
+  }
+
+  // ⚡ 위치 - 최대 3초만 대기 (race)
+  initialLocation = await Promise.race([
+    locationPromise,
+    new Promise(resolve => setTimeout(() => resolve(null), 3000))
+  ]);
   if (initialLocation) currentUserLocation = initialLocation;
 
+  // ⚡ 지도 즉시 띄움
   initMap();
-  checkNotices();
+
+  // ⚡ 무거운 백그라운드 작업
+  setTimeout(async function() {
+    const tasks = [];
+
+    if (!cachedOtherVisits) {
+      tasks.push(loadOtherPartnerContacts());
+    }
+    if (!cachedMyProjects) {
+      tasks.push(loadMyProjectsFromIndex());
+    }
+    if (isAdminUser && !cachedAggregate) {
+      tasks.push((async function() {
+        await loadVisitsAggregate();
+        await loadAdminMasterStores();
+        updateAdminStatsBar();
+        bindAdminStatsFilters();
+        buildAdminPartnerDropdown();
+        if (adminViewActive) renderAdminView();
+      })());
+    }
+
+    await Promise.all(tasks);
+    checkNotices();
+  }, 100);
 }
 
 function bindAdminStatsFilters() {
@@ -985,15 +1157,9 @@ function bindAdminStatsFilters() {
     el.addEventListener('click', function() {
       const filter = el.dataset.adminFilter;
 
-      if (filter === 'all') {
+      if (currentFilter === filter) {
         currentFilter = 'all';
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
-        el.classList.add('active');
-      } else if (currentFilter === filter) {
-        currentFilter = 'all';
-        document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
-        const allChip = document.getElementById('adminStatAll');
-        if (allChip) allChip.classList.add('active');
       } else {
         currentFilter = filter;
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
@@ -1005,6 +1171,100 @@ function bindAdminStatsFilters() {
       renderAdminView();
     });
   });
+
+  // 파트너 드롭다운 외부 클릭 시 닫기
+  document.addEventListener('click', function(e) {
+    const selector = document.getElementById('adminPartnerSelector');
+    const dropdown = document.getElementById('adminPartnerDropdown');
+    if (selector && dropdown && !selector.contains(e.target)) {
+      dropdown.classList.remove('show');
+    }
+  });
+
+  // 파트너 드롭다운 토글
+  const selectorEl = document.getElementById('adminPartnerSelector');
+  if (selectorEl) {
+    selectorEl.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const dropdown = document.getElementById('adminPartnerDropdown');
+      if (dropdown) dropdown.classList.toggle('show');
+    });
+  }
+}
+
+// v51.0: 관리자 파트너 드롭다운 빌드
+function buildAdminPartnerDropdown() {
+  if (!isAdminUser || !visitsAggregate) return;
+
+  const dropdown = document.getElementById('adminPartnerDropdown');
+  if (!dropdown) return;
+
+  const byPartner = visitsAggregate.byPartner || {};
+
+  // 파트너 목록 만들기 (totalUniqueStores 내림차순)
+  const partnerList = Object.keys(byPartner).map(function(key) {
+    const p = byPartner[key];
+    return {
+      key: key,
+      name: p.partnerName || '(이름 없음)',
+      count: (p.summary && p.summary.totalUniqueStores) || 0
+    };
+  }).sort(function(a, b) { return b.count - a.count; });
+
+  let html = '<div class="admin-partner-option ' + (selectedAdminPartner === 'all' ? 'selected' : '') + '" data-partner="all">';
+  html += '<span>📊 전체</span>';
+  if (visitsAggregate.summary && visitsAggregate.summary.totalUniqueStores) {
+    html += '<span class="partner-record-count">' + visitsAggregate.summary.totalUniqueStores + '</span>';
+  }
+  html += '</div>';
+
+  partnerList.forEach(function(p) {
+    html += '<div class="admin-partner-option ' + (selectedAdminPartner === p.key ? 'selected' : '') + '" data-partner="' + escapeHtml(p.key) + '">';
+    html += '<span>👤 ' + escapeHtml(p.name) + '</span>';
+    html += '<span class="partner-record-count">' + p.count + '</span>';
+    html += '</div>';
+  });
+
+  dropdown.innerHTML = html;
+
+  dropdown.querySelectorAll('.admin-partner-option').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const partnerKey = el.dataset.partner;
+      selectAdminPartner(partnerKey);
+      dropdown.classList.remove('show');
+    });
+  });
+}
+
+function selectAdminPartner(partnerKey) {
+  selectedAdminPartner = partnerKey;
+
+  // 라벨 업데이트
+  const labelEl = document.getElementById('adminPartnerLabel');
+  const selectorEl = document.getElementById('adminPartnerSelector');
+  if (partnerKey === 'all') {
+    labelEl.textContent = '전체';
+    if (selectorEl) selectorEl.classList.remove('active');
+  } else {
+    const byPartner = visitsAggregate.byPartner || {};
+    const p = byPartner[partnerKey];
+    labelEl.textContent = (p && p.partnerName) ? p.partnerName : partnerKey;
+    if (selectorEl) selectorEl.classList.add('active');
+  }
+
+  // 드롭다운 selected 갱신
+  document.querySelectorAll('.admin-partner-option').forEach(function(el) {
+    if (el.dataset.partner === partnerKey) el.classList.add('selected');
+    else el.classList.remove('selected');
+  });
+
+  // 마스터 데이터 + 통계바 + 뷰 재구성
+  loadAdminMasterStores().then(function() {
+    updateAdminStatsBar();
+    resetAdminViewZoom();
+    renderAdminView();
+  });
 }
 
 function resetAdminViewZoom() {
@@ -1013,6 +1273,7 @@ function resetAdminViewZoom() {
   map.setLevel(ADMIN_INIT_LEVEL);
 }
 
+// v51.0: 파트너 선택 모드에 따라 다른 stores 표시
 async function renderAdminView() {
   if (!isAdminUser) return;
 
@@ -1036,7 +1297,7 @@ async function renderAdminView() {
           contractsAdded++;
         }
       });
-      console.log('[기계약 추가됨] ' + contractsAdded + '개 (중복 ' + (contracts.length - contractsAdded) + '개 제외)');
+      console.log('[기계약 추가됨] ' + contractsAdded + '개');
     } catch(e) { console.warn('[기계약 동적 로드] 실패:', e); }
   }
 
@@ -1044,7 +1305,7 @@ async function renderAdminView() {
   allStoresInView = filtered;
   renderMarkers();
 
-  console.log('[관리자뷰] filter=' + currentFilter + ', level=' + (map ? map.getLevel() : '?') + ', 총 ' + filtered.length + '개 (기계약 추가 ' + contractsAdded + '개)');
+  console.log('[관리자뷰] partner=' + selectedAdminPartner + ', filter=' + currentFilter + ', 총 ' + filtered.length + '개');
 }
 
 async function fetchContractsInCurrentBounds() {
@@ -1057,7 +1318,7 @@ async function fetchContractsInCurrentBounds() {
     const elapsed = Date.now() - contractsCache.ts;
     const moved = haversine(contractsCache.center.lat, contractsCache.center.lng, centerLat, centerLng);
     if (elapsed < CONTRACTS_CACHE_TTL_MS && moved < CONTRACTS_CACHE_MOVE_THRESHOLD_KM) {
-      console.log('[기계약 캐시 적중] 이동 ' + moved.toFixed(2) + 'km, 경과 ' + Math.round(elapsed/1000) + 's');
+      console.log('[기계약 캐시 적중]');
       return contractsCache.data;
     }
   }
@@ -1076,8 +1337,6 @@ async function fetchContractsInCurrentBounds() {
   latMax = Math.max(latMax, centerLat + radiusLatDeg);
   lngMin = Math.min(lngMin, centerLng - radiusLngDeg);
   lngMax = Math.max(lngMax, centerLng + radiusLngDeg);
-
-  console.log('[기계약 fetch 시작] level=' + map.getLevel() + ', 중심=' + centerLat.toFixed(4) + ',' + centerLng.toFixed(4));
 
   try {
     const snap = await db.ref('stores_light').orderByChild('lat').startAt(latMin).endAt(latMax).once('value');
@@ -1105,8 +1364,6 @@ async function fetchContractsInCurrentBounds() {
     contracts.sort(function(a, b) { return a._distFromCenter - b._distFromCenter; });
     const limited = contracts.slice(0, ADMIN_CONTRACT_MAX_PINS);
 
-    console.log('[기계약 fetch 결과] 총 ' + contracts.length + '개 (제한 후 ' + limited.length + '개)');
-
     contractsCache = {
       center: { lat: centerLat, lng: centerLng },
       data: limited,
@@ -1121,35 +1378,41 @@ async function fetchContractsInCurrentBounds() {
 }
 
 async function loadVisitsAggregate() {
-  const cached = getCache(CACHE.ADMIN_AGGREGATE);
-  if (cached) {
-    visitsAggregate = cached;
-    console.log('[캐시] 관리자 집계');
-    return;
-  }
   try {
     const snap = await db.ref('visits_aggregate').once('value');
     const data = snap.val();
     if (!data) {
-      visitsAggregate = { stores: {}, summary: {}, version: '미집계', updatedAt: 0 };
+      visitsAggregate = { stores: {}, summary: {}, byPartner: {}, version: '미집계', updatedAt: 0 };
       return;
     }
     visitsAggregate = data;
     setCache(CACHE.ADMIN_AGGREGATE, data);
     console.log('[관리자 집계] 로드 완료');
   } catch(e) {
-    visitsAggregate = { stores: {}, summary: {}, version: '오류', updatedAt: 0 };
+    visitsAggregate = { stores: {}, summary: {}, byPartner: {}, version: '오류', updatedAt: 0 };
   }
 }
 
+// v51.0: 파트너 선택 모드에 따라 다른 데이터원 사용
 async function loadAdminMasterStores() {
-  if (!visitsAggregate || !visitsAggregate.stores) {
-    visitsAggregate = visitsAggregate || { stores: {}, summary: {} };
+  if (!visitsAggregate) {
+    visitsAggregate = { stores: {}, summary: {}, byPartner: {} };
     adminMasterStores = [];
     return;
   }
-  const aggKeys = Object.keys(visitsAggregate.stores || {});
-  console.log('[관리자 마스터] ' + aggKeys.length + '개 fetch 시작');
+
+  let targetStoresMap;
+  if (selectedAdminPartner === 'all') {
+    targetStoresMap = visitsAggregate.stores || {};
+  } else {
+    const byPartner = visitsAggregate.byPartner || {};
+    const pData = byPartner[selectedAdminPartner];
+    targetStoresMap = (pData && pData.stores) || {};
+  }
+
+  const aggKeys = Object.keys(targetStoresMap);
+  console.log('[관리자 마스터] partner=' + selectedAdminPartner + ', ' + aggKeys.length + '개 fetch 시작');
+
   try {
     const fetchPromises = aggKeys.map(function(k) {
       return db.ref('stores_light/' + k).once('value').then(function(snap) {
@@ -1166,7 +1429,7 @@ async function loadAdminMasterStores() {
     let validStores = results.filter(function(s) { return s !== null; });
     validStores = validStores.filter(function(s) {
       if (!isClosed(s)) return true;
-      const aggData = visitsAggregate.stores[s._key];
+      const aggData = targetStoresMap[s._key];
       return aggData && aggData.lastStatus === 'lead';
     });
     adminMasterStores = validStores;
@@ -1177,12 +1440,22 @@ async function loadAdminMasterStores() {
   }
 }
 
+// v51.0: 파트너 선택 모드에 따라 summary 다르게 표시
 function updateAdminStatsBar() {
   if (!isAdminUser || !adminViewActive || !visitsAggregate) {
     document.getElementById('adminStatsBar').classList.remove('visible');
     return;
   }
-  const summary = visitsAggregate.summary || {};
+
+  let summary;
+  if (selectedAdminPartner === 'all') {
+    summary = visitsAggregate.summary || {};
+  } else {
+    const byPartner = visitsAggregate.byPartner || {};
+    const pData = byPartner[selectedAdminPartner];
+    summary = (pData && pData.summary) || {};
+  }
+
   document.getElementById('adminStat-visit').textContent = summary.visit || 0;
   document.getElementById('adminStat-lead').textContent = summary.lead || 0;
   document.getElementById('adminStat-success').textContent = summary.success || 0;
@@ -1203,58 +1476,6 @@ function updateAdminStatsBar() {
   document.getElementById('adminStatsBar').classList.add('visible');
 }
 
-async function checkMyProjectAssignment() {
-  const cached = getCache(CACHE.MY_PROJECTS);
-  if (cached) {
-    hasMyProjects = cached.hasMyProjects;
-    myProjectStores = cached.myProjectStores || [];
-    if (hasMyProjects) {
-      const showChip = function(retries) {
-        const projChip = document.getElementById('filterProject');
-        if (projChip) projChip.classList.add('visible');
-        else if (retries > 0) setTimeout(function() { showChip(retries - 1); }, 200);
-      };
-      showChip(5);
-    }
-    return;
-  }
-  try {
-    const snap = await db.ref("stores_light").once("value");
-    const all = snap.val() || {};
-    let foundCount = 0;
-    const myKey = String(currentUser.key).trim();
-    const myCode = String(currentUser.code).trim();
-    myProjectStores = [];
-    for (const k in all) {
-      const s = all[k];
-      if (!s || !s.projects) continue;
-      if (isClosed(s)) {
-        s._key = k;
-        if (getVisitStatus(s) !== "lead") continue;
-      }
-      const projectNames = Object.keys(s.projects);
-      for (const projectName of projectNames) {
-        const codes = String(s.projects[projectName]).split(';').map(x => x.trim());
-        if (codes.indexOf(myKey) !== -1 || codes.indexOf(myCode) !== -1) {
-          foundCount++;
-          if (!isNaN(s.lat) && !isNaN(s.lng)) myProjectStores.push({ lat: s.lat, lng: s.lng });
-          break;
-        }
-      }
-    }
-    hasMyProjects = (foundCount > 0);
-    setCache(CACHE.MY_PROJECTS, { hasMyProjects: hasMyProjects, myProjectStores: myProjectStores });
-    if (hasMyProjects) {
-      const showChip = function(retries) {
-        const projChip = document.getElementById('filterProject');
-        if (projChip) projChip.classList.add('visible');
-        else if (retries > 0) setTimeout(function() { showChip(retries - 1); }, 200);
-      };
-      showChip(5);
-    }
-  } catch(e) { console.warn("프로젝트 배정 확인 실패:", e); }
-}
-
 function moveToMyProjectStores() {
   if (!myProjectStores || myProjectStores.length === 0) return;
   fitToCoords(myProjectStores);
@@ -1264,8 +1485,6 @@ function moveToMyProjectStores() {
 }
 
 async function loadOtherPartnerContacts() {
-  const cached = getCache(CACHE.OTHER_VISITS);
-  if (cached) { otherPartnerLastContactMap = cached; return; }
   try {
     const snap = await db.ref("visits").once("value");
     const all = snap.val() || {};
@@ -1307,7 +1526,6 @@ function computeMyVisitCounts() {
     if (outcome === "성사") { counts.success++; continue; }
     if (outcome === "실패") { counts.fail++; continue; }
 
-    // v50.2: 단순방문/유효리드 새 기준
     const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
     const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
     const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
@@ -1315,7 +1533,6 @@ function computeMyVisitCounts() {
 
     if (allVisitFilled && allLeadAdditionalFilled) { counts.lead++; continue; }
     if (allVisitFilled) { counts.visit++; continue; }
-    // 폐업이거나 미입력 상태는 카운트 안 함
   }
   return counts;
 }
@@ -1342,7 +1559,7 @@ function initMap() {
     console.log('[지도 초기화] 관리자 - 전국 뷰');
   } else if (initialLocation) {
     initialCenter = new kakao.maps.LatLng(initialLocation.lat, initialLocation.lng);
-    initialLevel = 4;
+    initialLevel = 3;  // v51.0: 4→3 (반경 약 1km, 초기 bounds 축소)
   } else {
     initialCenter = new kakao.maps.LatLng(37.5665, 126.9780);
     initialLevel = 4;
@@ -1350,7 +1567,6 @@ function initMap() {
   const options = { center: initialCenter, level: initialLevel };
   map = new kakao.maps.Map(container, options);
 
-  // v50.0: 관리자만 클러스터러 생성 (파트너는 핀 직접 표시)
   if (isAdminUser) {
     markerClusterer = createClusterer();
   }
@@ -1371,7 +1587,7 @@ function initMap() {
         const isInContractZone = currentLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
 
         if (isInContractZone || wasInContractZone) {
-          console.log('[관리자 idle] level ' + lastZoomLevel + ' → ' + currentLevel + ' / 재렌더링');
+          console.log('[관리자 idle] level ' + lastZoomLevel + ' → ' + currentLevel);
           renderAdminView();
         }
         lastZoomLevel = currentLevel;
@@ -1504,7 +1720,6 @@ function handleClusterClick(cluster) {
     const lngRange = Math.max.apply(null, lngs) - Math.min.apply(null, lngs);
 
     if (latRange > 1 || lngRange > 1) {
-      console.log('[클러스터 클릭] 멤버 거리 너무 멈 → 중심으로 줌인');
       const center = cluster.getCenter ? cluster.getCenter() : positions[0];
       map.setCenter(center);
       map.setLevel(6);
@@ -1591,7 +1806,6 @@ async function moveToFilteredStoresForPartner(filter) {
     if (outcome === '성사') status = 'success';
     else if (outcome === '실패') status = 'fail';
     else {
-      // v50.2: 단순방문/유효리드 새 기준
       const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
       const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
       const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
@@ -1742,16 +1956,6 @@ async function loadStoresInView() {
       return getVisitStatus(s) === "lead";
     });
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
-    if (!hasMyProjects) {
-      for (const s of list) {
-        if (amIAssignedToProject(s, currentUser.key)) {
-          hasMyProjects = true;
-          const projChip = document.getElementById('filterProject');
-          if (projChip) projChip.classList.add('visible');
-          break;
-        }
-      }
-    }
     if (currentUserLocation) {
       list = list.filter(function(s) {
         if (!isContractGrade(s.grade)) return true;
@@ -1834,9 +2038,18 @@ function nameSimilarity(a, b) {
   return matches / longer.length;
 }
 
+// v51.0: 파트너 선택 모드에 따라 다른 데이터원에서 상태 가져옴
 function getEffectiveStatus(store) {
-  if (isAdminUser && adminViewActive && visitsAggregate && visitsAggregate.stores) {
-    const aggData = visitsAggregate.stores[store._key];
+  if (isAdminUser && adminViewActive && visitsAggregate) {
+    let targetStoresMap;
+    if (selectedAdminPartner === 'all') {
+      targetStoresMap = visitsAggregate.stores || {};
+    } else {
+      const byPartner = visitsAggregate.byPartner || {};
+      const pData = byPartner[selectedAdminPartner];
+      targetStoresMap = (pData && pData.stores) || {};
+    }
+    const aggData = targetStoresMap[store._key];
     if (aggData && aggData.lastStatus) {
       if (isContractGrade(store.grade)) return "contract";
       return aggData.lastStatus;
@@ -1845,7 +2058,6 @@ function getEffectiveStatus(store) {
   return getVisitStatus(store);
 }
 
-// v50.0: 파트너 모드는 클러스터링 없이 핀 직접 표시
 function renderMarkers() {
   if (markerClusterer) markerClusterer.clear();
   markers.forEach(m => m.setMap(null));
@@ -1875,7 +2087,6 @@ function renderMarkers() {
     markerByKey[store._key] = marker;
     shown++;
 
-    // v50.0: 파트너 모드면 모두 directMarkers, 관리자 모드만 클러스터링
     if (!isAdminUser) {
       directMarkers.push(marker);
     } else if (isSelected || (adminViewActive && isContract)) {
@@ -1904,7 +2115,6 @@ function renderMarkers() {
   }
   directMarkers.forEach(function(m) { m.setMap(map); });
 
-  console.log('[renderMarkers] 클러스터 ' + clusterMarkers.length + '개 + 직접표시 ' + directMarkers.length + '개');
   document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
 }
 
@@ -1914,8 +2124,15 @@ function createMarker(store, status, isSelected) {
 
   let labelLines;
   if (isAdminUser && adminViewActive && !isContractGrade(store.grade)) {
-    const aggData = visitsAggregate && visitsAggregate.stores ? visitsAggregate.stores[store._key] : null;
-    const partnerName = aggData ? aggData.lastPartnerName : '';
+    // v51.0: 파트너 선택 모드면 그 파트너의 storeKey 정보, 전체면 lastPartnerName
+    let partnerName = '';
+    if (selectedAdminPartner === 'all' && visitsAggregate && visitsAggregate.stores) {
+      const aggData = visitsAggregate.stores[store._key];
+      partnerName = aggData ? aggData.lastPartnerName : '';
+    } else if (selectedAdminPartner !== 'all' && visitsAggregate && visitsAggregate.byPartner) {
+      const pData = visitsAggregate.byPartner[selectedAdminPartner];
+      partnerName = (pData && pData.partnerName) || '';
+    }
     labelLines = formatPartnerNameForPin(partnerName);
   } else {
     labelLines = [getGradeIcon(store.grade)];
@@ -1941,7 +2158,6 @@ function createMarker(store, status, isSelected) {
   marker._upboxStoreKey = store._key;
   marker._upboxIsContract = isContractGrade(store.grade);
   kakao.maps.event.addListener(marker, "click", function() {
-    // v50.0: 파트너 모드는 클러스터 없으니 바로 패널 열기
     if (isAdminUser && map.getLevel() >= CLUSTER_MIN_LEVEL) {
       map.setCenter(position);
       map.setLevel(4);
@@ -2025,9 +2241,6 @@ function getVisitStatus(store) {
   if (outcome === "성사") return "success";
   if (outcome === "실패") return "fail";
 
-  // v50.2: 단순방문/유효리드 기준 재정의
-  // 단순방문 = 현재업체명 + 통갯수 + 비닐 + 트럭 (4개 모두)
-  // 유효리드 = 단순방문 4개 + 담당자연락처 + 월예상배출량 + 제안단가 + 상세상담내용 (총 8개 모두)
   const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
   const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
 
@@ -2138,7 +2351,6 @@ function closePanel(clearSelection) {
   rvInstance = null;
   currentRvState = 'collapsed';
   if (clearSelection && selectedStore) {
-    const previousKey = selectedStore._key;
     selectedStore = null;
     if (isAdminUser) renderAdminView();
     else renderMarkers();
@@ -2317,7 +2529,6 @@ async function saveVisit(store) {
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome'].forEach(function(k) {
     currentData[k] = getVal('v_' + k);
   });
-  // v50.1: 영업구분은 빈값이면 필드 자체 생략 (Firebase 용량 최적화, closed 패턴과 동일)
   const salesTypeVal = getVal('v_salesType');
   if (salesTypeVal) currentData.salesType = salesTypeVal;
   currentData.updatedAt = Date.now();
@@ -2442,7 +2653,7 @@ function escapeHtml(s) {
 }
 
 // ============================================================
-// v49.0 신규업장추가 모달 (D 작업)
+// 신규업장추가 모달
 // ============================================================
 
 function openNewStoreModal() {
@@ -2479,11 +2690,9 @@ function resetNewStoreForm() {
   });
 
   _nsSelectedAdminType = '';
-  document.querySelectorAll('.ns-admin-type-buttons button').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('button[data-admintype]').forEach(function(b) { b.classList.remove('active'); });
 
   _nsSelectedSalesType = '';
-  // 영업구분 버튼은 행정신고구분과 같은 ns-admin-type-buttons 스타일을 공유하지만
-  // data-salestype 속성으로 구분되므로 별도 셀렉터로 초기화
   document.querySelectorAll('button[data-salestype]').forEach(function(b) { b.classList.remove('active'); });
 
   _nsSelectedOutcome = '';
