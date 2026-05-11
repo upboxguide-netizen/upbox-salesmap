@@ -2580,8 +2580,24 @@ async function searchStores(q) {
       return getVisitStatus(s) === "lead";
     });
     list = removeContractDuplicates(list);
-    renderSearchResults(list);
-  } catch(e) {}
+
+    // v51.1: 검색 결과 표시할 만큼만 디테일 노드에서 주소 fetch
+    const MAX_DISPLAY = 15;
+    const displayList = list.slice(0, MAX_DISPLAY);
+    const addressPromises = displayList.map(function(s) {
+      return db.ref("stores/" + s._key).once("value")
+        .then(function(snap) {
+          const d = snap.val();
+          if (d && d.address) s.address = d.address;
+        })
+        .catch(function() {});
+    });
+    await Promise.all(addressPromises);
+
+    renderSearchResults(displayList);
+  } catch(e) {
+    console.error('[검색 실패]', e);
+  }
 }
 
 function renderSearchResults(list) {
