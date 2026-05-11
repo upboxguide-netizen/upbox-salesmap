@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>업박스 영업 지도 v50.1</title>
+<title>업박스 영업 지도 v50.2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1306,14 +1306,16 @@ function computeMyVisitCounts() {
     const outcome = String(cur.outcome || "").trim();
     if (outcome === "성사") { counts.success++; continue; }
     if (outcome === "실패") { counts.fail++; continue; }
-    const leadFields = [cur.currentStoreName, cur.contact, cur.amount, cur.suggestedPrice, cur.bins, cur.vinyl, cur.truck, cur.note];
-    const allLeadFilled = leadFields.every(v => String(v || "").trim().length > 0);
-    if (allLeadFilled) { counts.lead++; continue; }
-    if (outcome === "폐업") continue;
-    const anyField = leadFields.some(v => String(v || "").trim().length > 0)
-                     || String(cur.price || "").trim().length > 0
-                     || String(cur.freq || "").trim().length > 0;
-    if (anyField) counts.visit++;
+
+    // v50.2: 단순방문/유효리드 새 기준
+    const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
+    const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
+    const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
+    const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
+
+    if (allVisitFilled && allLeadAdditionalFilled) { counts.lead++; continue; }
+    if (allVisitFilled) { counts.visit++; continue; }
+    // 폐업이거나 미입력 상태는 카운트 안 함
   }
   return counts;
 }
@@ -1585,13 +1587,18 @@ async function moveToFilteredStoresForPartner(filter) {
     const rec = myVisitedStoreData[storeKey];
     const cur = rec.current || {};
     const outcome = String(cur.outcome || "").trim();
-    let status = 'visit';
+    let status = 'none';
     if (outcome === '성사') status = 'success';
     else if (outcome === '실패') status = 'fail';
     else {
-      const leadFields = [cur.currentStoreName, cur.contact, cur.amount, cur.suggestedPrice, cur.bins, cur.vinyl, cur.truck, cur.note];
-      const allLeadFilled = leadFields.every(v => String(v || "").trim().length > 0);
-      if (allLeadFilled) status = 'lead';
+      // v50.2: 단순방문/유효리드 새 기준
+      const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
+      const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
+      const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
+      const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
+
+      if (allVisitFilled && allLeadAdditionalFilled) status = 'lead';
+      else if (allVisitFilled) status = 'visit';
       else if (outcome === '폐업') status = 'closedByMe';
     }
     if (status === filter) targetKeys.push(storeKey);
@@ -2017,12 +2024,19 @@ function getVisitStatus(store) {
   const outcome = String(cur.outcome || "").trim();
   if (outcome === "성사") return "success";
   if (outcome === "실패") return "fail";
-  const leadFields = [cur.currentStoreName, cur.contact, cur.amount, cur.suggestedPrice, cur.bins, cur.vinyl, cur.truck, cur.note];
-  const allLeadFilled = leadFields.every(v => String(v || "").trim().length > 0);
-  if (allLeadFilled) return "lead";
+
+  // v50.2: 단순방문/유효리드 기준 재정의
+  // 단순방문 = 현재업체명 + 통갯수 + 비닐 + 트럭 (4개 모두)
+  // 유효리드 = 단순방문 4개 + 담당자연락처 + 월예상배출량 + 제안단가 + 상세상담내용 (총 8개 모두)
+  const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
+  const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
+
+  const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
+  const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
+
+  if (allVisitFilled && allLeadAdditionalFilled) return "lead";
+  if (allVisitFilled) return "visit";
   if (outcome === "폐업") return "closedByMe";
-  const anyField = leadFields.some(v => String(v || "").trim().length > 0) || String(cur.price || "").trim().length > 0 || String(cur.freq || "").trim().length > 0;
-  if (anyField) return "visit";
   return "none";
 }
 
