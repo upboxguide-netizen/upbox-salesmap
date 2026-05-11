@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>업박스 영업 지도</title>
+<title>업박스 영업 지도 v50.1</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -607,6 +607,14 @@
       </div>
 
       <div class="ns-form-group">
+        <label>영업구분</label>
+        <div class="ns-admin-type-buttons">
+          <button type="button" data-salestype="인바운드" onclick="selectSalesType(this)">인바운드</button>
+          <button type="button" data-salestype="아웃바운드" onclick="selectSalesType(this)">아웃바운드</button>
+        </div>
+      </div>
+
+      <div class="ns-form-group">
         <label>행정신고구분</label>
         <div class="ns-admin-type-buttons">
           <button type="button" data-admintype="다량배출사업장" onclick="selectAdminType(this)">다량배출사업장</button>
@@ -877,6 +885,7 @@ let _placesSearchCache = null;
 let _placesSearchTimer = null;
 let _nsSelectedPlace = null;
 let _nsSelectedAdminType = '';
+let _nsSelectedSalesType = '';
 let _nsSelectedOutcome = '';
 
 document.getElementById("loginBtn").onclick = tryLogin;
@@ -2219,6 +2228,8 @@ async function openPriceGuide() {
 function buildVisitForm() {
   return '<div class="visit-form">' +
     '<h3>방문기록</h3>' +
+    '<label>영업구분</label>' +
+    '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
     '<div class="visit-dates" id="visitDates"></div>' +
     '<label><span style="color:#E53935;">*</span> 현재 업체명</label>' +
     '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (없을경우 사유기재)">' +
@@ -2248,7 +2259,7 @@ function loadMyVisit(store) {
     return;
   }
   const cur = rec.current || {};
-  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome'].forEach(function(k) {
+  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
   });
   const first = rec.firstVisitAt ? formatDate(rec.firstVisitAt) : '';
@@ -2292,6 +2303,9 @@ async function saveVisit(store) {
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome'].forEach(function(k) {
     currentData[k] = getVal('v_' + k);
   });
+  // v50.1: 영업구분은 빈값이면 필드 자체 생략 (Firebase 용량 최적화, closed 패턴과 동일)
+  const salesTypeVal = getVal('v_salesType');
+  if (salesTypeVal) currentData.salesType = salesTypeVal;
   currentData.updatedAt = Date.now();
 
   const recKey = "REC_" + currentUser.key + "_" + store._key;
@@ -2453,6 +2467,11 @@ function resetNewStoreForm() {
   _nsSelectedAdminType = '';
   document.querySelectorAll('.ns-admin-type-buttons button').forEach(function(b) { b.classList.remove('active'); });
 
+  _nsSelectedSalesType = '';
+  // 영업구분 버튼은 행정신고구분과 같은 ns-admin-type-buttons 스타일을 공유하지만
+  // data-salestype 속성으로 구분되므로 별도 셀렉터로 초기화
+  document.querySelectorAll('button[data-salestype]').forEach(function(b) { b.classList.remove('active'); });
+
   _nsSelectedOutcome = '';
   document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
   const defaultOutcomeBtn = document.querySelector('.ns-outcome-buttons button[data-outcome=""]');
@@ -2542,9 +2561,15 @@ function clearSelectedPlace() {
 }
 
 function selectAdminType(btn) {
-  document.querySelectorAll('.ns-admin-type-buttons button').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('button[data-admintype]').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   _nsSelectedAdminType = btn.dataset.admintype;
+}
+
+function selectSalesType(btn) {
+  document.querySelectorAll('button[data-salestype]').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  _nsSelectedSalesType = btn.dataset.salestype;
 }
 
 function selectOutcome(btn) {
@@ -2585,6 +2610,7 @@ async function submitNewStore() {
     lng: lng,
     usedSearch: usedSearch,
     adminType: _nsSelectedAdminType,
+    salesType: _nsSelectedSalesType,
     currentStoreName: document.getElementById('nsCurrentStoreName').value.trim(),
     contact: document.getElementById('nsContact').value.trim(),
     amount: document.getElementById('nsAmount').value.trim(),
