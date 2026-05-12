@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>업박스 영업 지도 v51.1</title>
+<title>업박스 영업 지도 v51.2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2442,7 +2442,7 @@ function buildVisitForm() {
     '<label>영업구분</label>' +
     '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
     '<div class="visit-dates" id="visitDates"></div>' +
-    '<label><span style="color:#E53935;">*</span> 현재 업체명</label>' +
+    '<label><span style="color:#E53935;">*</span> 현재 수거업체명</label>' +
     '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (없을경우 사유기재)">' +
     '<label>담당자 연락처</label>' +
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
@@ -2456,8 +2456,8 @@ function buildVisitForm() {
     '<select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="지자체">지자체</option><option value="처리기">처리기</option></select>' +
     '<label><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>' +
     '<select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select>' +
-    '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요"></textarea>' +
-    '<label>최종영업결과</label>' +
+    '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
+    '<label>최종영업결과 및 폐업 여부 선택</label>' +
     '<select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option><option value="폐업">폐업</option></select>' +
     '<button class="save-btn" id="saveVisitBtn">저장</button></div>';
 }
