@@ -1943,6 +1943,11 @@ async function loadStoresInView() {
       return getVisitStatus(s) === "lead";
     });
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
+    
+    // 기계약 노출은 현재위치 3km 제한을 유지하되,
+    // 중복 판단은 지도에 로드된 전체 기계약을 기준으로 먼저 수행한다.
+    list = removeContractDuplicates(list);
+    
     if (currentUserLocation) {
       list = list.filter(function(s) {
         if (!isContractGrade(s.grade)) return true;
@@ -1950,7 +1955,7 @@ async function loadStoresInView() {
         return dist <= CONTRACT_RADIUS_KM;
       });
     }
-    list = removeContractDuplicates(list);
+    
     allStoresInView = list;
     renderMarkers();
   } catch(e) {
