@@ -919,7 +919,7 @@ let selectedStore = null;
 let searchTimer = null;
 let currentUserLocation = null;
 const CONTRACT_RADIUS_KM = 3;
-const DUPLICATE_RADIUS_M = 30;
+const DUPLICATE_RADIUS_M = 8;
 
 let myLocationMarker = null;
 let geoWatchId = null;
@@ -2001,28 +2001,37 @@ function haversine(lat1, lng1, lat2, lng2) {
 function removeContractDuplicates(list) {
   const contracts = list.filter(s => isContractGrade(s.grade));
   const others = list.filter(s => !isContractGrade(s.grade));
+
   const filteredOthers = others.filter(function(o) {
+    if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
+
     for (const c of contracts) {
       const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
-      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.7) return false;
+      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) return false;
     }
     return true;
   });
+
   return contracts.concat(filteredOthers);
 }
 
 function nameSimilarity(a, b) {
   if (!a || !b) return 0;
-  a = String(a).replace(/\s+/g, "");
-  b = String(b).replace(/\s+/g, "");
+
+  a = String(a).replace(/[\s_]+/g, "");
+  b = String(b).replace(/[\s_]+/g, "");
+
   const longer = a.length > b.length ? a : b;
   const shorter = a.length > b.length ? b : a;
-  if (longer.length === 0) return 1;
+
+  if (shorter.length === 0) return 1;
+
   let matches = 0;
   for (let i = 0; i < shorter.length; i++) {
     if (longer.indexOf(shorter[i]) !== -1) matches++;
   }
-  return matches / longer.length;
+
+  return matches / shorter.length;
 }
 
 function getEffectiveStatus(store) {
