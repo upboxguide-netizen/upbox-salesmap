@@ -1,2905 +1,1350 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>업박스 영업 지도 v51.2</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>업박스 영업 지도 v51.2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=99eb8a92f038be2cb6a6352932ff492a&libraries=clusterer,services"></script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1E3A8A;
+            --primary-light: #3B82F6;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --text-main: #1F2937;
+            --text-sub: #6B7280;
+            --bg-light: #F3F4F6;
+            --border: #E5E7EB;
+            --contract: #F2AC57;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-top: env(safe-area-inset-top, 0px);
+        }
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Sans KR', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services,clusterer"></script>
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f0f2f5;
+            position: fixed;
+        }
 
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Noto Sans KR', sans-serif; overflow: hidden; }
-  #app { width: 100vw; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+        #app-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
 
-  #loginScreen { position: fixed; inset: 0; z-index: 9999; background: #363859; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .login-box { background: white; border-radius: 16px; padding: 36px 28px; max-width: 380px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
-  .login-box h1 { font-size: 22px; color: #363859; margin-bottom: 6px; text-align: center; }
-  .login-box p { font-size: 13px; color: #888; text-align: center; margin-bottom: 24px; }
-  .login-box input { width: 100%; padding: 12px 14px; border: 1px solid #DDD; border-radius: 8px; font-size: 14px; margin-bottom: 12px; font-family: inherit; }
-  .login-box input:focus { outline: none; border-color: #F2AC57; }
-  .login-box button { width: 100%; padding: 13px; border: none; border-radius: 8px; background: #363859; color: white; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; }
-  .login-error { color: #E53935; font-size: 12px; margin-top: 8px; text-align: center; }
+        #map-container {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
 
-  #header { background: #363859; color: white; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
-  #header .title { font-size: 15px; font-weight: 700; flex: 1; display: flex; align-items: center; gap: 6px; }
-  #header .admin-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #F2AC57; color: white; font-size: 10px; font-weight: 700; }
-  #header .user { font-size: 11px; color: #CCC; }
-  #header .header-btn { background: none; border: 1px solid #666; color: #CCC; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: inherit; }
-  #header .header-btn:hover { background: rgba(255,255,255,0.1); }
+        #map {
+            width: 100%;
+            height: 100%;
+        }
 
-  #searchBar { padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; position: relative; }
-  #searchInput { width: 100%; padding: 10px 12px; border: 1px solid #DDD; border-radius: 8px; font-size: 14px; font-family: inherit; }
-  #searchInput:focus { outline: none; border-color: #F2AC57; }
-  #searchResults { position: absolute; top: 100%; left: 10px; right: 10px; background: white; border: 1px solid #DDD; border-radius: 8px; max-height: 300px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-  .search-item { padding: 10px 12px; border-bottom: 1px solid #EEE; cursor: pointer; }
-  .search-item:hover { background: #F5F5F5; }
-  .search-item:last-child { border-bottom: none; }
-  .search-name-row { display: flex; align-items: center; gap: 6px; }
-  .search-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .search-name { font-size: 13px; color: #333; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .search-status-label { font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex-shrink: 0; color: white; }
-  .search-project-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 3px; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; font-size: 10px; font-weight: 600; flex-shrink: 0; }
-  /* v51.1: 검색 결과 주소 라인 */
-  .search-address {
-    font-size: 11px;
-    color: #999;
-    margin-top: 3px;
-    margin-left: 14px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.85);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+            transition: opacity 0.3s ease;
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid var(--border);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #loading-text { font-size: 15px; color: var(--text-main); font-weight: 500; text-align: center; line-height: 1.5; }
 
-  #filterBar { display: flex; gap: 6px; padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; overflow-x: auto; white-space: nowrap; }
-  .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
-  .filter-chip.active { color: white; border: none; }
-  .filter-chip-project { display: none; align-items: center; gap: 3px; }
-  .filter-chip-project.visible { display: inline-flex; }
-  .filter-chip-project.active { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%) !important; }
+        /* Floating Search & Filter Bar */
+        .floating-top-bar {
+            position: absolute;
+            top: calc(15px + var(--safe-top));
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92%;
+            max-width: 480px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
 
-  .chip-count { margin-left: 3px; font-weight: 600; opacity: 0.9; }
-  .chip-count:empty { display: none; }
+        .search-box-wrapper {
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+            display: flex;
+            align-items: center;
+            padding: 4px 8px 4px 14px;
+            height: 52px;
+            border: 1px solid rgba(0,0,0,0.04);
+        }
+        .search-box-wrapper i.fa-search { color: var(--text-sub); font-size: 18px; margin-right: 10px; }
+        .search-box-wrapper input {
+            flex: 1; border: none; outline: none; font-size: 16px; color: var(--text-main); font-weight: 400;
+        }
+        .search-box-wrapper input::placeholder { color: #A0AEC0; }
+        .clear-search-btn { padding: 8px; color: var(--text-sub); font-size: 16px; display: none; cursor: pointer; }
+        .menu-toggle-btn {
+            width: 40px; height: 40px; border-radius: 10px; background: var(--bg-light);
+            display: flex; align-items: center; justify-content: center; color: var(--text-main);
+            font-size: 18px; cursor: pointer; margin-left: 6px; transition: background 0.2s;
+        }
+        .menu-toggle-btn:active { background: #E5E7EB; }
 
-  #adminStatsBar {
-    display: none;
-    padding: 8px 10px;
-    background: linear-gradient(90deg, #363859 0%, #5c5e8a 100%);
-    color: white;
-    font-size: 12px;
-    border-bottom: 1px solid #DDD;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-  }
-  #adminStatsBar.visible { display: flex; }
-  .admin-stats-label {
-    font-weight: 700;
-    color: #F2AC57;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .admin-stats-version {
-    font-size: 10px;
-    color: #BBB;
-    flex-shrink: 0;
-    margin-left: auto;
-  }
-  .admin-stat-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.15);
-    flex-shrink: 0;
-    cursor: pointer;
-    border: 1.5px solid transparent;
-    transition: all 0.15s;
-    user-select: none;
-  }
-  .admin-stat-item:hover { background: rgba(255,255,255,0.25); }
-  .admin-stat-item.active {
-    background: rgba(255,255,255,0.35);
-    border-color: white;
-    box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.4);
-  }
+        /* Filter Chips Scroll Row */
+        .filter-chips-container {
+            width: 100%;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 2px 8px 2px;
+            scrollbar-width: none;
+        }
+        .filter-chips-container::-webkit-scrollbar { display: none; }
+        .filter-chip {
+            background: white; padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+            color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.08); white-space: nowrap; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; border: 1px solid transparent; cursor: pointer;
+        }
+        .filter-chip.active { background: var(--primary); color: white; font-weight: 700; }
+        .filter-chip i { margin-right: 5px; font-size: 12px; }
 
-  .admin-stat-all {
-    background: rgba(242, 172, 87, 0.2);
-    font-weight: 700;
-    color: #F2AC57;
-  }
-  .admin-stat-all .admin-stat-name { color: #F2AC57; font-weight: 700; }
-  .admin-stat-all.active {
-    background: rgba(242, 172, 87, 0.45);
-    border-color: #F2AC57;
-    box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5);
-  }
-  .admin-stat-all.active .admin-stat-name { color: white; }
-  .admin-stats-label-icon { font-size: 13px; }
-  .admin-stat-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-  }
-  .admin-stat-name { font-size: 11px; color: #EEE; }
-  .admin-stat-value { font-size: 12px; font-weight: 700; color: white; }
+        /* GPS Track & Admin Buttons on Map Bottom-Right */
+        .map-action-buttons {
+            position: absolute;
+            right: 16px;
+            bottom: calc(30px + var(--safe-bottom));
+            z-index: 90;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .map-btn {
+            width: 50px; height: 50px; border-radius: 50%; background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center;
+            justify-content: center; font-size: 20px; color: var(--text-main); cursor: pointer;
+        }
+        .map-btn:active { background: var(--bg-light); }
+        .map-btn.active { color: var(--primary-light); }
 
-  .admin-partner-selector {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.2);
-    border: 1.5px solid transparent;
-    flex-shrink: 0;
-    cursor: pointer;
-    transition: all 0.15s;
-    position: relative;
-    user-select: none;
-  }
-  .admin-partner-selector:hover { background: rgba(255,255,255,0.3); }
-  .admin-partner-selector.active {
-    background: rgba(242, 172, 87, 0.45);
-    border-color: #F2AC57;
-    box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5);
-  }
-  .admin-partner-selector .admin-partner-arrow {
-    font-size: 9px;
-    color: #FFF;
-    margin-left: 2px;
-  }
-  .admin-partner-dropdown {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: 4px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-    min-width: 160px;
-    max-height: 300px;
-    overflow-y: auto;
-    z-index: 200;
-  }
-  .admin-partner-dropdown.show { display: block; }
-  .admin-partner-option {
-    padding: 8px 12px;
-    color: #333;
-    font-size: 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #F2F2F7;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .admin-partner-option:last-child { border-bottom: none; }
-  .admin-partner-option:hover { background: #F5F5F7; }
-  .admin-partner-option.selected {
-    background: #FFF3E0;
-    color: #F2AC57;
-    font-weight: 600;
-  }
-  .admin-partner-option .partner-record-count {
-    color: #888;
-    font-size: 10px;
-  }
-  .admin-partner-option.selected .partner-record-count { color: #F2AC57; }
+        /* Bottom Detail Panel Sheet */
+        #detail-sheet {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%;
+            background: white;
+            border-top-left-radius: 24px; border-top-right-radius: 24px;
+            box-shadow: 0 -4px 25px rgba(0,0,0,0.15);
+            z-index: 150;
+            display: flex;
+            flex-direction: column;
+            max-height: 85%;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            padding-bottom: var(--safe-bottom);
+        }
+        #detail-sheet.open { transform: translateY(0); }
+        .sheet-handle {
+            width: 100%; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .sheet-handle::before {
+            content: ''; width: 40px; height: 4px; background: #CBD5E1; border-radius: 2px;
+        }
+        .sheet-handle::before {
+            content: ''; width: 40px; height: 4px; background: #CBD5E1; border-radius: 2px;
+        }
+        .sheet-header { padding: 0 20px 12px 20px; border-bottom: 1px solid var(--border); position: relative; }
+        .sheet-title { font-size: 20px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; padding-right: 30px; }
+        .sheet-subtitle { font-size: 13px; color: var(--text-sub); line-height: 1.4; }
+        .sheet-close-btn {
+            position: absolute; top: 0; right: 20px; width: 32px; height: 32px; border-radius: 50%;
+            background: var(--bg-light); display: flex; align-items: center; justify-content: center;
+            color: var(--text-sub); cursor: pointer;
+        }
+        .sheet-body { flex: 1; overflow-y: auto; padding: 20px; }
 
-  .admin-stats-contract-hint {
-    font-size: 11px;
-    color: #F2AC57;
-    flex-shrink: 0;
-    padding: 3px 8px;
-    border-radius: 12px;
-    background: rgba(242, 172, 87, 0.15);
-    border: 1px solid rgba(242, 172, 87, 0.3);
-  }
+        /* Info Fields List */
+        .info-grid { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+        .info-item { display: flex; align-items: flex-start; }
+        .info-label { width: 90px; font-size: 13px; color: var(--text-sub); font-weight: 500; padding-top: 2px; flex-shrink: 0; }
+        .info-value { flex: 1; font-size: 14px; color: var(--text-main); font-weight: 400; line-height: 1.4; }
+        .info-value.bold { font-weight: 700; }
 
-  #map { flex: 1; position: relative; }
-  #statusBar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(54, 56, 89, 0.9); color: white; padding: 6px 14px; border-radius: 16px; font-size: 12px; text-align: center; z-index: 50; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        /* Visit History Section */
+        .visit-section-title { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; }
+        .visit-section-title i { margin-right: 6px; color: var(--primary-light); }
+        .visit-history-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+        .visit-card { background: var(--bg-light); padding: 12px 14px; border-radius: 12px; font-size: 13px; }
+        .visit-card-meta { display: flex; justify-content: space-between; color: var(--text-sub); font-size: 12px; margin-bottom: 6px; font-weight: 500; }
+        .visit-card-comment { color: var(--text-main); line-height: 1.4; white-space: pre-wrap; }
+        .no-visit-msg { text-align: center; padding: 20px 0; color: var(--text-sub); font-size: 13px; }
 
-  #addBtn { position: absolute; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; height: 44px; padding: 0 18px; border: none; border-radius: 22px; background: #F2AC57; color: white; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 4px; font-family: inherit; }
-  #addBtn:hover { background: #e89a3e; }
-  #locBtn { position: absolute; bottom: calc(126px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; width: 48px; height: 48px; border-radius: 50%; border: none; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        /* Action Buttons Grid inside Sheet Footer */
+        .sheet-actions-bar {
+            padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; background: white;
+        }
+        .action-btn {
+            flex: 1; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 15px; font-weight: 700; border: none; cursor: pointer; transition: opacity 0.2s;
+        }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .action-btn.btn-outline { background: white; border: 1px solid var(--border); color: var(--text-main); }
+        .action-btn.btn-primary { background: var(--primary); color: white; }
 
-  #storePanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 67vh; height: 67vh; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); transform: translateY(100%); transition: transform 0.3s; z-index: 200; overflow-y: auto; overscroll-behavior: contain; }
-  #storePanel.open { transform: translateY(0); }
-  #panelDrag { width: 40px; height: 4px; background: #CCC; border-radius: 2px; margin: 8px auto; cursor: pointer; }
-  #panelClose { position: sticky; top: 0; float: right; margin-top: -4px; margin-right: 4px; width: 32px; height: 32px; border: none; background: rgba(255,255,255,0.95); border-radius: 50%; font-size: 16px; color: #666; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-  #panelClose:hover { background: #F5F5F5; color: #333; }
-  #panelContent { padding: 4px 18px 20px; clear: both; }
-  #panelContent h2 { font-size: 18px; color: #222; margin-bottom: 8px; line-height: 1.3; }
-  #panelContent .addr { font-size: 13px; color: #666; margin-bottom: 10px; }
-  #panelContent .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  #panelContent .badge { display: inline-block; padding: 4px 9px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-  #panelContent .badge-admin { background: #ECEEF3; color: #363859; }
-  #panelContent .badge-grade { background: #F5F5F5; color: #666; }
-  #panelContent .badge-contract { background: #FFF3E0; color: #F2AC57; font-weight: 700; }
-  #panelContent .badge-closed { background: #E0E0E0; color: #424242; font-weight: 600; }
+        /* Visit Form Modal Overlay */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);
+            z-index: 300; display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-card {
+            background: white; width: 100%; max-width: 400px; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25); display: flex; flex-direction: column; overflow: hidden;
+            animation: modalUp 0.25s ease-out;
+        }
+        @keyframes modalUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border); font-size: 16px; font-weight: 700; color: var(--text-main); }
+        .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; max-height: 400px; overflow-y: auto; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 13px; font-weight: 500; color: var(--text-sub); }
+        .form-select, .form-textarea {
+            width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #CBD5E1; font-size: 14px; outline: none;
+        }
+        .form-select:focus, .form-textarea:focus { border-color: var(--primary-light); }
+        .form-textarea { height: 100px; resize: none; }
+        .modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
 
-  .admin-info-box {
-    background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%);
-    color: white;
-    padding: 10px 12px;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    font-size: 12px;
-    line-height: 1.6;
-  }
-  .admin-info-box .admin-info-label { color: #F2AC57; font-weight: 700; margin-right: 6px; }
+        /* Sidebar Overlay Style */
+        .sidebar-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4);
+            z-index: 500; display: none;
+        }
+        .sidebar-panel {
+            position: fixed; top: 0; left: 0; width: 280px; height: 100%; background: white;
+            z-index: 501; display: flex; flex-direction: column; box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+            transform: translateX(-100%); transition: transform 0.25s ease-out;
+            padding-top: var(--safe-top); padding-bottom: var(--safe-bottom);
+        }
+        .sidebar-panel.open { transform: translateX(0); }
+        .sidebar-header { padding: 24px 20px; border-bottom: 1px solid var(--border); background: #FAFBFD; }
+        .user-profile-title { font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+        .user-profile-sub { font-size: 12px; color: var(--text-sub); }
+        .sidebar-menu-list { flex: 1; overflow-y: auto; padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; }
+        .sidebar-item {
+            display: flex; align-items: center; padding: 12px 14px; border-radius: 10px; color: var(--text-main);
+            font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; gap: 12px;
+        }
+        .sidebar-item:active { background: var(--bg-light); }
+        .sidebar-item i { width: 20px; font-size: 16px; color: var(--text-sub); }
+        .sidebar-item.logout-btn { color: var(--danger); margin-top: auto; }
+        .sidebar-item.logout-btn i { color: var(--danger); }
 
-  .multi-projects { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; margin-bottom: 10px; }
-  .project-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; box-shadow: 0 1px 3px rgba(54, 56, 89, 0.3); }
-  .project-badge-icon { font-size: 13px; }
+        /* Search List Panel Overlay */
+        #search-results-panel {
+            position: absolute; top: calc(75px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+            width: 92%; max-width: 480px; background: white; border-radius: 14px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15); z-index: 110; display: none;
+            flex-direction: column; max-height: 260px; overflow-y: auto; border: 1px solid var(--border);
+        }
+        .search-item {
+            padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; flex-direction: column; gap: 3px;
+        }
+        .search-item:last-child { border-bottom: none; }
+        .search-item:active { background: var(--bg-light); }
+        .search-item-name { font-size: 14px; font-weight: 700; color: var(--text-main); }
+        .search-item-addr { font-size: 11px; color: var(--text-sub); }
 
-  .contact-info { font-size: 12px; color: #888; margin-bottom: 10px; padding: 6px 10px; background: #FAFAFA; border-radius: 6px; }
-  .service { display: flex; gap: 8px; margin-bottom: 14px; }
-  .service-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: #F5F5F5; color: #666; }
-  .service-badge.on { background: #E8F5E9; color: #43A047; }
+        /* Custom Map Pins Label */
+        .custom-pin-label {
+            position: relative; background: white; border: 1px solid #999; border-radius: 4px;
+            padding: 2px 5px; font-size: 10px; font-weight: 700; color: #333; white-space: nowrap;
+            box-shadow: 1px 1px 3px rgba(0,0,0,0.2); transform: translate(-50%, -42px); text-align: center;
+        }
 
-  .roadview-section { border: 1px solid #EEE; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
-  .roadview-header { padding: 10px 14px; background: #F8F8F8; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; color: #555; font-weight: 500; }
-  .roadview-header:hover { background: #F0F0F0; }
-  .roadview-header-toggle { font-size: 10px; color: #999; }
-  .roadview-body { display: none; position: relative; height: 220px; background: #EEE; }
-  .roadview-body.expanded { display: block; }
-  #roadview { width: 100%; height: 100%; }
-  .rv-loading, .rv-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #888; font-size: 13px; background: #F5F5F5; }
-  .rv-external { position: absolute; bottom: 8px; right: 8px; background: rgba(54,56,89,0.9); color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 11px; z-index: 10; }
-
-  .info-table { border-top: 1px solid #EEE; padding-top: 12px; margin-bottom: 14px; }
-  .info-row { display: flex; gap: 10px; font-size: 13px; padding: 4px 0; }
-  .info-key { color: #999; min-width: 80px; }
-  .info-value { color: #333; flex: 1; }
-  .memo { background: #FFF9E6; border-left: 3px solid #F5B800; padding: 8px 12px; font-size: 12px; color: #8C6900; border-radius: 4px; margin-bottom: 14px; line-height: 1.5; }
-
-  .priceGuideBtn { display: block; width: 100%; padding: 11px; border: none; border-radius: 8px; background: #363859; color: white; font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; margin-bottom: 8px; font-family: inherit; }
-  .navBtn { display: block; width: 100%; padding: 11px; border: 1px solid #363859; border-radius: 8px; background: white; color: #363859; font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; margin-bottom: 14px; font-family: inherit; }
-
-  .visit-form { border-top: 1px solid #EEE; padding-top: 14px; margin-top: 4px; }
-  .visit-form h3 { font-size: 14px; color: #363859; margin-bottom: 4px; }
-  .visit-dates { font-size: 11px; color: #999; margin-bottom: 12px; }
-  .visit-form label { display: block; font-size: 12px; color: #666; margin: 10px 0 4px 0; }
-  .visit-form input, .visit-form select, .visit-form textarea { width: 100%; padding: 8px 10px; border: 1px solid #DDD; border-radius: 6px; font-size: 13px; font-family: inherit; }
-  .visit-form textarea { min-height: 60px; resize: vertical; }
-  .visit-form input:focus, .visit-form select:focus, .visit-form textarea:focus { outline: none; border-color: #F2AC57; }
-  .save-btn { width: 100%; padding: 12px; margin-top: 14px; border: none; border-radius: 8px; background: #F2AC57; color: white; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
-  .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  #noticeModal { position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; }
-  #noticeModal.show { display: flex; }
-  .notice-box { background: white; border-radius: 16px; padding: 28px 24px; max-width: 360px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: noticePopup 0.3s ease-out; }
-  @keyframes noticePopup {
-    from { transform: scale(0.9); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-  }
-  .notice-icon { font-size: 36px; text-align: center; margin-bottom: 12px; }
-  .notice-title { font-size: 17px; font-weight: 700; color: #363859; text-align: center; margin-bottom: 12px; }
-  .notice-message { font-size: 14px; color: #555; text-align: center; line-height: 1.5; margin-bottom: 20px; padding: 12px; background: #FAFAFA; border-radius: 8px; }
-  .notice-buttons { display: flex; gap: 8px; }
-  .notice-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .notice-btn-primary { background: #F2AC57; color: white; }
-  .notice-btn-primary:hover { background: #e89a3e; }
-  .notice-btn-secondary { background: #EEE; color: #555; }
-  .notice-btn-secondary:hover { background: #DDD; }
-
-  /* 신규업장추가 모달 */
-  .new-store-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 10000;
-    justify-content: center;
-    align-items: flex-start;
-    overflow-y: auto;
-    padding: 20px 0;
-    -webkit-overflow-scrolling: touch;
-  }
-  .new-store-modal.open { display: flex; }
-  .new-store-content {
-    background: #fff;
-    width: 100%;
-    max-width: 480px;
-    border-radius: 16px;
-    margin: 20px;
-    padding: 0;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  }
-  .new-store-header {
-    background: #363859;
-    color: #fff;
-    padding: 16px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .new-store-header h2 { margin: 0; font-size: 17px; font-weight: 700; }
-  .new-store-close {
-    background: transparent;
-    border: none;
-    color: #fff;
-    font-size: 22px;
-    cursor: pointer;
-    padding: 0 4px;
-    line-height: 1;
-    font-family: inherit;
-  }
-  .new-store-body {
-    padding: 14px 18px 18px;
-    max-height: 75vh;
-    overflow-y: auto;
-  }
-  .new-store-hint {
-    background: #F8F8F8;
-    color: #666;
-    padding: 9px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border-left: 3px solid #9E9E9E;
-  }
-  .ns-search-wrapper { position: relative; margin-bottom: 6px; }
-  .ns-search-wrapper input {
-    width: 100%;
-    padding: 11px 13px;
-    border: 2px solid #E5E5E7;
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: inherit;
-  }
-  .ns-search-wrapper input:focus { outline: none; border-color: #F2AC57; }
-  .ns-search-results {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: #fff;
-    border: 1px solid #DDD;
-    border-radius: 8px;
-    margin-top: 4px;
-    max-height: 240px;
-    overflow-y: auto;
-    z-index: 10;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-    display: none;
-  }
-  .ns-search-results.open { display: block; }
-  .ns-search-result-item {
-    padding: 9px 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #F2F2F7;
-  }
-  .ns-search-result-item:last-child { border-bottom: none; }
-  .ns-search-result-item:hover { background: #F5F5F7; }
-  .ns-search-result-item .ns-place-name {
-    font-weight: 600;
-    font-size: 13px;
-    color: #1C1C1E;
-  }
-  .ns-search-result-item .ns-place-address {
-    font-size: 11px;
-    color: #888;
-    margin-top: 2px;
-  }
-  .ns-search-results-empty {
-    padding: 14px;
-    text-align: center;
-    color: #888;
-    font-size: 12px;
-  }
-  .ns-form-group { margin-bottom: 11px; }
-  .ns-form-group label {
-    display: block;
-    font-size: 12px;
-    font-weight: 600;
-    color: #363859;
-    margin-bottom: 4px;
-  }
-  .ns-form-group label .required { color: #E53935; margin-left: 2px; }
-  .ns-form-group input,
-  .ns-form-group select,
-  .ns-form-group textarea {
-    width: 100%;
-    padding: 9px 11px;
-    border: 1px solid #DDD;
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: inherit;
-    background: #fff;
-  }
-  .ns-form-group input:focus,
-  .ns-form-group select:focus,
-  .ns-form-group textarea:focus { outline: none; border-color: #F2AC57; }
-  .ns-form-group textarea { resize: vertical; min-height: 56px; }
-  .ns-form-group .ns-helper {
-    font-size: 11px;
-    color: #888;
-    margin-top: 3px;
-  }
-  .ns-form-row { display: flex; gap: 8px; }
-  .ns-form-row .ns-form-group { flex: 1; }
-  .ns-admin-type-buttons { display: flex; gap: 6px; }
-  .ns-admin-type-buttons button {
-    flex: 1;
-    padding: 9px;
-    border: 1px solid #DDD;
-    background: #fff;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-family: inherit;
-  }
-  .ns-admin-type-buttons button.active {
-    background: #363859;
-    color: #fff;
-    border-color: #363859;
-    font-weight: 700;
-  }
-  .ns-outcome-buttons { display: flex; gap: 6px; }
-  .ns-outcome-buttons button {
-    flex: 1;
-    padding: 9px;
-    border: 1px solid #DDD;
-    background: #fff;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-family: inherit;
-  }
-  .ns-outcome-buttons button.active.default { background: #363859; color: #fff; border-color: #363859; font-weight: 700; }
-  .ns-outcome-buttons button.active.success { background: #F5B800; color: #fff; border-color: #F5B800; font-weight: 700; }
-  .ns-outcome-buttons button.active.fail { background: #E53935; color: #fff; border-color: #E53935; font-weight: 700; }
-  .ns-submit-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid #F2F2F7;
-  }
-  .ns-submit-row button {
-    flex: 1;
-    padding: 13px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-  }
-  .ns-btn-cancel { background: #F2F2F7; color: #1C1C1E; }
-  .ns-btn-submit { background: #F2AC57; color: #fff; }
-  .ns-btn-submit:disabled { background: #E0BC9C; cursor: not-allowed; }
-  .ns-selected-place {
-    background: #FFF3E0;
-    border: 1px solid #F2AC57;
-    border-radius: 6px;
-    padding: 9px 11px;
-    margin-bottom: 11px;
-    font-size: 12px;
-    display: none;
-    position: relative;
-  }
-  .ns-selected-place.show { display: block; }
-  .ns-selected-place .ns-sp-label {
-    color: #F2AC57;
-    font-weight: 700;
-    font-size: 10px;
-    margin-bottom: 3px;
-  }
-  .ns-selected-place .ns-sp-name { font-weight: 700; color: #1C1C1E; font-size: 13px; }
-  .ns-selected-place .ns-sp-addr { color: #666; font-size: 11px; margin-top: 2px; }
-  .ns-selected-place .ns-sp-clear {
-    position: absolute;
-    top: 8px;
-    right: 10px;
-    background: transparent;
-    border: none;
-    color: #F2AC57;
-    cursor: pointer;
-    font-size: 11px;
-    text-decoration: underline;
-    font-family: inherit;
-  }
-  .ns-toast {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1C1C1E;
-    color: #fff;
-    padding: 13px 22px;
-    border-radius: 12px;
-    font-size: 13px;
-    z-index: 20000;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-    opacity: 0;
-    transition: opacity 0.3s;
-    max-width: 90%;
-    text-align: center;
-    font-family: inherit;
-  }
-  .ns-toast.show { opacity: 1; }
-</style>
+        /* Responsive UI Optimization */
+        @media (max-width: 480px) {
+            .floating-top-bar { width: 94%; }
+            .sheet-title { font-size: 18px; }
+            .action-btn { height: 46px; font-size: 14px; }
+        }
+    </style>
 </head>
 <body>
 
-<div id="app">
-  <div id="header">
-    <div class="title">
-      <span>업박스 영업 지도</span>
-      <span class="admin-badge" id="adminBadge" style="display:none;">관리자</span>
+<div id="app-container">
+    <div id="map-container">
+        <div id="map"></div>
     </div>
-    <div class="user" id="userInfo"></div>
-    <button class="header-btn" id="logoutBtn">로그아웃</button>
-  </div>
 
-  <div id="searchBar">
-    <input type="text" id="searchInput" placeholder="업장명으로 검색...">
-    <div id="searchResults"></div>
-  </div>
+    <div class="floating-top-bar">
+        <div class="search-box-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="map-search-input" placeholder="업장명 앞 두글자 검색..." autocomplete="off">
+            <span class="clear-search-btn" id="search-clear-btn"><i class="fas fa-times-circle"></i></span>
+            <div class="menu-toggle-btn" id="sidebar-open-trigger"><i class="fas fa-bars"></i></div>
+        </div>
 
-  <div id="adminStatsBar">
-    <span class="admin-partner-selector" id="adminPartnerSelector">
-      <span class="admin-stats-label-icon">📊</span>
-      <span class="admin-stat-name" id="adminPartnerLabel">전체</span>
-      <span class="admin-partner-arrow">▼</span>
-      <div class="admin-partner-dropdown" id="adminPartnerDropdown"></div>
-    </span>
-    <span class="admin-stat-item" data-admin-filter="visit">
-      <span class="admin-stat-dot" style="background:#4d4678;"></span>
-      <span class="admin-stat-name">단순방문</span>
-      <span class="admin-stat-value" id="adminStat-visit">0</span>
-    </span>
-    <span class="admin-stat-item" data-admin-filter="lead">
-      <span class="admin-stat-dot" style="background:#43A047;"></span>
-      <span class="admin-stat-name">유효리드</span>
-      <span class="admin-stat-value" id="adminStat-lead">0</span>
-    </span>
-    <span class="admin-stat-item" data-admin-filter="success">
-      <span class="admin-stat-dot" style="background:#F5B800;"></span>
-      <span class="admin-stat-name">계약성사</span>
-      <span class="admin-stat-value" id="adminStat-success">0</span>
-    </span>
-    <span class="admin-stat-item" data-admin-filter="fail">
-      <span class="admin-stat-dot" style="background:#E53935;"></span>
-      <span class="admin-stat-name">최종불발</span>
-      <span class="admin-stat-value" id="adminStat-fail">0</span>
-    </span>
-    <span class="admin-stats-contract-hint">★ 기계약업장 줌인 시 노출</span>
-    <span class="admin-stats-version" id="adminStatsVersion"></span>
-  </div>
+        <div class="filter-chips-container" id="filter-chips-row">
+            <div class="filter-chip active" data-filter="all"><i class="fas fa-globe"></i>전체</div>
+            <div class="filter-chip" data-filter="project"><i class="fas fa-tasks"></i>프로젝트영업</div>
+            <div class="filter-chip" data-filter="lead"><i class="fas fa-star"></i>리드건</div>
+            <div class="filter-chip" data-filter="visit"><i class="fas fa-route"></i>오늘방문수정</div>
+            <div class="filter-chip" data-filter="contract"><i class="fas fa-file-contract"></i>기계약업장</div>
+        </div>
+    </div>
 
-  <div id="filterBar">
-    <button class="filter-chip active" data-filter="all" style="background:#363859;">전체</button>
-    <button class="filter-chip filter-chip-project" data-filter="project" id="filterProject">🎯 프로젝트영업</button>
-    <button class="filter-chip" data-filter="visit" style="background:transparent;">단순방문<span class="chip-count" data-count-for="visit"></span></button>
-    <button class="filter-chip" data-filter="lead" style="background:transparent;">유효리드<span class="chip-count" data-count-for="lead"></span></button>
-    <button class="filter-chip" data-filter="success" style="background:transparent;">계약성사<span class="chip-count" data-count-for="success"></span></button>
-    <button class="filter-chip" data-filter="fail" style="background:transparent;">최종불발<span class="chip-count" data-count-for="fail"></span></button>
-    <button class="filter-chip" data-filter="contract" style="background:transparent;">기계약</button>
-  </div>
+    <div id="search-results-panel"></div>
 
-  <div id="map">
-    <div id="statusBar">업장 로딩 중...</div>
-    <button id="locBtn" title="현재 위치">📍</button>
-    <button id="addBtn" title="업장 추가">＋ 업장추가</button>
-  </div>
+    <div class="map-action-buttons">
+        <div class="map-btn" id="admin-view-btn" style="display: none;" title="관리자 통합뷰"><i class="fas fa-user-shield"></i></div>
+        <div class="map-btn" id="my-location-tracker" title="현재 내위치 이동"><i class="fas fa-crosshairs"></i></div>
+    </div>
+
+    <div id="detail-sheet">
+        <div class="sheet-handle" id="sheet-drag-handle"></div>
+        <div class="sheet-header">
+            <div class="sheet-title" id="sheet-store-name">-</div>
+            <div class="sheet-subtitle" id="sheet-store-address">-</div>
+            <div class="sheet-close-btn" id="sheet-close-trigger"><i class="fas fa-times"></i></div>
+        </div>
+        <div class="sheet-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">업장 등급</div>
+                    <div class="info-value bold" id="sheet-store-grade">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">월 배출량</div>
+                    <div class="info-value" id="sheet-store-vol">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">업종 구분</div>
+                    <div class="info-value" id="sheet-store-type">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">특이 사항</div>
+                    <div class="info-value" id="sheet-store-memo">-</div>
+                </div>
+            </div>
+
+            <div class="visit-section-title"><i class="fas fa-history"></i>방문 및 접촉 이력</div>
+            <div class="visit-history-list" id="sheet-history-container">
+                <div class="no-visit-msg">이력이 존재하지 않습니다.</div>
+            </div>
+        </div>
+        <div class="sheet-actions-bar">
+            <button class="action-btn btn-outline" id="action-add-visit-btn">방문 기록 추가</button>
+            <button class="action-btn btn-primary" id="action-set-lead-btn">리드 지정</button>
+        </div>
+    </div>
 </div>
 
-<div id="loginScreen" style="display:none;">
-  <div class="login-box">
-    <h1>업박스 영업 지도</h1>
-    <p>파트너 전용 CRM</p>
-    <input type="text" id="loginName" placeholder="파트너명">
-    <input type="text" id="loginCode" placeholder="파트너사 코드">
-    <button id="loginBtn">로그인</button>
-    <div class="login-error" id="loginError"></div>
-  </div>
+<div class="modal-overlay" id="visit-form-modal">
+    <div class="modal-card">
+        <div class="modal-header">방문 기록 작성</div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>접촉 결과 상태 선택</label>
+                <select class="form-select" id="form-visit-status">
+                    <option value="visit">단순방문 (부재/단순거절)</option>
+                    <option value="lead">리드확보 (단가협의/제안서제출)</option>
+                    <option value="success">계약성사 (서류접수완료)</option>
+                    <option value="fail">영업실패 (타사지속이용 등)</option>
+                    <option value="closed_request">폐업 확인 (원장 폐업신고 요청)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>상세 접촉 및 상담내용 기록</label>
+                <textarea class="form-textarea" id="form-visit-comment" placeholder="상담 세부 요약 피드백 내용을 기입해 주세요..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="action-btn btn-outline" id="form-cancel-btn" style="height:40px;">취소</button>
+            <button class="action-btn btn-primary" id="form-submit-btn" style="height:40px; flex:none; width:100px;">저장하기</button>
+        </div>
+    </div>
 </div>
 
-<div id="storePanel">
-  <div id="panelDrag"></div>
-  <button id="panelClose" type="button" aria-label="닫기">✕</button>
-  <div id="panelContent"></div>
+<div class="sidebar-overlay" id="sidebar-dim-layer"></div>
+<div class="sidebar-panel" id="sidebar-drawer-menu">
+    <div class="sidebar-header">
+        <div class="user-profile-title" id="menu-user-name">영업 파트너 유저</div>
+        <div class="user-profile-sub" id="menu-user-code">CODE: -----</div>
+    </div>
+    <div class="sidebar-menu-list">
+        <div class="sidebar-item" id="menu-clear-cache-btn"><i class="fas fa-sync-alt"></i>데이터 강제 동기화</div>
+        <div class="sidebar-item logout-btn" id="menu-logout-trigger"><i class="fas fa-sign-out-alt"></i>로그아웃</div>
+    </div>
 </div>
 
-<div id="noticeModal">
-  <div class="notice-box">
-    <div class="notice-icon" id="noticeIcon">📢</div>
-    <div class="notice-title" id="noticeTitle">새로운 안내사항이 있습니다</div>
-    <div class="notice-message" id="noticeMessage"></div>
-    <div class="notice-buttons">
-      <button class="notice-btn notice-btn-secondary" id="noticeBtnLater">나중에</button>
-      <button class="notice-btn notice-btn-primary" id="noticeBtnApply">지금 갱신</button>
-    </div>
-  </div>
-</div>
-
-<div id="newStoreModal" class="new-store-modal">
-  <div class="new-store-content">
-    <div class="new-store-header">
-      <h2>＋ 신규업장 등록</h2>
-      <button class="new-store-close" onclick="closeNewStoreModal()" type="button">✕</button>
-    </div>
-    <div class="new-store-body">
-      <div class="new-store-hint">
-        <span>📍</span>
-        <span>업장 검색 후에 나오지 않는 곳만 등록해주세요!<br>(사업자명 변경은 상담내용에 기입)</span>
-      </div>
-
-      <div class="ns-form-group">
-        <label>사업장명 / 주소 검색 <span class="required">*</span></label>
-        <div class="ns-search-wrapper">
-          <input type="text" id="nsSearchInput" placeholder="사업장명 또는 주소를 검색하세요" autocomplete="off" oninput="onNsSearchInput()">
-          <div id="nsSearchResults" class="ns-search-results"></div>
-        </div>
-        <div class="ns-helper">검색 결과가 없으면 아래 사업장명/주소를 직접 입력하세요</div>
-      </div>
-
-      <div id="nsSelectedPlace" class="ns-selected-place">
-        <button class="ns-sp-clear" onclick="clearSelectedPlace()" type="button">변경</button>
-        <div class="ns-sp-label">선택된 장소</div>
-        <div class="ns-sp-name" id="nsSelectedName"></div>
-        <div class="ns-sp-addr" id="nsSelectedAddr"></div>
-      </div>
-
-      <div class="ns-form-group">
-        <label>사업장명 <span class="required">*</span></label>
-        <input type="text" id="nsStoreName" placeholder="검색 시 자동 입력 / 직접 입력 가능">
-      </div>
-
-      <div class="ns-form-group">
-        <label>주소 <span class="required">*</span></label>
-        <input type="text" id="nsAddress" placeholder="검색 시 자동 입력 / 직접 입력 가능">
-      </div>
-
-      <div class="ns-form-group">
-        <label>영업구분</label>
-        <div class="ns-admin-type-buttons">
-          <button type="button" data-salestype="인바운드" onclick="selectSalesType(this)">인바운드</button>
-          <button type="button" data-salestype="아웃바운드" onclick="selectSalesType(this)">아웃바운드</button>
-        </div>
-      </div>
-
-      <div class="ns-form-group">
-        <label>행정신고구분</label>
-        <div class="ns-admin-type-buttons">
-          <button type="button" data-admintype="다량배출사업장" onclick="selectAdminType(this)">다량배출사업장</button>
-          <button type="button" data-admintype="올바로사업장" onclick="selectAdminType(this)">올바로사업장</button>
-          <button type="button" data-admintype="일반사업장" onclick="selectAdminType(this)">일반사업장</button>
-        </div>
-      </div>
-
-      <div class="ns-form-group">
-        <label>현재 수거업체명</label>
-        <input type="text" id="nsCurrentStoreName" placeholder="이미 거래 중인 업체가 있다면">
-      </div>
-
-      <div class="ns-form-group">
-        <label>담당자 연락처</label>
-        <input type="tel" id="nsContact" inputmode="numeric" placeholder="010-0000-0000" maxlength="13">
-      </div>
-
-      <div class="ns-form-row">
-        <div class="ns-form-group">
-          <label>월 예상배출량 (L)</label>
-          <input type="text" id="nsAmount" inputmode="numeric" placeholder="예: 500">
-        </div>
-        <div class="ns-form-group">
-          <label>주 수거횟수</label>
-          <input type="text" id="nsFreq" inputmode="numeric" placeholder="예: 3">
-        </div>
-      </div>
-
-      <div class="ns-form-row">
-        <div class="ns-form-group">
-          <label>현재 단가 (원/L)</label>
-          <input type="text" id="nsPrice" inputmode="numeric" placeholder="예: 180">
-        </div>
-        <div class="ns-form-group">
-          <label>제안 단가 (원/L)</label>
-          <input type="text" id="nsSuggestedPrice" inputmode="numeric" placeholder="예: 170">
-        </div>
-      </div>
-
-      <div class="ns-form-row">
-        <div class="ns-form-group">
-          <label>현재 통 갯수</label>
-          <input type="text" id="nsBins" inputmode="numeric" placeholder="예: 4">
-        </div>
-        <div class="ns-form-group">
-          <label>비닐 사용여부</label>
-          <select id="nsVinyl">
-            <option value="">선택</option>
-            <option value="사용">사용</option>
-            <option value="미사용">미사용</option>
-            <option value="지자체">지자체</option>
-            <option value="처리기">처리기</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="ns-form-group">
-        <label>5톤 차량 진입 가능여부</label>
-        <select id="nsTruck">
-          <option value="">선택</option>
-          <option value="가능">가능</option>
-          <option value="불가능">불가능</option>
-        </select>
-      </div>
-
-      <div class="ns-form-group">
-        <label>상세 상담내용</label>
-        <textarea id="nsNote" placeholder="상담 내용을 기록하세요"></textarea>
-      </div>
-
-      <div class="ns-form-group">
-        <label>최종영업결과</label>
-        <div class="ns-outcome-buttons">
-          <button type="button" data-outcome="" class="default active" onclick="selectOutcome(this)">기록만</button>
-          <button type="button" data-outcome="성사" class="success" onclick="selectOutcome(this)">성사</button>
-          <button type="button" data-outcome="실패" class="fail" onclick="selectOutcome(this)">실패</button>
-        </div>
-      </div>
-
-      <div class="ns-submit-row">
-        <button class="ns-btn-cancel" onclick="closeNewStoreModal()" type="button">취소</button>
-        <button class="ns-btn-submit" id="nsSubmitBtn" onclick="submitNewStore()" type="button">등록</button>
-      </div>
-    </div>
-  </div>
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">업박스 영업 시스템<br>데이터 초기 노드 동기화 중...</div>
 </div>
 
 <script>
-const firebaseConfig = {
-  databaseURL: "https://salespartners-map-67daf-default-rtdb.asia-southeast1.firebasedatabase.app"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec';
-const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
-const NEW_STORE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzSBmYw2I2NBTb8TwGtQe2r5hG0THf60eIROO7kbLWckHBGbYufoA8odWghYjs_sGJuNA/exec';
-
-const ADMIN_CODES = ['0001', '0002', '0003', '0004', '0005', '0006', '0007'];
-const CLUSTER_MIN_LEVEL = 7;
-const FILTER_MOVE_MAX_PINS = 500;
-const ADMIN_INIT_LEVEL = 11;
-const ADMIN_CONTRACT_ZOOM_LEVEL = 8;
-const ADMIN_CONTRACT_RADIUS_KM = 10;
-const ADMIN_CONTRACT_MAX_PINS = 500;
-
-function isAdmin(code) {
-  return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
-}
-
-const CACHE = {
-  OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },
-  MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
-  ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v2',  ttlMs: 12 * 60 * 60 * 1000 }
-};
-
-function getCache(c) {
-  try {
-    const raw = localStorage.getItem(c.key);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (!obj.t || !obj.d) return null;
-    if (Date.now() - obj.t > c.ttlMs) { localStorage.removeItem(c.key); return null; }
-    return obj.d;
-  } catch(e) { return null; }
-}
-
-function setCache(c, data) {
-  try {
-    localStorage.setItem(c.key, JSON.stringify({ t: Date.now(), d: data }));
-  } catch(e) {
-    try {
-      const keys = ['cache_other_visits_v2', 'cache_my_projects_v3', 'cache_admin_aggregate_v2', 'cache_my_projects_v2', 'cache_admin_aggregate_v1', 'cache_other_visits', 'cache_my_projects'];
-      for (const k of keys) {
-        if (k !== c.key && localStorage.getItem(k)) { localStorage.removeItem(k); break; }
-      }
-      localStorage.setItem(c.key, JSON.stringify({ t: Date.now(), d: data }));
-    } catch(e2) {}
-  }
-}
-
-function clearAllCaches() {
-  ['cache_other_visits_v2','cache_my_projects_v3','cache_my_projects_v2','cache_admin_aggregate_v2','cache_admin_aggregate_v1','cache_other_visits','cache_my_projects'].forEach(k => localStorage.removeItem(k));
-}
-
-(function migrateOldCaches() {
-  ['cache_other_visits','cache_my_projects','cache_my_projects_v2','cache_admin_aggregate_v1'].forEach(k => {
-    if (localStorage.getItem(k)) localStorage.removeItem(k);
-  });
-})();
-
-const NOTICE_TYPES = {
-  projectAssignments: { icon: '🎯', title: '프로젝트 배정 변경', cacheKeysToClear: ['cache_my_projects_v3'] },
-  contractStores: { icon: '⭐', title: '기계약 업장 변경', cacheKeysToClear: [] },
-  general: { icon: '📢', title: '공지사항', cacheKeysToClear: [] }
-};
-const NOTICE_SEEN_PREFIX = 'notice_seen_';
-
-async function checkNotices() {
-  try {
-    const snap = await db.ref('notices').once('value');
-    const notices = snap.val() || {};
-    const queue = [];
-    for (const type in notices) {
-      const notice = notices[type];
-      if (!notice || !notice.version) continue;
-      if (localStorage.getItem(NOTICE_SEEN_PREFIX + type) !== notice.version) {
-        queue.push({ type: type, notice: notice });
-      }
-    }
-    if (queue.length > 0) showNoticesSequentially(queue);
-  } catch(e) {}
-}
-
-function showNoticesSequentially(queue) {
-  if (queue.length === 0) return;
-  const item = queue.shift();
-  showNoticeModal(item.type, item.notice, function() { showNoticesSequentially(queue); });
-}
-
-function showNoticeModal(type, notice, onClose) {
-  const meta = NOTICE_TYPES[type] || { icon: '📢', title: '안내', cacheKeysToClear: [] };
-  const modal = document.getElementById('noticeModal');
-
-  document.getElementById('noticeIcon').textContent = meta.icon;
-
-  const displayTitle = (type === 'general' && notice.title) ? notice.title : meta.title;
-  document.getElementById('noticeTitle').textContent = displayTitle;
-
-  const messageEl = document.getElementById('noticeMessage');
-  messageEl.textContent = notice.message;
-  if (type === 'general') {
-    messageEl.style.whiteSpace = 'pre-line';
-    messageEl.style.textAlign = 'left';
-  } else {
-    messageEl.style.whiteSpace = '';
-    messageEl.style.textAlign = '';
-  }
-
-  const laterBtn = document.getElementById('noticeBtnLater');
-  const applyBtn = document.getElementById('noticeBtnApply');
-
-  if (type === 'general') {
-    laterBtn.style.display = 'none';
-    applyBtn.textContent = '확인';
-    applyBtn.onclick = function() {
-      localStorage.setItem(NOTICE_SEEN_PREFIX + type, notice.version);
-      modal.classList.remove('show');
-      if (onClose) setTimeout(onClose, 200);
-    };
-  } else {
-    laterBtn.style.display = '';
-    applyBtn.textContent = '지금 갱신';
-    applyBtn.onclick = function() {
-      if (meta.cacheKeysToClear) meta.cacheKeysToClear.forEach(k => localStorage.removeItem(k));
-      localStorage.setItem(NOTICE_SEEN_PREFIX + type, notice.version);
-      modal.classList.remove('show');
-      location.reload();
-    };
-    laterBtn.onclick = function() {
-      modal.classList.remove('show');
-      if (onClose) setTimeout(onClose, 200);
-    };
-  }
-
-  modal.classList.add('show');
-}
-
-let map, currentUser = null;
-let markers = [];
-let markerByKey = {};
-let allStoresInView = [];
-let currentFilter = "all";
-let selectedStore = null;
-let searchTimer = null;
-let currentUserLocation = null;
-const CONTRACT_RADIUS_KM = 3;
-const DUPLICATE_RADIUS_M = 30;
-
-let myLocationMarker = null;
-let geoWatchId = null;
-let rvInstance = null;
-let currentRvState = 'collapsed';
-
-let otherPartnerLastContactMap = {};
-let myVisitedStoreData = {};
-let hasMyProjects = false;
-let myProjectStores = [];
-
-let isAdminUser = false;
-let adminViewActive = false;
-let visitsAggregate = null;
-let adminMasterStores = [];
-let selectedAdminPartner = 'all';
-
-let contractsCache = { center: null, data: [], ts: 0 };
-const CONTRACTS_CACHE_TTL_MS = 30 * 1000;
-const CONTRACTS_CACHE_MOVE_THRESHOLD_KM = 2;
-
-let markerClusterer = null;
-let initialLocation = null;
-let suppressNextIdle = false;
-
-let _placesSearchCache = null;
-let _placesSearchTimer = null;
-let _nsSelectedPlace = null;
-let _nsSelectedAdminType = '';
-let _nsSelectedSalesType = '';
-let _nsSelectedOutcome = '';
-
-document.getElementById("loginBtn").onclick = tryLogin;
-document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
-document.getElementById("logoutBtn").onclick = logout;
-
-async function tryLogin() {
-  const name = document.getElementById("loginName").value.trim();
-  const code = document.getElementById("loginCode").value.trim();
-  const errEl = document.getElementById("loginError");
-  errEl.textContent = "";
-  if (!name || !code) { errEl.textContent = "이름과 코드를 모두 입력하세요."; return; }
-  try {
-    const key = code.replace(/[.#$\/\[\]]/g, "_");
-    const snap = await db.ref("partners/" + key).once("value");
-    const partner = snap.val();
-    if (!partner || partner.name !== name || partner.active === false) {
-      errEl.textContent = "이름 또는 코드가 일치하지 않습니다.";
-      return;
-    }
-    currentUser = { name: name, code: code, key: key };
-    localStorage.setItem("upboxPartner", JSON.stringify(currentUser));
-    startApp();
-  } catch(e) {
-    errEl.textContent = "로그인 오류: " + e.message;
-  }
-}
-
-function logout() {
-  stopLocationTracking();
-  localStorage.removeItem("upboxPartner");
-  clearAllCaches();
-  location.reload();
-}
-
-(function autoLogin() {
-  const saved = localStorage.getItem("upboxPartner");
-  if (saved) {
-    try { currentUser = JSON.parse(saved); startApp(); }
-    catch(e) { localStorage.removeItem("upboxPartner"); }
-  } else {
-    document.getElementById("loginScreen").style.display = "flex";
-  }
-})();
-
-async function fetchInitialLocation() {
-  return new Promise(function(resolve) {
-    if (!navigator.geolocation) { resolve(null); return; }
-    navigator.geolocation.getCurrentPosition(
-      function(pos) { resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
-      function(err) { resolve(null); },
-      { enableHighAccuracy: false, maximumAge: 60000, timeout: 3000 }
-    );
-  });
-}
-
-async function loadMyProjectsFromIndex() {
-  try {
-    const snap = await db.ref('partner_projects/' + currentUser.key).once('value');
-    const data = snap.val();
-
-    if (!data) {
-      console.warn('[partner_projects] 인덱스 없음 → fallback');
-      await checkMyProjectAssignmentLegacy();
-      return;
-    }
-
-    hasMyProjects = data.hasAny === true;
-    myProjectStores = [];
-
-    if (hasMyProjects && data.stores) {
-      for (const k in data.stores) {
-        const s = data.stores[k];
-        if (s && !isNaN(s.lat) && !isNaN(s.lng)) {
-          myProjectStores.push({ lat: s.lat, lng: s.lng, key: k, projects: s.projects || [] });
-        }
-      }
-    }
-
-    setCache(CACHE.MY_PROJECTS, { hasMyProjects: hasMyProjects, myProjectStores: myProjectStores });
-
-    if (hasMyProjects) {
-      const projChip = document.getElementById('filterProject');
-      if (projChip) projChip.classList.add('visible');
-    }
-
-    console.log('[partner_projects] 인덱스 로드 완료: hasAny=' + hasMyProjects + ', stores=' + myProjectStores.length);
-  } catch(e) {
-    console.warn('[partner_projects] 로드 실패, fallback:', e);
-    await checkMyProjectAssignmentLegacy();
-  }
-}
-
-async function checkMyProjectAssignmentLegacy() {
-  try {
-    const snap = await db.ref("stores_light").once("value");
-    const all = snap.val() || {};
-    let foundCount = 0;
-    const myKey = String(currentUser.key).trim();
-    const myCode = String(currentUser.code).trim();
-    myProjectStores = [];
-    for (const k in all) {
-      const s = all[k];
-      if (!s || !s.projects) continue;
-      if (isClosed(s)) {
-        s._key = k;
-        if (getVisitStatus(s) !== "lead") continue;
-      }
-      const projectNames = Object.keys(s.projects);
-      for (const projectName of projectNames) {
-        const codes = String(s.projects[projectName]).split(';').map(x => x.trim());
-        if (codes.indexOf(myKey) !== -1 || codes.indexOf(myCode) !== -1) {
-          foundCount++;
-          if (!isNaN(s.lat) && !isNaN(s.lng)) myProjectStores.push({ lat: s.lat, lng: s.lng, key: k, projects: [projectName] });
-          break;
-        }
-      }
-    }
-    hasMyProjects = (foundCount > 0);
-    setCache(CACHE.MY_PROJECTS, { hasMyProjects: hasMyProjects, myProjectStores: myProjectStores });
-    if (hasMyProjects) {
-      const projChip = document.getElementById('filterProject');
-      if (projChip) projChip.classList.add('visible');
-    }
-  } catch(e) { console.warn("프로젝트 배정 확인 실패:", e); }
-}
-
-async function startApp() {
-  document.getElementById("loginScreen").style.display = "none";
-  document.getElementById("userInfo").textContent = currentUser.name;
-
-  isAdminUser = isAdmin(currentUser.code);
-  if (isAdminUser) {
-    adminViewActive = true;
-    document.getElementById('adminBadge').style.display = 'inline-block';
-    document.getElementById('filterBar').style.display = 'none';
-    console.log('[관리자 모드] 자동 활성화 - ' + currentUser.name);
-  }
-
-  const locationPromise = fetchInitialLocation();
-
-  const cachedOtherVisits = getCache(CACHE.OTHER_VISITS);
-  const cachedMyProjects = getCache(CACHE.MY_PROJECTS);
-  const cachedAggregate = isAdminUser ? getCache(CACHE.ADMIN_AGGREGATE) : null;
-
-  if (cachedOtherVisits) otherPartnerLastContactMap = cachedOtherVisits;
-  if (cachedMyProjects) {
-    hasMyProjects = cachedMyProjects.hasMyProjects;
-    myProjectStores = cachedMyProjects.myProjectStores || [];
-    if (hasMyProjects) {
-      const projChip = document.getElementById('filterProject');
-      if (projChip) projChip.classList.add('visible');
-    }
-  }
-  if (cachedAggregate) visitsAggregate = cachedAggregate;
-
-  await loadMyVisits();
-  updateChipCounts();
-
-  if (isAdminUser && cachedAggregate) {
-    await loadAdminMasterStores();
-    updateAdminStatsBar();
-    bindAdminStatsFilters();
-    buildAdminPartnerDropdown();
-  }
-
-  initialLocation = await Promise.race([
-    locationPromise,
-    new Promise(resolve => setTimeout(() => resolve(null), 3000))
-  ]);
-  if (initialLocation) currentUserLocation = initialLocation;
-
-  initMap();
-
-  setTimeout(async function() {
-    const tasks = [];
-
-    if (!cachedOtherVisits) {
-      tasks.push(loadOtherPartnerContacts());
-    }
-    if (!cachedMyProjects) {
-      tasks.push(loadMyProjectsFromIndex());
-    }
-    if (isAdminUser && !cachedAggregate) {
-      tasks.push((async function() {
-        await loadVisitsAggregate();
-        await loadAdminMasterStores();
-        updateAdminStatsBar();
-        bindAdminStatsFilters();
-        buildAdminPartnerDropdown();
-        if (adminViewActive) renderAdminView();
-      })());
-    }
-
-    await Promise.all(tasks);
-    checkNotices();
-  }, 100);
-}
-
-function bindAdminStatsFilters() {
-  document.querySelectorAll('.admin-stat-item[data-admin-filter]').forEach(function(el) {
-    el.addEventListener('click', function() {
-      const filter = el.dataset.adminFilter;
-
-      if (currentFilter === filter) {
-        currentFilter = 'all';
-        document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
-      } else {
-        currentFilter = filter;
-        document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
-        el.classList.add('active');
-      }
-
-      console.log('[관리자 필터]', currentFilter);
-      resetAdminViewZoom();
-      renderAdminView();
-    });
-  });
-
-  document.addEventListener('click', function(e) {
-    const selector = document.getElementById('adminPartnerSelector');
-    const dropdown = document.getElementById('adminPartnerDropdown');
-    if (selector && dropdown && !selector.contains(e.target)) {
-      dropdown.classList.remove('show');
-    }
-  });
-
-  const selectorEl = document.getElementById('adminPartnerSelector');
-  if (selectorEl) {
-    selectorEl.addEventListener('click', function(e) {
-      e.stopPropagation();
-      const dropdown = document.getElementById('adminPartnerDropdown');
-      if (dropdown) dropdown.classList.toggle('show');
-    });
-  }
-}
-
-function buildAdminPartnerDropdown() {
-  if (!isAdminUser || !visitsAggregate) return;
-
-  const dropdown = document.getElementById('adminPartnerDropdown');
-  if (!dropdown) return;
-
-  const byPartner = visitsAggregate.byPartner || {};
-
-  const partnerList = Object.keys(byPartner).map(function(key) {
-    const p = byPartner[key];
-    return {
-      key: key,
-      name: p.partnerName || '(이름 없음)',
-      count: (p.summary && p.summary.totalUniqueStores) || 0
-    };
-  }).sort(function(a, b) { return b.count - a.count; });
-
-  let html = '<div class="admin-partner-option ' + (selectedAdminPartner === 'all' ? 'selected' : '') + '" data-partner="all">';
-  html += '<span>📊 전체</span>';
-  if (visitsAggregate.summary && visitsAggregate.summary.totalUniqueStores) {
-    html += '<span class="partner-record-count">' + visitsAggregate.summary.totalUniqueStores + '</span>';
-  }
-  html += '</div>';
-
-  partnerList.forEach(function(p) {
-    html += '<div class="admin-partner-option ' + (selectedAdminPartner === p.key ? 'selected' : '') + '" data-partner="' + escapeHtml(p.key) + '">';
-    html += '<span>👤 ' + escapeHtml(p.name) + '</span>';
-    html += '<span class="partner-record-count">' + p.count + '</span>';
-    html += '</div>';
-  });
-
-  dropdown.innerHTML = html;
-
-  dropdown.querySelectorAll('.admin-partner-option').forEach(function(el) {
-    el.addEventListener('click', function(e) {
-      e.stopPropagation();
-      const partnerKey = el.dataset.partner;
-      selectAdminPartner(partnerKey);
-      dropdown.classList.remove('show');
-    });
-  });
-}
-
-function selectAdminPartner(partnerKey) {
-  selectedAdminPartner = partnerKey;
-
-  const labelEl = document.getElementById('adminPartnerLabel');
-  const selectorEl = document.getElementById('adminPartnerSelector');
-  if (partnerKey === 'all') {
-    labelEl.textContent = '전체';
-    if (selectorEl) selectorEl.classList.remove('active');
-  } else {
-    const byPartner = visitsAggregate.byPartner || {};
-    const p = byPartner[partnerKey];
-    labelEl.textContent = (p && p.partnerName) ? p.partnerName : partnerKey;
-    if (selectorEl) selectorEl.classList.add('active');
-  }
-
-  document.querySelectorAll('.admin-partner-option').forEach(function(el) {
-    if (el.dataset.partner === partnerKey) el.classList.add('selected');
-    else el.classList.remove('selected');
-  });
-
-  loadAdminMasterStores().then(function() {
-    updateAdminStatsBar();
-    resetAdminViewZoom();
-    renderAdminView();
-  });
-}
-
-function resetAdminViewZoom() {
-  if (!map) return;
-  map.setCenter(new kakao.maps.LatLng(36.5, 127.8));
-  map.setLevel(ADMIN_INIT_LEVEL);
-}
-
-async function renderAdminView() {
-  if (!isAdminUser) return;
-
-  let filtered = adminMasterStores.slice();
-
-  if (currentFilter !== 'all' && currentFilter !== 'project') {
-    filtered = filtered.filter(function(s) {
-      return getEffectiveStatus(s) === currentFilter;
-    });
-  }
-
-  let contractsAdded = 0;
-  if (map && map.getLevel() <= ADMIN_CONTRACT_ZOOM_LEVEL) {
-    try {
-      const contracts = await fetchContractsInCurrentBounds();
-      const seenKeys = {};
-      filtered.forEach(function(s) { seenKeys[s._key] = true; });
-      contracts.forEach(function(c) {
-        if (!seenKeys[c._key]) {
-          filtered.push(c);
-          contractsAdded++;
-        }
-      });
-      console.log('[기계약 추가됨] ' + contractsAdded + '개');
-    } catch(e) { console.warn('[기계약 동적 로드] 실패:', e); }
-  }
-
-  filtered = removeContractDuplicates(filtered);
-  allStoresInView = filtered;
-  renderMarkers();
-
-  console.log('[관리자뷰] partner=' + selectedAdminPartner + ', filter=' + currentFilter + ', 총 ' + filtered.length + '개');
-}
-
-async function fetchContractsInCurrentBounds() {
-  if (!map) return [];
-  const center = map.getCenter();
-  const centerLat = center.getLat();
-  const centerLng = center.getLng();
-
-  if (contractsCache.center && contractsCache.data.length > 0) {
-    const elapsed = Date.now() - contractsCache.ts;
-    const moved = haversine(contractsCache.center.lat, contractsCache.center.lng, centerLat, centerLng);
-    if (elapsed < CONTRACTS_CACHE_TTL_MS && moved < CONTRACTS_CACHE_MOVE_THRESHOLD_KM) {
-      console.log('[기계약 캐시 적중]');
-      return contractsCache.data;
-    }
-  }
-
-  const bounds = map.getBounds();
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  let latMin = sw.getLat(), latMax = ne.getLat();
-  let lngMin = sw.getLng(), lngMax = ne.getLng();
-
-  const radiusKm = ADMIN_CONTRACT_RADIUS_KM;
-  const radiusLatDeg = radiusKm / 111;
-  const radiusLngDeg = radiusKm / (111 * Math.cos(centerLat * Math.PI / 180));
-
-  latMin = Math.min(latMin, centerLat - radiusLatDeg);
-  latMax = Math.max(latMax, centerLat + radiusLatDeg);
-  lngMin = Math.min(lngMin, centerLng - radiusLngDeg);
-  lngMax = Math.max(lngMax, centerLng + radiusLngDeg);
-
-  try {
-    const snap = await db.ref('stores_light').orderByChild('lat').startAt(latMin).endAt(latMax).once('value');
-    const raw = snap.val() || {};
-    const contracts = [];
-
-    for (const k in raw) {
-      const s = raw[k];
-      if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
-      if (s.lng < lngMin || s.lng > lngMax) continue;
-      if (!isContractGrade(s.grade)) continue;
-
-      const dist = haversine(centerLat, centerLng, s.lat, s.lng);
-      const inRadius = dist <= radiusKm;
-      const inBounds = (s.lat >= sw.getLat() && s.lat <= ne.getLat() &&
-                        s.lng >= sw.getLng() && s.lng <= ne.getLng());
-      if (!inRadius && !inBounds) continue;
-
-      s._key = k;
-      s._isContract = true;
-      s._distFromCenter = dist;
-      contracts.push(s);
-    }
-
-    contracts.sort(function(a, b) { return a._distFromCenter - b._distFromCenter; });
-    const limited = contracts.slice(0, ADMIN_CONTRACT_MAX_PINS);
-
-    contractsCache = {
-      center: { lat: centerLat, lng: centerLng },
-      data: limited,
-      ts: Date.now()
+    // ==========================================
+    // 1. GLOBAL SYSTEM ARCHITECTURE VARIABLES
+    // ==========================================
+    let db;
+    let map;
+    let clusterer;
+    
+    let currentUser = null;
+    let isAdminMode = false;
+    let currentFilter = "all"; 
+    
+    let allStoresInView = [];
+    let activeMarkers = [];
+    let selectedStoreData = null;
+    
+    // Core Memory Object Storage Models Cache Pools
+    let myVisitedStoreData = {}; 
+    let myProjectStores = [];    
+    let adminSummaryMap = {};    
+
+    // Constants Configuration Parameters
+    const CONTRACT_RADIUS_KM = 3; 
+    const DUPLICATE_RADIUS_M = 30; 
+    
+    // LocalStorage Caches Specifications Architecture Version Configuration keys
+    const CACHE = {
+        MY_PROJECTS: { key: 'cache_my_projects_v3', ttlMs: 30 * 24 * 60 * 60 * 1000 },
+        MY_VISITS: { key: 'cache_my_visits_v3', ttlMs: 12 * 60 * 60 * 1000 },
+        ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v2', ttlMs: 12 * 60 * 60 * 1000 }
     };
 
-    return limited;
-  } catch(e) {
-    console.error('[기계약 fetch 실패]', e);
-    return [];
-  }
-}
-
-async function loadVisitsAggregate() {
-  try {
-    const snap = await db.ref('visits_aggregate').once('value');
-    const data = snap.val();
-    if (!data) {
-      visitsAggregate = { stores: {}, summary: {}, byPartner: {}, version: '미집계', updatedAt: 0 };
-      return;
-    }
-    visitsAggregate = data;
-    setCache(CACHE.ADMIN_AGGREGATE, data);
-    console.log('[관리자 집계] 로드 완료');
-  } catch(e) {
-    visitsAggregate = { stores: {}, summary: {}, byPartner: {}, version: '오류', updatedAt: 0 };
-  }
-}
-
-async function loadAdminMasterStores() {
-  if (!visitsAggregate) {
-    visitsAggregate = { stores: {}, summary: {}, byPartner: {} };
-    adminMasterStores = [];
-    return;
-  }
-
-  let targetStoresMap;
-  if (selectedAdminPartner === 'all') {
-    targetStoresMap = visitsAggregate.stores || {};
-  } else {
-    const byPartner = visitsAggregate.byPartner || {};
-    const pData = byPartner[selectedAdminPartner];
-    targetStoresMap = (pData && pData.stores) || {};
-  }
-
-  const aggKeys = Object.keys(targetStoresMap);
-  console.log('[관리자 마스터] partner=' + selectedAdminPartner + ', ' + aggKeys.length + '개 fetch 시작');
-
-  try {
-    const fetchPromises = aggKeys.map(function(k) {
-      return db.ref('stores_light/' + k).once('value').then(function(snap) {
-        const v = snap.val();
-        if (v && !isNaN(v.lat) && !isNaN(v.lng)) {
-          v._key = k;
-          v._isContract = false;
-          return v;
-        }
-        return null;
-      }).catch(function() { return null; });
-    });
-    const results = await Promise.all(fetchPromises);
-    let validStores = results.filter(function(s) { return s !== null; });
-    validStores = validStores.filter(function(s) {
-      if (!isClosed(s)) return true;
-      const aggData = targetStoresMap[s._key];
-      return aggData && aggData.lastStatus === 'lead';
-    });
-    adminMasterStores = validStores;
-    console.log('[관리자 마스터] 적재 완료: ' + adminMasterStores.length + '개');
-  } catch(e) {
-    console.error('[관리자 마스터] 실패:', e);
-    adminMasterStores = [];
-  }
-}
-
-function updateAdminStatsBar() {
-  if (!isAdminUser || !adminViewActive || !visitsAggregate) {
-    document.getElementById('adminStatsBar').classList.remove('visible');
-    return;
-  }
-
-  let summary;
-  if (selectedAdminPartner === 'all') {
-    summary = visitsAggregate.summary || {};
-  } else {
-    const byPartner = visitsAggregate.byPartner || {};
-    const pData = byPartner[selectedAdminPartner];
-    summary = (pData && pData.summary) || {};
-  }
-
-  document.getElementById('adminStat-visit').textContent = summary.visit || 0;
-  document.getElementById('adminStat-lead').textContent = summary.lead || 0;
-  document.getElementById('adminStat-success').textContent = summary.success || 0;
-  document.getElementById('adminStat-fail').textContent = summary.fail || 0;
-
-  const v = visitsAggregate.version || '미집계';
-  const ts = visitsAggregate.updatedAt;
-  let versionText = 'v' + v;
-  if (ts) {
-    const d = new Date(ts);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    versionText = '집계: ' + mm + '/' + dd + ' ' + hh + ':' + mi;
-  }
-  document.getElementById('adminStatsVersion').textContent = versionText;
-  document.getElementById('adminStatsBar').classList.add('visible');
-}
-
-function moveToMyProjectStores() {
-  if (!myProjectStores || myProjectStores.length === 0) return;
-  fitToCoords(myProjectStores);
-  setTimeout(function() {
-    if (map.getLevel() > 10) map.setLevel(10);
-  }, 100);
-}
-
-async function loadOtherPartnerContacts() {
-  try {
-    const snap = await db.ref("visits").once("value");
-    const all = snap.val() || {};
-    otherPartnerLastContactMap = {};
-    for (const partnerKey in all) {
-      if (partnerKey === currentUser.key) continue;
-      for (const recKey in all[partnerKey]) {
-        const rec = all[partnerKey][recKey];
-        const storeKey = rec.storeKey;
-        const ts = rec.lastUpdatedAt || rec.firstVisitAt || 0;
-        if (!storeKey || !ts) continue;
-        if (!otherPartnerLastContactMap[storeKey] || otherPartnerLastContactMap[storeKey] < ts) {
-          otherPartnerLastContactMap[storeKey] = ts;
-        }
-      }
-    }
-    setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
-  } catch(e) {}
-}
-
-async function loadMyVisits() {
-  try {
-    const snap = await db.ref("visits/" + currentUser.key).once("value");
-    const all = snap.val() || {};
-    myVisitedStoreData = {};
-    for (const recKey in all) {
-      const rec = all[recKey];
-      if (rec && rec.storeKey) myVisitedStoreData[rec.storeKey] = rec;
-    }
-  } catch(e) {}
-}
-
-function computeMyVisitCounts() {
-  const counts = { visit: 0, lead: 0, success: 0, fail: 0 };
-  for (const storeKey in myVisitedStoreData) {
-    const rec = myVisitedStoreData[storeKey];
-    const cur = rec.current || {};
-    const outcome = String(cur.outcome || "").trim();
-    if (outcome === "성사") { counts.success++; continue; }
-    if (outcome === "실패") { counts.fail++; continue; }
-
-    const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
-    const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
-    const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
-    const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-
-    if (allVisitFilled && allLeadAdditionalFilled) { counts.lead++; continue; }
-    if (allVisitFilled) { counts.visit++; continue; }
-  }
-  return counts;
-}
-
-function updateChipCounts() {
-  if (isAdminUser) {
-    document.querySelectorAll('.chip-count').forEach(el => { el.textContent = ''; });
-    return;
-  }
-  const counts = computeMyVisitCounts();
-  document.querySelectorAll('.chip-count').forEach(el => {
-    const key = el.dataset.countFor;
-    const n = counts[key] || 0;
-    el.textContent = n > 0 ? '(' + n + ')' : '';
-  });
-}
-
-function initMap() {
-  const container = document.getElementById("map");
-  let initialCenter, initialLevel;
-  if (isAdminUser) {
-    initialCenter = new kakao.maps.LatLng(36.5, 127.8);
-    initialLevel = ADMIN_INIT_LEVEL;
-    console.log('[지도 초기화] 관리자 - 전국 뷰');
-  } else if (initialLocation) {
-    initialCenter = new kakao.maps.LatLng(initialLocation.lat, initialLocation.lng);
-    initialLevel = 3;
-  } else {
-    initialCenter = new kakao.maps.LatLng(37.5665, 126.9780);
-    initialLevel = 4;
-  }
-  const options = { center: initialCenter, level: initialLevel };
-  map = new kakao.maps.Map(container, options);
-
-  if (isAdminUser) {
-    markerClusterer = createClusterer();
-  }
-
-  startLocationTracking();
-  if (initialLocation) updateMyLocationMarker(initialLocation.lat, initialLocation.lng);
-
-  if (isAdminUser) {
-    setTimeout(function() { renderAdminView(); }, 100);
-
-    let adminIdleDebounce;
-    let lastZoomLevel = ADMIN_INIT_LEVEL;
-    kakao.maps.event.addListener(map, "idle", function() {
-      clearTimeout(adminIdleDebounce);
-      adminIdleDebounce = setTimeout(function() {
-        const currentLevel = map.getLevel();
-        const wasInContractZone = lastZoomLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
-        const isInContractZone = currentLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
-
-        if (isInContractZone || wasInContractZone) {
-          console.log('[관리자 idle] level ' + lastZoomLevel + ' → ' + currentLevel);
-          renderAdminView();
-        }
-        lastZoomLevel = currentLevel;
-      }, 300);
-    });
-  } else {
-    let moveDebounce;
-    kakao.maps.event.addListener(map, "idle", function() {
-      if (suppressNextIdle) { suppressNextIdle = false; return; }
-      clearTimeout(moveDebounce);
-      moveDebounce = setTimeout(function() { loadStoresInView(); }, 400);
-    });
-  }
-
-  kakao.maps.event.addListener(map, "click", function() { closePanel(true); });
-
-  document.getElementById("locBtn").onclick = moveToMyLocation;
-  document.getElementById("addBtn").onclick = openNewStoreModal;
-
-  const newStoreModal = document.getElementById('newStoreModal');
-  if (newStoreModal) {
-    newStoreModal.addEventListener('click', function(e) {
-      if (e.target === newStoreModal) closeNewStoreModal();
-    });
-  }
-
-  document.querySelectorAll(".filter-chip").forEach(function(btn) {
-    btn.onclick = function() {
-      document.querySelectorAll(".filter-chip").forEach(b => {
-        b.classList.remove("active");
-        b.style.background = b.dataset.filter === "project" ? "" : "transparent";
-      });
-      btn.classList.add("active");
-      if (btn.dataset.filter !== "project") {
-        btn.style.background = getFilterColor(btn.dataset.filter);
-      }
-      currentFilter = btn.dataset.filter;
-      if (btn.dataset.filter === "project") {
-        moveToMyProjectStores();
-      } else if (btn.dataset.filter === "all") {
-        renderMarkers();
-      } else {
-        moveToFilteredStoresForPartner(btn.dataset.filter);
-      }
+    // Firebase Connection Bootstrap Driver Initialization Credentials
+    const firebaseConfig = {
+        databaseURL: "https://upbox-salesmap-default-rtdb.firebaseio.com"
     };
-  });
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
 
-  document.getElementById("searchInput").oninput = function(e) {
-    clearTimeout(searchTimer);
-    const q = e.target.value.trim();
-    searchTimer = setTimeout(function() {
-      if (q.length >= 1) searchStores(q);
-      else document.getElementById("searchResults").style.display = "none";
-    }, 300);
-  };
-  document.addEventListener("click", function(e) {
-    if (!e.target.closest("#searchBar")) {
-      document.getElementById("searchResults").style.display = "none";
-    }
-  });
+    // ==========================================
+    // 2. LIFECYCLE DOM LOADING BOOTSTRAP EVENT
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', function() {
+        initKakaoMapEngine();
+        bindUserInterfaceInterfaceEvents();
+        checkUserAuthenticationState();
+    });
 
-  document.getElementById("panelClose").onclick = function(e) {
-    e.stopPropagation();
-    closePanel(false);
-  };
+    // Initialize Native Kakao Map Object Model Setup
+    function initKakaoMapEngine() {
+        const container = document.getElementById('map');
+        const options = {
+            center: new kakao.maps.LatLng(37.5665, 126.9780),
+            level: 8
+        };
+        map = new kakao.maps.Map(container, options);
 
-  const panel = document.getElementById("storePanel");
-  let touchStartY = 0;
-  let isDragging = false;
-  let dragStartedAtTop = false;
+        clusterer = new kakao.maps.MarkerClusterer({
+            map: map,
+            averageCenter: true,
+            minLevel: 6,
+            disableClickZoom: false,
+            styles: [{
+                width : '36px', height : '36px',
+                background: 'rgba(30, 58, 138, 0.85)',
+                color: '#fff', border: '2px solid #fff',
+                borderRadius: '50%', textAlign: 'center',
+                lineHeight: '32px', fontSize: '12px', fontWeight: 'bold'
+            }]
+        });
 
-  panel.addEventListener("touchstart", function(e) {
-    touchStartY = e.touches[0].clientY;
-    const target = e.target;
-    const isHeaderArea = (target.id === 'panelDrag' || target.id === 'panelClose');
-    const atTop = panel.scrollTop <= 0;
-    dragStartedAtTop = isHeaderArea || atTop;
-    isDragging = true;
-  }, { passive: true });
-
-  panel.addEventListener("touchmove", function(e) {
-    if (!isDragging || !dragStartedAtTop) return;
-    const deltaY = e.touches[0].clientY - touchStartY;
-    if (deltaY > 80) { closePanel(false); isDragging = false; }
-  }, { passive: true });
-
-  panel.addEventListener("touchend", function() { isDragging = false; dragStartedAtTop = false; }, { passive: true });
-  document.getElementById("panelDrag").onclick = function() { closePanel(false); };
-}
-
-function getFilterColor(f) {
-  return { all:"#363859", visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935", contract:"#F2AC57" }[f] || "#363859";
-}
-
-function createClusterer() {
-  const baseStyle = {
-    color: 'white', border: '3px solid white', borderRadius: '50%',
-    textAlign: 'center', fontWeight: '700', boxShadow: '0 2px 10px rgba(0,0,0,0.25)'
-  };
-  const clusterer = new kakao.maps.MarkerClusterer({
-    map: map, averageCenter: true, minLevel: CLUSTER_MIN_LEVEL,
-    minClusterSize: 2, disableClickZoom: true, gridSize: 60,
-    calculator: [10, 100],
-    styles: [
-      Object.assign({}, baseStyle, { width: '44px', height: '44px', lineHeight: '38px', fontSize: '13px', background: '#363859' }),
-      Object.assign({}, baseStyle, { width: '52px', height: '52px', lineHeight: '46px', fontSize: '14px', background: '#363859' }),
-      Object.assign({}, baseStyle, { width: '60px', height: '60px', lineHeight: '54px', fontSize: '15px', background: '#363859' })
-    ]
-  });
-  kakao.maps.event.addListener(clusterer, 'clustered', function(clusters) { applyClusterColors(clusters); });
-  kakao.maps.event.addListener(clusterer, 'clusterclick', function(cluster) { handleClusterClick(cluster); });
-  return clusterer;
-}
-
-function handleClusterClick(cluster) {
-  try {
-    const ms = cluster.getMarkers ? cluster.getMarkers() : [];
-    if (ms.length === 0) return;
-    if (ms.length === 1) {
-      map.setCenter(ms[0].getPosition());
-      map.setLevel(3);
-      if (isAdminUser) setTimeout(function() { renderAdminView(); }, 400);
-      return;
+        // Register Viewport Bounds Boundaries Update Drag/Zoom Idle Handle
+        kakao.maps.event.addListener(map, 'idle', function() {
+            if (!currentUser) return;
+            loadStoresInView();
+        });
     }
 
-    const positions = ms.map(function(m) { return m.getPosition(); });
-    const lats = positions.map(function(p) { return p.getLat(); });
-    const lngs = positions.map(function(p) { return p.getLng(); });
-    const latRange = Math.max.apply(null, lats) - Math.min.apply(null, lats);
-    const lngRange = Math.max.apply(null, lngs) - Math.min.apply(null, lngs);
+    // Bind Document Element Interactive Events Listeners Framework
+    function bindUserInterfaceInterfaceEvents() {
+        document.getElementById('my-location-tracker').addEventListener('click', moveToCurrentDevicePosition);
 
-    if (latRange > 1 || lngRange > 1) {
-      const center = cluster.getCenter ? cluster.getCenter() : positions[0];
-      map.setCenter(center);
-      map.setLevel(6);
-      if (isAdminUser) setTimeout(function() { renderAdminView(); }, 400);
-      return;
+        document.getElementById('sidebar-open-trigger').addEventListener('click', toggleSidebarMenuDrawer);
+        document.getElementById('sidebar-dim-layer').addEventListener('click', toggleSidebarMenuDrawer);
+        document.getElementById('menu-clear-cache-btn').addEventListener('click', forcePurgeStorageSyncReload);
+        document.getElementById('menu-logout-trigger').addEventListener('click', logoutUserSessionSystem);
+
+        document.getElementById('filter-chips-row').addEventListener('click', function(e) {
+            const chip = e.target.closest('.filter-chip');
+            if (!chip) return;
+            
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            
+            currentFilter = chip.getAttribute('data-filter');
+            
+            if (currentFilter === "project") {
+                moveToMyProjectStores();
+            }
+            
+            loadStoresInView();
+        });
+
+        document.getElementById('sheet-close-trigger').addEventListener('click', closeStoreDetailSheet);
+        document.getElementById('action-add-visit-btn').addEventListener('click', () => openVisitFormLogModal(false));
+        document.getElementById('action-set-lead-btn').addEventListener('click', () => openVisitFormLogModal(true));
+        document.getElementById('form-cancel-btn').addEventListener('click', closeVisitFormLogModal);
+        document.getElementById('form-submit-btn').addEventListener('click', submitVisitFormLogData);
+
+        const searchInput = document.getElementById('map-search-input');
+        searchInput.addEventListener('input', debounce(handleSearchInputQuery, 250));
+        searchInput.addEventListener('focus', () => {
+            if(searchInput.value.trim().length >= 2) document.getElementById('search-results-panel').style.display = 'flex';
+        });
+        
+        document.getElementById('search-clear-btn').addEventListener('click', function() {
+            searchInput.value = "";
+            this.style.display = 'none';
+            document.getElementById('search-results-panel').innerHTML = "";
+            document.getElementById('search-results-panel').style.display = 'none';
+        });
+
+        document.addEventListener('click', function(e) {
+            if(!e.target.closest('.search-box-wrapper') && !e.target.closest('#search-results-panel')) {
+                document.getElementById('search-results-panel').style.display = 'none';
+            }
+        });
+
+        document.getElementById('admin-view-btn').addEventListener('click', function() {
+            if(!currentUser || currentUser.code !== "0007") return;
+            isAdminMode = !isAdminMode;
+            this.classList.toggle('active', isAdminMode);
+            
+            const chipsRow = document.getElementById('filter-chips-row');
+            if(isAdminMode) {
+                chipsRow.style.opacity = '0.3';
+                chipsRow.style.pointerEvents = 'none';
+                showLoadingMask("관리자 원격 마스터 애그리게이션<br>실시간 노드 구조 집계 중...");
+                loadAdminGlobalSummaryData();
+            } else {
+                chipsRow.style.opacity = '1';
+                chipsRow.style.pointerEvents = 'auto';
+                clusterer.clear();
+                clearAllMarkers();
+                loadStoresInView();
+            }
+        });
     }
 
-    const bounds = new kakao.maps.LatLngBounds();
-    positions.forEach(function(p) { bounds.extend(p); });
-    map.setBounds(bounds, 80, 80, 80, 80);
-    setTimeout(function() {
-      if (map.getLevel() >= CLUSTER_MIN_LEVEL) map.setLevel(CLUSTER_MIN_LEVEL - 1);
-      if (isAdminUser) setTimeout(function() { renderAdminView(); }, 250);
-    }, 150);
-  } catch(e) {
-    console.warn('[클러스터 클릭] 처리 실패:', e);
-  }
-}
-
-function applyClusterColors(clusters) {
-  if (!clusters || clusters.length === 0) return;
-  const filterColorMap = {
-    visit: '#4d4678', lead: '#43A047', success: '#F5B800', fail: '#E53935', contract: '#F2AC57'
-  };
-  clusters.forEach(function(cluster) {
-    let bgColor;
-    if (filterColorMap[currentFilter]) {
-      bgColor = filterColorMap[currentFilter];
-    } else if (currentFilter === 'project') {
-      bgColor = '#363859';
-    } else {
-      bgColor = computeDominantClusterColor(cluster);
-    }
-    try {
-      const overlay = cluster._clusterMarker;
-      if (overlay && overlay.getContent) {
-        const content = overlay.getContent();
-        if (typeof content === 'string') {
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = content;
-          const innerDiv = tempDiv.firstElementChild;
-          if (innerDiv && innerDiv.style) {
-            innerDiv.style.background = bgColor;
-            overlay.setContent(tempDiv.innerHTML);
-          }
-        } else if (content && content.style) {
-          content.style.background = bgColor;
+    // ==========================================
+    // 3. AUTHENTICATION & SECURITY CONTROL NODE
+    // ==========================================
+    function checkUserAuthenticationState() {
+        const cachedUser = localStorage.getItem("upboxPartner");
+        if (cachedUser) {
+            currentUser = JSON.parse(cachedUser);
+            bootstrapAuthorizedSession();
+        } else {
+            window.location.replace("login.html");
         }
-      }
-    } catch(e) {}
-  });
-}
-
-function computeDominantClusterColor(cluster) {
-  const ms = cluster.getMarkers ? cluster.getMarkers() : [];
-  if (ms.length === 0) return '#363859';
-  const counts = { visit: 0, lead: 0, success: 0, fail: 0, contract: 0, closedByMe: 0, none: 0 };
-  ms.forEach(function(m) {
-    const status = m._upboxStatus || 'none';
-    if (counts[status] !== undefined) counts[status]++;
-  });
-  const priorityOrder = ['success', 'lead', 'visit', 'fail', 'contract', 'closedByMe'];
-  let maxCount = 0;
-  let dominant = 'none';
-  for (const key of priorityOrder) {
-    if (counts[key] > maxCount) { maxCount = counts[key]; dominant = key; }
-  }
-  return getStatusColor(dominant);
-}
-
-async function moveToFilteredStoresForPartner(filter) {
-  const statusBar = document.getElementById('statusBar');
-  if (statusBar) statusBar.textContent = '필터 적용 중...';
-
-  if (filter === 'all') { renderMarkers(); return; }
-  if (filter === 'contract') { await moveToContractStores(); return; }
-
-  const targetKeys = [];
-  for (const storeKey in myVisitedStoreData) {
-    const rec = myVisitedStoreData[storeKey];
-    const cur = rec.current || {};
-    const outcome = String(cur.outcome || "").trim();
-    let status = 'none';
-    if (outcome === '성사') status = 'success';
-    else if (outcome === '실패') status = 'fail';
-    else {
-      const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
-      const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
-      const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
-      const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-
-      if (allVisitFilled && allLeadAdditionalFilled) status = 'lead';
-      else if (allVisitFilled) status = 'visit';
-      else if (outcome === '폐업') status = 'closedByMe';
-    }
-    if (status === filter) targetKeys.push(storeKey);
-  }
-
-  if (targetKeys.length === 0) {
-    if (statusBar) statusBar.textContent = '해당 상태 업장 없음';
-    renderMarkers();
-    return;
-  }
-
-  await fitMapToStoreKeys(targetKeys, filter);
-}
-
-async function moveToContractStores() {
-  const statusBar = document.getElementById('statusBar');
-  try {
-    const snap = await db.ref('stores_light').once('value');
-    const all = snap.val() || {};
-    const coords = [];
-    for (const k in all) {
-      const s = all[k];
-      if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
-      if (!isContractGrade(s.grade)) continue;
-      if (currentUserLocation) {
-        const dist = haversine(currentUserLocation.lat, currentUserLocation.lng, s.lat, s.lng);
-        if (dist > CONTRACT_RADIUS_KM) continue;
-      }
-      coords.push({ lat: s.lat, lng: s.lng });
-      if (coords.length >= FILTER_MOVE_MAX_PINS) break;
-    }
-    if (coords.length === 0) {
-      if (statusBar) statusBar.textContent = '근처 기계약 업장 없음';
-      renderMarkers();
-      return;
-    }
-    fitToCoords(coords);
-  } catch(e) { renderMarkers(); }
-}
-
-async function fitMapToStoreKeys(targetKeys, filterLabel) {
-  const statusBar = document.getElementById('statusBar');
-  if (statusBar) statusBar.textContent = '필터 적용 중... (' + targetKeys.length + '개)';
-  const limited = targetKeys.slice(0, FILTER_MOVE_MAX_PINS);
-  try {
-    const fetchPromises = limited.map(function(k) {
-      return db.ref('stores_light/' + k).once('value').then(function(snap) {
-        const v = snap.val();
-        if (v && !isNaN(v.lat) && !isNaN(v.lng)) return { lat: v.lat, lng: v.lng };
-        return null;
-      }).catch(function() { return null; });
-    });
-    const results = await Promise.all(fetchPromises);
-    const validCoords = results.filter(function(c) { return c !== null; });
-    if (validCoords.length === 0) {
-      if (statusBar) statusBar.textContent = '좌표 없음';
-      renderMarkers();
-      return;
-    }
-    fitToCoords(validCoords);
-  } catch(e) { renderMarkers(); }
-}
-
-function fitToCoords(coords) {
-  if (!coords || coords.length === 0) return;
-  if (coords.length === 1) {
-    map.setCenter(new kakao.maps.LatLng(coords[0].lat, coords[0].lng));
-    map.setLevel(4);
-  } else {
-    const bounds = new kakao.maps.LatLngBounds();
-    coords.forEach(function(c) { bounds.extend(new kakao.maps.LatLng(c.lat, c.lng)); });
-    map.setBounds(bounds, 80, 80, 80, 80);
-    setTimeout(function() { if (map.getLevel() < 4) map.setLevel(4); }, 100);
-  }
-}
-
-function startLocationTracking() {
-  if (!navigator.geolocation || geoWatchId !== null) return;
-  geoWatchId = navigator.geolocation.watchPosition(
-    function(pos) {
-      currentUserLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      updateMyLocationMarker(pos.coords.latitude, pos.coords.longitude);
-    },
-    function(err) {},
-    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-  );
-}
-
-function stopLocationTracking() {
-  if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
-  if (myLocationMarker) { myLocationMarker.setMap(null); myLocationMarker = null; }
-}
-
-function updateMyLocationMarker(lat, lng) {
-  const position = new kakao.maps.LatLng(lat, lng);
-  if (myLocationMarker) { myLocationMarker.setPosition(position); return; }
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="#FFFFFF"/><circle cx="11" cy="11" r="7" fill="#1A73E8"/></svg>';
-  const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
-  const markerImage = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(22, 22), { offset: new kakao.maps.Point(11, 11) });
-  myLocationMarker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: 9999 });
-  myLocationMarker.setMap(map);
-}
-
-function moveToMyLocation() {
-  if (currentUserLocation) {
-    map.setCenter(new kakao.maps.LatLng(currentUserLocation.lat, currentUserLocation.lng));
-    map.setLevel(4);
-    return;
-  }
-  if (!navigator.geolocation) { alert("위치 기능을 지원하지 않는 브라우저입니다."); return; }
-  navigator.geolocation.getCurrentPosition(function(pos) {
-    currentUserLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    updateMyLocationMarker(pos.coords.latitude, pos.coords.longitude);
-    map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
-    map.setLevel(4);
-  }, function(err) {
-    alert("현재 위치를 가져올 수 없습니다.\n위치 권한을 허용해주세요.");
-  });
-}
-
-async function loadStoresInView() {
-  const bounds = map.getBounds();
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  const latMin = sw.getLat(), latMax = ne.getLat();
-  const lngMin = sw.getLng(), lngMax = ne.getLng();
-  document.getElementById("statusBar").textContent = "업장 로딩 중...";
-  try {
-    const snap = await db.ref("stores_light").orderByChild("lat").startAt(latMin).endAt(latMax).once("value");
-    const raw = snap.val() || {};
-    let list = [];
-    for (const k in raw) {
-      const s = raw[k];
-      if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
-      if (s.lng < lngMin || s.lng > lngMax) continue;
-      s._key = k;
-      list.push(s);
-    }
-    list = list.filter(s => {
-      if (!isClosed(s)) return true;
-      return getVisitStatus(s) === "lead";
-    });
-    list = list.filter(s => isVisibleForProject(s, currentUser.key));
-    if (currentUserLocation) {
-      list = list.filter(function(s) {
-        if (!isContractGrade(s.grade)) return true;
-        const dist = haversine(currentUserLocation.lat, currentUserLocation.lng, s.lat, s.lng);
-        return dist <= CONTRACT_RADIUS_KM;
-      });
-    }
-    list = removeContractDuplicates(list);
-    allStoresInView = list;
-    renderMarkers();
-  } catch(e) {
-    document.getElementById("statusBar").textContent = "로딩 실패";
-  }
-}
-
-function isVisibleForProject(store, currentPartnerKey) {
-  if (!store.projects) return true;
-  const keys = Object.keys(store.projects);
-  if (keys.length === 0) return true;
-  for (const projectName of keys) {
-    const codes = String(store.projects[projectName]).split(';').map(s => s.trim());
-    if (codes.indexOf(currentPartnerKey) !== -1) return true;
-  }
-  return false;
-}
-
-function amIAssignedToProject(store, currentPartnerKey) {
-  if (!store.projects) return false;
-  const keys = Object.keys(store.projects);
-  if (keys.length === 0) return false;
-  const myKey = String(currentPartnerKey || '').trim();
-  const myCode = currentUser ? String(currentUser.code || '').trim() : '';
-  for (const projectName of keys) {
-    const codes = String(store.projects[projectName]).split(';').map(s => s.trim());
-    if (codes.indexOf(myKey) !== -1 || (myCode && codes.indexOf(myCode) !== -1)) return true;
-  }
-  return false;
-}
-
-function isContractGrade(g) {
-  if (!g) return false;
-  const s = String(g).trim();
-  return s === "기계약" || s === "업박스기계약업장" || s.indexOf("기계약") !== -1;
-}
-
-function isClosed(store) { return store && store.closed === true; }
-
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function removeContractDuplicates(list) {
-  const contracts = list.filter(s => isContractGrade(s.grade));
-  const others = list.filter(s => !isContractGrade(s.grade));
-  const filteredOthers = others.filter(function(o) {
-    for (const c of contracts) {
-      const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
-      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.7) return false;
-    }
-    return true;
-  });
-  return contracts.concat(filteredOthers);
-}
-
-function nameSimilarity(a, b) {
-  if (!a || !b) return 0;
-  a = String(a).replace(/\s+/g, "");
-  b = String(b).replace(/\s+/g, "");
-  const longer = a.length > b.length ? a : b;
-  const shorter = a.length > b.length ? b : a;
-  if (longer.length === 0) return 1;
-  let matches = 0;
-  for (let i = 0; i < shorter.length; i++) {
-    if (longer.indexOf(shorter[i]) !== -1) matches++;
-  }
-  return matches / longer.length;
-}
-
-function getEffectiveStatus(store) {
-  if (isAdminUser && adminViewActive && visitsAggregate) {
-    let targetStoresMap;
-    if (selectedAdminPartner === 'all') {
-      targetStoresMap = visitsAggregate.stores || {};
-    } else {
-      const byPartner = visitsAggregate.byPartner || {};
-      const pData = byPartner[selectedAdminPartner];
-      targetStoresMap = (pData && pData.stores) || {};
-    }
-    const aggData = targetStoresMap[store._key];
-    if (aggData && aggData.lastStatus) {
-      if (isContractGrade(store.grade)) return "contract";
-      return aggData.lastStatus;
-    }
-  }
-  return getVisitStatus(store);
-}
-
-function renderMarkers() {
-  if (markerClusterer) markerClusterer.clear();
-  markers.forEach(m => m.setMap(null));
-  markers = [];
-  markerByKey = {};
-
-  let shown = 0;
-  let selectedRendered = false;
-  const clusterMarkers = [];
-  const directMarkers = [];
-
-  for (const store of allStoresInView) {
-    const status = getEffectiveStatus(store);
-    const isContract = isContractGrade(store.grade);
-
-    if (currentFilter === "project") {
-      if (isContract || !amIAssignedToProject(store, currentUser.key)) continue;
-    } else if (currentFilter !== "all") {
-      if (!isContract && status !== currentFilter) continue;
-      if (currentFilter === "contract" && !isContract) continue;
     }
 
-    const isSelected = selectedStore && selectedStore._key === store._key;
-    if (isSelected) selectedRendered = true;
-    const marker = createMarker(store, status, isSelected);
-    markers.push(marker);
-    markerByKey[store._key] = marker;
-    shown++;
+    async function bootstrapAuthorizedSession() {
+        document.getElementById('menu-user-name').innerText = currentUser.name + " 파트너";
+        document.getElementById('menu-user-code').innerText = "CODE: " + currentUser.code;
+        
+        if (currentUser.code === "0007") {
+            document.getElementById('admin-view-btn').style.display = 'flex';
+        }
 
-    if (!isAdminUser) {
-      directMarkers.push(marker);
-    } else if (isSelected || (adminViewActive && isContract)) {
-      directMarkers.push(marker);
-    } else {
-      clusterMarkers.push(marker);
+        showLoadingMask("내 프로젝트 영업 인덱스<br>백엔드 대조 다운로드 중...");
+        
+        try {
+            await Promise.all([
+                loadMyProjectsFromIndex(),
+                loadMyVisitHistoryRecords()
+            ]);
+        } catch(e) {
+            console.error("Critical error synchronization baseline data nodes: ", e);
+        } finally {
+            hideLoadingMask();
+            moveToCurrentDevicePosition();
+            loadStoresInView();
+        }
     }
-  }
 
-  if (selectedStore && !selectedRendered) {
-    const status = getEffectiveStatus(selectedStore);
-    const marker = createMarker(selectedStore, status, true);
-    markers.push(marker);
-    markerByKey[selectedStore._key] = marker;
-    directMarkers.push(marker);
-  }
+    // ==========================================
+    // 4. DATA SYNCHRONIZATION AND STORAGE CACHE
+    // ==========================================
+    async function loadMyProjectsFromIndex() {
+        const cacheKey = CACHE.MY_PROJECTS.key + "_" + currentUser.key;
+        const cached = getStorageCacheItem(cacheKey, CACHE.MY_PROJECTS.ttlMs);
+        if (cached) {
+            myProjectStores = cached;
+            console.log("[partner_projects] 캐시 로드 완료. 상점 수: " + myProjectStores.length);
+            return;
+        }
 
-  if (markerClusterer && clusterMarkers.length > 0) {
-    markerClusterer.addMarkers(clusterMarkers);
-    setTimeout(function() {
-      try {
-        const clusters = markerClusterer.getClusters ? markerClusterer.getClusters() : [];
-        if (clusters && clusters.length > 0) applyClusterColors(clusters);
-      } catch(e) {}
-    }, 100);
-  }
-  directMarkers.forEach(function(m) { m.setMap(map); });
-
-  document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
-}
-
-function createMarker(store, status, isSelected) {
-  const position = new kakao.maps.LatLng(store.lat, store.lng);
-  const color = getStatusColor(status);
-
-  let labelLines;
-  if (isAdminUser && adminViewActive && !isContractGrade(store.grade)) {
-    let partnerName = '';
-    if (selectedAdminPartner === 'all' && visitsAggregate && visitsAggregate.stores) {
-      const aggData = visitsAggregate.stores[store._key];
-      partnerName = aggData ? aggData.lastPartnerName : '';
-    } else if (selectedAdminPartner !== 'all' && visitsAggregate && visitsAggregate.byPartner) {
-      const pData = visitsAggregate.byPartner[selectedAdminPartner];
-      partnerName = (pData && pData.partnerName) || '';
+        try {
+            const res = await fetch(`https://upbox-salesmap-default-rtdb.firebaseio.com/partner_projects/${currentUser.key}.json`);
+            const data = await res.json();
+            
+            myProjectStores = [];
+            if (data && data.hasAny && data.stores) {
+                for (const k in data.stores) {
+                    const s = data.stores[k];
+                    if (s && !isNaN(s.lat) && !isNaN(s.lng)) {
+                        myProjectStores.push({
+                            lat: s.lat,
+                            lng: s.lng,
+                            key: k,
+                            projects: s.projects || []
+                        });
+                    }
+                }
+            }
+            setStorageCacheItem(cacheKey, myProjectStores);
+            console.log(`[partner_projects] 인덱스 백엔드 실시간 로드 성공: hasAny=${data?.hasAny}, stores=${myProjectStores.length}`);
+        } catch(e) {
+            console.error("Failed fetching assigned projects map metadata", e);
+            myProjectStores = [];
+        }
     }
-    labelLines = formatPartnerNameForPin(partnerName);
-  } else {
-    labelLines = [getGradeIcon(store.grade)];
-  }
 
-  let w, h, anchorX, anchorY, zIdx, strokeColor, strokeWidth;
-  if (isSelected) {
-    w = 38; h = 48; anchorX = 19; anchorY = 48; zIdx = 1000;
-    strokeColor = '#1a1a1a'; strokeWidth = 2.5;
-  } else if (labelLines.length >= 2) {
-    w = 30; h = 38; anchorX = 15; anchorY = 38; zIdx = 1;
-    strokeColor = 'white'; strokeWidth = 1.6;
-  } else {
-    w = 26; h = 33; anchorX = 13; anchorY = 33; zIdx = 1;
-    strokeColor = 'white'; strokeWidth = 1.6;
-  }
+    async function loadMyVisitHistoryRecords() {
+        const cacheKey = CACHE.MY_VISITS.key + "_" + currentUser.key;
+        const cached = getStorageCacheItem(cacheKey, CACHE.MY_VISITS.ttlMs);
+        if (cached) {
+            myVisitedStoreData = cached;
+            console.log("[visits] 캐시 데이터 로드 완료. 기록 수: " + Object.keys(myVisitedStoreData).length);
+            return;
+        }
 
-  const svg = buildPinSvg(w, h, color, strokeColor, strokeWidth, labelLines);
-  const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
-  const markerImage = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(w, h), { offset: new kakao.maps.Point(anchorX, anchorY) });
-  const marker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: zIdx });
-  marker._upboxStatus = status;
-  marker._upboxStoreKey = store._key;
-  marker._upboxIsContract = isContractGrade(store.grade);
-  kakao.maps.event.addListener(marker, "click", function() {
-    if (isAdminUser && map.getLevel() >= CLUSTER_MIN_LEVEL) {
-      map.setCenter(position);
-      map.setLevel(4);
-      setTimeout(function() {
-        openPanel(store);
-        renderAdminView();
-      }, 300);
-    } else {
-      openPanel(store);
+        try {
+            const snap = await db.ref("visits").orderByChild("partnerKey").equalTo(currentUser.key).once("value");
+            const val = snap.val() || {};
+            
+            myVisitedStoreData = {};
+            for (const id in val) {
+                const r = val[id];
+                if (!r.storeKey) continue;
+                
+                if (!myVisitedStoreData[r.storeKey] || myVisitedStoreData[r.storeKey].timestamp < r.timestamp) {
+                    myVisitedStoreData[r.storeKey] = {
+                        status: r.status,
+                        comment: r.comment,
+                        timestamp: r.timestamp,
+                        dateStr: r.dateStr
+                    };
+                }
+            }
+            setStorageCacheItem(cacheKey, myVisitedStoreData);
+            console.log("[visits] 실시간 기록 백엔드 동기화 완료: 수집된 유니크 상점 수=" + Object.keys(myVisitedStoreData).length);
+        } catch(e) {
+            console.error("Failed downloading remote visits profiles", e);
+            myVisitedStoreData = {};
+        }
     }
-  });
-  return marker;
-}
 
-function buildPinSvg(w, h, fillColor, strokeColor, strokeWidth, lines) {
-  if (!lines || lines.length === 0) lines = ['-'];
-  let textElements = '';
-  if (lines.length === 1) {
-    textElements = '<text x="16" y="21" text-anchor="middle" font-size="13" font-weight="bold" fill="white">' + escapeXml(lines[0]) + '</text>';
-  } else {
-    textElements =
-      '<text x="16" y="16" text-anchor="middle" font-size="9" font-weight="bold" fill="white">' + escapeXml(lines[0]) + '</text>' +
-      '<text x="16" y="25" text-anchor="middle" font-size="9" font-weight="bold" fill="white">' + escapeXml(lines[1]) + '</text>';
-  }
-  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 32 40">' +
-         '<path d="M16 0.8 C7.4 0.8 0.8 7.4 0.8 16 C0.8 24.6 16 39.2 16 39.2 C16 39.2 31.2 24.6 31.2 16 C31.2 7.4 24.6 0.8 16 0.8 Z" ' +
-         'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="' + strokeWidth + '"/>' +
-         textElements + '</svg>';
-}
+    async function loadAdminGlobalSummaryData() {
+        const cached = getStorageCacheItem(CACHE.ADMIN_AGGREGATE.key, CACHE.ADMIN_AGGREGATE.ttlMs);
+        if (cached) {
+            adminSummaryMap = cached;
+            hideLoadingMask();
+            renderAdminView();
+            return;
+        }
 
-function escapeXml(s) {
-  if (s === null || s === undefined) return '';
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-}
-
-function formatPartnerNameForPin(name) {
-  if (!name) return ['-'];
-  const clean = String(name).trim().replace(/\s+/g, '');
-  if (clean.length === 0) return ['-'];
-  if (clean.length <= 2) return [clean];
-
-  const surnamesSingle = '김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주구원우진민방천표채공현함변여염도어';
-  const surnamesDouble = ['남궁', '제갈', '독고', '황보', '선우', '서문', '사공', '동방', '망절'];
-
-  if (clean.length === 4) {
-    const firstTwo = clean.substring(0, 2);
-    if (surnamesDouble.indexOf(firstTwo) !== -1) return [clean.substring(2)];
-    if (surnamesSingle.indexOf(clean[0]) !== -1) return [clean.substring(2)];
-    return [clean.substring(0, 2), clean.substring(2)];
-  }
-  if (clean.length === 3) {
-    if (surnamesSingle.indexOf(clean[0]) !== -1) return [clean.substring(1)];
-    return [clean];
-  }
-  return [clean.substring(0, 2)];
-}
-
-function getStatusColor(status) {
-  return {
-    visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935",
-    contract:"#F2AC57", closedByMe:"#616161", none:"#9E9E9E"
-  }[status] || "#9E9E9E";
-}
-
-function getGradeIcon(grade) {
-  if (!grade) return "-";
-  const g = String(grade).trim();
-  if (isContractGrade(g)) return "★";
-  if (g === "A등급") return "A";
-  if (g === "B등급") return "B";
-  if (g === "C등급") return "C";
-  return "-";
-}
-
-function getVisitStatus(store) {
-  if (isContractGrade(store.grade)) return "contract";
-  const rec = myVisitedStoreData[store._key];
-  if (!rec) return "none";
-  const cur = rec.current || {};
-  const outcome = String(cur.outcome || "").trim();
-  if (outcome === "성사") return "success";
-  if (outcome === "실패") return "fail";
-
-  const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
-  const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
-
-  const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
-  const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-
-  if (allVisitFilled && allLeadAdditionalFilled) return "lead";
-  if (allVisitFilled) return "visit";
-  if (outcome === "폐업") return "closedByMe";
-  return "none";
-}
-
-async function openPanel(store) {
-  rvInstance = null;
-  currentRvState = 'collapsed';
-
-  const previousKey = selectedStore ? selectedStore._key : null;
-  selectedStore = store;
-  if (previousKey !== store._key) refreshMarkerSelection(previousKey, store._key);
-
-  const panel = document.getElementById("storePanel");
-  const content = document.getElementById("panelContent");
-  content.innerHTML = '<h2 style="color:#999;">업장 정보 불러오는 중...</h2>';
-  panel.classList.add("open");
-
-  try {
-    const detailSnap = await db.ref("stores/" + store._key).once("value");
-    const detail = detailSnap.val();
-    if (detail) store = Object.assign({}, detail, store);
-  } catch(e) {}
-  selectedStore = store;
-
-  const isContract = isContractGrade(store.grade);
-  const closedFlag = isClosed(store);
-
-  const adminBadge = store.adminType ? '<span class="badge badge-admin">' + escapeHtml(store.adminType) + '</span>' : '';
-  const gradeBadge = isContract ? '<span class="badge badge-contract">★ 기계약</span>' : '<span class="badge badge-grade">' + escapeHtml(store.grade || '미지정') + '</span>';
-  const closedBadge = closedFlag ? '<span class="badge badge-closed">⚠️ 폐업</span>' : '';
-
-  let projectsBadgeHtml = '';
-  if (amIAssignedToProject(store, currentUser.key)) {
-    const projectNames = Object.keys(store.projects);
-    projectsBadgeHtml = '<div class="multi-projects">' + projectNames.map(name => {
-      return '<div class="project-badge"><span class="project-badge-icon">🎯</span><span>' + escapeHtml(name) + '</span></div>';
-    }).join('') + '</div>';
-  }
-
-  let adminInfoHtml = '';
-  if (isAdminUser && adminViewActive && visitsAggregate && visitsAggregate.stores) {
-    const aggData = visitsAggregate.stores[store._key];
-    if (aggData) {
-      const lastDate = aggData.lastUpdatedAt ? formatDate(aggData.lastUpdatedAt) : '-';
-      const statusLabel = getStatusLabel(aggData.lastStatus);
-      adminInfoHtml = '<div class="admin-info-box">' +
-        '<div><span class="admin-info-label">최신 접촉:</span>' + escapeHtml(aggData.lastPartnerName || '-') + ' (' + lastDate + ')</div>' +
-        '<div><span class="admin-info-label">최신 상태:</span>' + statusLabel + '</div>' +
-        '<div><span class="admin-info-label">접촉 파트너 수:</span>' + (aggData.totalContacts || 1) + '명</div>' +
-        '</div>';
+        try {
+            const snap = await db.ref("visits").once("value");
+            const val = snap.val() || {};
+            
+            adminSummaryMap = {};
+            for (const id in val) {
+                const r = val[id];
+                if (!r.storeKey) continue;
+                
+                if (!adminSummaryMap[r.storeKey] || adminSummaryMap[r.storeKey].timestamp < r.timestamp) {
+                    adminSummaryMap[r.storeKey] = {
+                        status: r.status,
+                        partnerName: r.partnerName || "미확인",
+                        timestamp: r.timestamp
+                    };
+                }
+            }
+            setStorageCacheItem(CACHE.ADMIN_AGGREGATE.key, adminSummaryMap);
+            hideLoadingMask();
+            renderAdminView();
+        } catch(e) {
+            console.error("Admin dataset compilation failure:", e);
+            hideLoadingMask();
+        }
     }
-  }
 
-  const otherTs = otherPartnerLastContactMap[store._key];
-  const otherContactHtml = otherTs ? '<div class="contact-info">타파트너 마지막접촉일자: ' + formatDate(otherTs) + '</div>' : '';
+    // ==========================================
+    // 5. CORE RENDER ENGINE & FILTERING PIPELINE
+    // ==========================================
+    async function loadStoresInView() {
+        if (isAdminMode) {
+            renderAdminView();
+            return;
+        }
 
-  let serviceHtml = '';
-  if (!isContract) {
-    const basicClass = store.basic === 'ON' ? 'service-badge on' : 'service-badge';
-    const plusClass = store.plus === 'ON' ? 'service-badge on' : 'service-badge';
-    const basicText = store.basic && store.basic !== '' ? store.basic : '-';
-    const plusText = store.plus && store.plus !== '' ? store.plus : '-';
-    serviceHtml = '<div class="service"><span class="' + basicClass + '">베이직 ' + escapeHtml(basicText) + '</span><span class="' + plusClass + '">플러스 ' + escapeHtml(plusText) + '</span></div>';
-  }
+        const bounds = map.getBounds();
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
 
-  const roadviewHtml = isContract ? '' : '<div class="roadview-section"><div class="roadview-header" onclick="toggleRoadview()"><span id="rvHeaderText">🌆 현장 로드뷰 (클릭하여 보기)</span><span class="roadview-header-toggle" id="rvToggleArrow">▼</span></div><div class="roadview-body" id="rvBody"><div class="rv-loading" id="rvLoading" style="display:none;">로드 중...</div><div id="roadview"></div><div class="rv-empty" id="rvEmpty" style="display:none;">로드뷰 없음</div><a href="https://map.kakao.com/link/roadview/' + store.lat + ',' + store.lng + '" target="_blank" class="rv-external">카카오맵에서 보기 →</a></div></div>';
+        const latPad = (ne.getLat() - sw.getLat()) * 0.1;
+        const lngPad = (ne.getLng() - sw.getLng()) * 0.1;
 
-  const infoRows = [];
-  if (store.bizType) infoRows.push({k:"업종", v:store.bizType});
-  if (store.area) infoRows.push({k:"면적", v:store.area});
-  if (store.phone) infoRows.push({k:"전화번호", v:store.phone});
-  if (store.volume) infoRows.push({k:"예상배출량", v:store.volume});
-  const infoHtml = infoRows.length === 0 ? '' : '<div class="info-table">' + infoRows.map(r => '<div class="info-row"><span class="info-key">' + r.k + '</span><span class="info-value">' + escapeHtml(r.v) + '</span></div>').join('') + '</div>';
+        const minLat = sw.getLat() - latPad;
+        const maxLat = ne.getLat() + latPad;
+        const minLng = sw.getLng() - lngPad;
+        const maxLng = ne.getLng() + lngPad;
 
-  const memoHtml = store.memo ? '<div class="memo">📝 ' + escapeHtml(store.memo) + '</div>' : '';
-  const priceGuideBtnHtml = isContract ? '' : '<button class="priceGuideBtn" onclick="openPriceGuide()">📊 영업기준표 확인</button>';
-  const navBtnHtml = isContract ? '' : '<button class="navBtn" type="button" onclick="openKakaoNav(selectedStore)">🧭 카카오맵 길찾기</button>';
-  const visitFormHtml = isContract ? '' : buildVisitForm();
+        try {
+            const snap = await db.ref("stores_light")
+                .orderByChild("lat")
+                .startAt(minLat)
+                .endAt(maxLat)
+                .once("value");
 
-  content.innerHTML =
-    '<h2>' + escapeHtml(store.name || '(이름 없음)') + '</h2>' +
-    '<div class="addr">' + escapeHtml(store.address || '') + '</div>' +
-    '<div class="badges">' + adminBadge + gradeBadge + closedBadge + '</div>' +
-    projectsBadgeHtml + adminInfoHtml + otherContactHtml + serviceHtml +
-    roadviewHtml + infoHtml + memoHtml + priceGuideBtnHtml + navBtnHtml + visitFormHtml;
+            const records = snap.val() || {};
+            let list = [];
 
-  if (!isContract) { loadMyVisit(store); bindVisitForm(store); }
-}
+            for (const key in records) {
+                const s = records[key];
+                if (s.lng >= minLng && s.lng <= maxLng) {
+                    s._key = key;
+                    list.push(s);
+                }
+            }
 
-function refreshMarkerSelection(previousKey, newKey) {
-  if (isAdminUser) {
-    renderAdminView();
-  } else {
-    renderMarkers();
-  }
-}
+            list = list.filter(s => {
+                if (!isClosedStore(s)) return true;
+                return getVisitStatus(s._key) === "lead";
+            });
 
-function closePanel(clearSelection) {
-  document.getElementById("storePanel").classList.remove("open");
-  rvInstance = null;
-  currentRvState = 'collapsed';
-  if (clearSelection && selectedStore) {
-    selectedStore = null;
-    if (isAdminUser) renderAdminView();
-    else renderMarkers();
-  }
-}
+            let userLoc = await getCurrentGeoLocationCoords().catch(() => null);
+            if (userLoc) {
+                list = list.filter(s => {
+                    if (!isContractGrade(s.grade)) return true;
+                    const d = haversineDistance(userLoc.lat, userLoc.lng, s.lat, s.lng);
+                    return d <= CONTRACT_RADIUS_KM;
+                });
+            }
 
-function toggleRoadview() {
-  const body = document.getElementById("rvBody");
-  const arrow = document.getElementById("rvToggleArrow");
-  const headerText = document.getElementById("rvHeaderText");
-  if (!body) return;
-  if (currentRvState === 'collapsed') {
-    body.classList.add("expanded");
-    arrow.textContent = "▲";
-    headerText.textContent = "🌆 현장 로드뷰";
-    currentRvState = 'expanded';
-    loadRoadviewForCurrentStore();
-  } else {
-    body.classList.remove("expanded");
-    arrow.textContent = "▼";
-    headerText.textContent = "🌆 현장 로드뷰 (클릭하여 보기)";
-    currentRvState = 'collapsed';
-  }
-}
+            list = removeContractDuplicates(list, false);
 
-function loadRoadviewForCurrentStore() {
-  if (!selectedStore) return;
-  const rvLoading = document.getElementById("rvLoading");
-  const rvEmpty = document.getElementById("rvEmpty");
-  const rvContainer = document.getElementById("roadview");
-  rvLoading.style.display = "flex";
-  rvEmpty.style.display = "none";
-  rvContainer.innerHTML = "";
-  const position = new kakao.maps.LatLng(selectedStore.lat, selectedStore.lng);
-  const rvClient = new kakao.maps.RoadviewClient();
-  rvClient.getNearestPanoId(position, 50, function(panoId) {
-    rvLoading.style.display = "none";
-    if (!panoId) { rvEmpty.style.display = "flex"; return; }
-    rvInstance = new kakao.maps.Roadview(rvContainer);
-    rvInstance.setPanoId(panoId, position);
-  });
-}
+            if (currentFilter === "project") {
+                list = list.filter(s => isVisibleForProjectFilter(s, currentUser.key));
+            } else if (currentFilter === "lead") {
+                list = list.filter(s => getVisitStatus(s._key) === "lead");
+            } else if (currentFilter === "visit") {
+                list = list.filter(s => {
+                    const h = myVisitedStoreData[s._key];
+                    if (!h) return false;
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    return h.dateStr === todayStr || h.timestamp >= Date.now() - 14*60*60*1000;
+                });
+            } else if (currentFilter === "contract") {
+                list = list.filter(s => isContractGrade(s.grade));
+            }
 
-function buildKakaoNavUrl(store) {
-  const name = String(store.name || '업장').replace(/[,/]/g, ' ').trim();
-  return 'https://map.kakao.com/link/to/' + name + ',' + store.lat + ',' + store.lng;
-}
+            allStoresInView = list;
+            renderMarkersOnCluster();
 
-function openKakaoNav(store) {
-  const appScheme = 'kakaomap://route?ep=' + store.lat + ',' + store.lng + '&by=car';
-  const webFallback = buildKakaoNavUrl(store);
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (!isMobile) { window.open(webFallback, '_blank'); return; }
-  const startTime = Date.now();
-  const fallbackTimer = setTimeout(function() {
-    if (document.hidden || document.webkitHidden) return;
-    if (Date.now() - startTime < 1400) return;
-    window.location.href = webFallback;
-  }, 1500);
-  document.addEventListener('visibilitychange', function onVis() {
-    if (document.hidden) {
-      clearTimeout(fallbackTimer);
-      document.removeEventListener('visibilitychange', onVis);
+        } catch (e) {
+            console.error("Viewport indexing calculation trace failure:", e);
+        }
     }
-  });
-  window.location.href = appScheme;
-}
 
-async function generateSSOToken(partnerName, partnerCode) {
-  const now = new Date();
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-  const kst = new Date(utc + 9 * 60 * 60 * 1000);
-  const today = kst.getFullYear() + String(kst.getMonth() + 1).padStart(2, '0') + String(kst.getDate()).padStart(2, '0');
-  const raw = partnerName + '|' + partnerCode + '|' + today + '|' + SSO_SECRET;
-  const data = new TextEncoder().encode(raw);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer)).slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+    function renderAdminView() {
+        const bounds = map.getBounds();
+        const sw = bounds.getSouthWest();
+        const ne = bounds.getNorthEast();
 
-async function openPriceGuide() {
-  if (!selectedStore || !currentUser) return;
-  try {
-    const token = await generateSSOToken(currentUser.name, currentUser.code);
-    const params = new URLSearchParams();
-    params.append('sso', '1');
-    params.append('partner_name', currentUser.name);
-    params.append('partner_code', currentUser.code);
-    params.append('token', token);
-    if (selectedStore.sido) params.append('sido', selectedStore.sido);
-    if (selectedStore.sigungu) params.append('sidodong', selectedStore.sigungu);
-    if (selectedStore.gu) params.append('gueup', selectedStore.gu);
-    else params.append('gueup', '없음');
-    if (selectedStore.emd) params.append('dong', selectedStore.emd);
-    params.append('service', '베이직');
-    window.open(PRICE_GUIDE_URL + '?' + params.toString(), '_blank');
-  } catch(err) {
-    alert('영업기준표를 여는 중 오류가 발생했습니다.');
-  }
-}
+        const latPad = (ne.getLat() - sw.getLat()) * 0.1;
+        const lngPad = (ne.getLng() - sw.getLng()) * 0.1;
 
-function buildVisitForm() {
-  return '<div class="visit-form">' +
-    '<h3>방문기록</h3>' +
-    '<label>영업구분</label>' +
-    '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
-    '<div class="visit-dates" id="visitDates"></div>' +
-    '<label><span style="color:#E53935;">*</span> 현재 수거업체명</label>' +
-    '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (없을경우 사유기재)">' +
-    '<label>담당자 연락처</label>' +
-    '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
-    '<label>월 예상배출량 (L)</label><input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500">' +
-    '<label>현재 단가 (원/L)</label><input id="v_price" type="text" inputmode="numeric" placeholder="예: 180">' +
-    '<label>제안 단가 (원/L)</label><input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170">' +
-    '<label>현재 주 수거횟수</label><input id="v_freq" type="text" inputmode="numeric" placeholder="예: 3">' +
-    '<label><span style="color:#E53935;">*</span> 현재 통 갯수</label>' +
-    '<input id="v_bins" type="text" inputmode="numeric" placeholder="예: 4">' +
-    '<label><span style="color:#E53935;">*</span> 비닐 사용여부</label>' +
-    '<select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="지자체">지자체</option><option value="처리기">처리기</option></select>' +
-    '<label><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>' +
-    '<select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select>' +
-    '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
-    '<label>최종영업결과 및 폐업 여부 선택</label>' +
-    '<select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option><option value="폐업">폐업</option></select>' +
-    '<button class="save-btn" id="saveVisitBtn">저장</button></div>';
-}
+        db.ref("stores_light")
+            .orderByChild("lat")
+            .startAt(sw.getLat() - latPad)
+            .endAt(ne.getLat() + latPad)
+            .once("value", function(snap) {
+                const val = snap.val() || {};
+                let filtered = [];
+                
+                const minLng = sw.getLng() - lngPad;
+                const maxLng = ne.getLng() + lngPad;
 
-function loadMyVisit(store) {
-  const rec = myVisitedStoreData[store._key];
-  if (!rec) {
-    const dateEl = document.getElementById("visitDates");
-    if (dateEl) dateEl.textContent = "";
-    return;
-  }
-  const cur = rec.current || {};
-  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
-    setVal('v_' + k, cur[k]);
-  });
-  const first = rec.firstVisitAt ? formatDate(rec.firstVisitAt) : '';
-  const last = rec.lastUpdatedAt ? formatDate(rec.lastUpdatedAt) : '';
-  const dateText = first && last && first !== last ? '최초 방문: ' + first + ' · 마지막 수정: ' + last : (first ? '최초 방문: ' + first : '');
-  const dateEl = document.getElementById("visitDates");
-  if (dateEl) dateEl.textContent = dateText;
-}
+                for (const k in val) {
+                    const s = val[k];
+                    if (s.lng >= minLng && s.lng <= maxLng) {
+                        s._key = k;
+                        
+                        const adm = adminSummaryMap[k];
+                        if (adm) {
+                            s._adminStatus = adm.status;
+                            s._adminOwner = adm.partnerName;
+                        }
+                        filtered.push(s);
+                    }
+                }
 
-function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v || ""; }
+                filtered = removeContractDuplicates(filtered, true);
 
-function bindVisitForm(store) {
-  const btn = document.getElementById("saveVisitBtn");
-  if (!btn) return;
-  btn.onclick = function() { saveVisit(store); };
-
-  const contactInput = document.getElementById("v_contact");
-  if (contactInput) {
-    contactInput.addEventListener("input", function(e) {
-      let v = e.target.value.replace(/[^0-9]/g, "");
-      if (!v) { e.target.value = ""; return; }
-      const mobilePrefix = ["010","011","016","017","018","019"];
-      const prefix3 = v.substring(0, 3);
-      if (mobilePrefix.indexOf(prefix3) !== -1) {
-        if (v.length <= 3) e.target.value = v;
-        else if (v.length <= 7) e.target.value = v.substring(0, 3) + "-" + v.substring(3);
-        else if (prefix3 === "010") e.target.value = v.substring(0, 3) + "-" + v.substring(3, 7) + "-" + v.substring(7, 11);
-        else if (v.length === 11) e.target.value = v.substring(0, 3) + "-" + v.substring(3, 7) + "-" + v.substring(7, 11);
-        else e.target.value = v.substring(0, 3) + "-" + v.substring(3, 6) + "-" + v.substring(6, 10);
-      } else { e.target.value = v; }
-    });
-  }
-}
-
-async function saveVisit(store) {
-  const btn = document.getElementById("saveVisitBtn");
-  btn.disabled = true;
-  btn.textContent = "저장 중...";
-
-  const currentData = {};
-  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome'].forEach(function(k) {
-    currentData[k] = getVal('v_' + k);
-  });
-  const salesTypeVal = getVal('v_salesType');
-  if (salesTypeVal) currentData.salesType = salesTypeVal;
-  currentData.updatedAt = Date.now();
-
-  const recKey = "REC_" + currentUser.key + "_" + store._key;
-  const recRef = db.ref("visits/" + currentUser.key + "/" + recKey);
-
-  try {
-    const existingSnap = await recRef.once("value");
-    const existing = existingSnap.val();
-    const now = Date.now();
-    let payload;
-    if (existing) {
-      const history = existing.history || [];
-      if (existing.current) history.push(Object.assign({}, existing.current, { savedAt: existing.current.updatedAt || now }));
-      payload = {
-        storeKey: store._key, storeName: store.name || '', storeAddress: store.address || '',
-        partnerName: currentUser.name, partnerKey: currentUser.key,
-        firstVisitAt: existing.firstVisitAt || now, lastUpdatedAt: now,
-        current: currentData, history: history
-      };
-    } else {
-      payload = {
-        storeKey: store._key, storeName: store.name || '', storeAddress: store.address || '',
-        partnerName: currentUser.name, partnerKey: currentUser.key,
-        firstVisitAt: now, lastUpdatedAt: now,
-        current: currentData, history: []
-      };
+                allStoresInView = filtered;
+                renderMarkersOnCluster();
+            });
     }
-    await recRef.set(payload);
-    myVisitedStoreData[store._key] = payload;
-    if (isAdminUser) renderAdminView(); else renderMarkers();
-    updateChipCounts();
 
-    btn.textContent = "✓ 저장됨";
-    setTimeout(function() { btn.textContent = "저장"; btn.disabled = false; }, 1500);
-
-    const first = formatDate(payload.firstVisitAt);
-    const last = formatDate(payload.lastUpdatedAt);
-    const dateEl = document.getElementById("visitDates");
-    if (dateEl) dateEl.textContent = first !== last ? '최초 방문: ' + first + ' · 마지막 수정: ' + last : '최초 방문: ' + first;
-  } catch(e) {
-    alert("저장 실패: " + e.message);
-    btn.textContent = "저장";
-    btn.disabled = false;
-  }
-}
-
-function getVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ""; }
-
-async function searchStores(q) {
-  try {
-    const snap = await db.ref("stores_light").orderByChild("name").startAt(q).endAt(q + '\uf8ff').limitToFirst(30).once("value");
-    const raw = snap.val() || {};
-    let list = [];
-    for (const k in raw) {
-      const s = raw[k];
-      if (!s) continue;
-      s._key = k;
-      list.push(s);
+    // ==========================================
+    // 6. DETECT CONTRACT DUPLICATES AND FILTERS
+    // ==========================================
+    function removeContractDuplicates(list, forceAdminMode = false) {
+        const contracts = list.filter(s => isContractGrade(s.grade));
+        const others = list.filter(s => !isContractGrade(s.grade));
+        
+        const filteredOthers = others.filter(function(o) {
+            for (const c of contracts) {
+                const distM = haversineDistance(o.lat, o.lng, c.lat, c.lng) * 1000;
+                if (distM > 8) continue; 
+                
+                if (nameSimilarity(o.name, c.name) >= 0.5) {
+                    if (!forceAdminMode && myVisitedStoreData && myVisitedStoreData[o._key]) {
+                        return true; 
+                    }
+                    return false; 
+                }
+            }
+            return true;
+        });
+        
+        return contracts.concat(filteredOthers);
     }
-    list = list.filter(s => {
-      if (!isClosed(s)) return true;
-      return getVisitStatus(s) === "lead";
-    });
-    list = removeContractDuplicates(list);
 
-    // v51.1: 검색 결과 표시할 만큼만 디테일 노드에서 주소 fetch
-    const MAX_DISPLAY = 15;
-    const displayList = list.slice(0, MAX_DISPLAY);
-    const addressPromises = displayList.map(function(s) {
-      return db.ref("stores/" + s._key).once("value")
-        .then(function(snap) {
-          const d = snap.val();
-          if (d && d.address) s.address = d.address;
-        })
-        .catch(function() {});
-    });
-    await Promise.all(addressPromises);
-
-    renderSearchResults(displayList);
-  } catch(e) {
-    console.error('[검색 실패]', e);
-  }
-}
-
-function renderSearchResults(list) {
-  const resultsEl = document.getElementById("searchResults");
-  if (list.length === 0) {
-    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px; line-height:1.5;">검색 결과가 없습니다.<br><span style="color:#F2AC57; font-weight:600;">＋ 업장추가</span> 버튼으로 추가해주세요.</div>';
-    resultsEl.style.display = "block";
-    return;
-  }
-  resultsEl.innerHTML = list.map(function(s, idx) {
-    const status = getEffectiveStatus(s);
-    const statusColor = getStatusColor(status);
-    const statusLabel = getStatusLabel(status);
-    const projectTag = amIAssignedToProject(s, currentUser.key) ? '<span class="search-project-tag">🎯</span>' : '';
-    // v51.1: 주소 라인 (있을 때만 표시)
-    const addressLine = s.address
-      ? '<div class="search-address">' + escapeHtml(s.address) + '</div>'
-      : '';
-    return '<div class="search-item" data-idx="' + idx + '">' +
-      '<div class="search-name-row">' +
-      '<span class="search-status-dot" style="background:' + statusColor + ';"></span>' +
-      '<span class="search-name">' + escapeHtml(s.name || '(이름 없음)') + '</span>' +
-      projectTag +
-      '<span class="search-status-label" style="background:' + statusColor + ';">' + statusLabel + '</span>' +
-      '</div>' +
-      addressLine +
-      '</div>';
-  }).join('');
-  resultsEl.querySelectorAll(".search-item").forEach(function(el) {
-    el.onclick = function() {
-      const idx = parseInt(el.dataset.idx, 10);
-      const s = list[idx];
-      if (!s) return;
-      resultsEl.style.display = "none";
-      document.getElementById("searchInput").value = "";
-      map.setCenter(new kakao.maps.LatLng(s.lat, s.lng));
-      map.setLevel(3);
-      openPanel(s);
-    };
-  });
-  resultsEl.style.display = "block";
-}
-
-function getStatusLabel(status) {
-  return {
-    visit: "단순방문", lead: "유효리드", success: "계약성사", fail: "최종불발",
-    closedByMe: "폐업", contract: "기계약", none: "미방문"
-  }[status] || "미방문";
-}
-
-function formatDate(ts) {
-  if (!ts) return "";
-  const d = new Date(ts);
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-function escapeHtml(s) {
-  if (s === null || s === undefined) return "";
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
-
-// ============================================================
-// 신규업장추가 모달
-// ============================================================
-
-function openNewStoreModal() {
-  if (!currentUser || !currentUser.code) {
-    showNsToast('로그인 후 이용 가능합니다');
-    return;
-  }
-  resetNewStoreForm();
-  document.getElementById('newStoreModal').classList.add('open');
-}
-
-function closeNewStoreModal() {
-  document.getElementById('newStoreModal').classList.remove('open');
-  resetNewStoreForm();
-}
-
-function resetNewStoreForm() {
-  document.getElementById('nsSearchInput').value = '';
-  document.getElementById('nsSearchResults').classList.remove('open');
-  document.getElementById('nsSearchResults').innerHTML = '';
-  _nsSelectedPlace = null;
-  document.getElementById('nsSelectedPlace').classList.remove('show');
-
-  ['nsStoreName', 'nsAddress', 'nsCurrentStoreName', 'nsContact',
-   'nsAmount', 'nsFreq', 'nsPrice', 'nsSuggestedPrice',
-   'nsBins', 'nsNote'].forEach(function(id) {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-
-  ['nsVinyl', 'nsTruck'].forEach(function(id) {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-
-  _nsSelectedAdminType = '';
-  document.querySelectorAll('button[data-admintype]').forEach(function(b) { b.classList.remove('active'); });
-
-  _nsSelectedSalesType = '';
-  document.querySelectorAll('button[data-salestype]').forEach(function(b) { b.classList.remove('active'); });
-
-  _nsSelectedOutcome = '';
-  document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
-  const defaultOutcomeBtn = document.querySelector('.ns-outcome-buttons button[data-outcome=""]');
-  if (defaultOutcomeBtn) defaultOutcomeBtn.classList.add('active');
-
-  const btn = document.getElementById('nsSubmitBtn');
-  if (btn) {
-    btn.disabled = false;
-    btn.textContent = '등록';
-  }
-}
-
-function onNsSearchInput() {
-  const query = document.getElementById('nsSearchInput').value.trim();
-  if (_placesSearchTimer) clearTimeout(_placesSearchTimer);
-
-  if (!query || query.length < 2) {
-    document.getElementById('nsSearchResults').classList.remove('open');
-    return;
-  }
-
-  _placesSearchTimer = setTimeout(function() {
-    runKakaoPlacesSearch(query);
-  }, 300);
-}
-
-function runKakaoPlacesSearch(query) {
-  if (typeof kakao === 'undefined' || !kakao.maps || !kakao.maps.services) {
-    console.error('Kakao services library not loaded');
-    return;
-  }
-
-  const ps = new kakao.maps.services.Places();
-  const options = {};
-  if (typeof map !== 'undefined' && map) {
-    const center = map.getCenter();
-    options.location = center;
-    options.radius = 20000;
-  }
-
-  ps.keywordSearch(query, function(data, status) {
-    const resultsEl = document.getElementById('nsSearchResults');
-    if (status === kakao.maps.services.Status.OK && data && data.length > 0) {
-      const items = data.slice(0, 10);
-      resultsEl.innerHTML = items.map(function(p, idx) {
-        const addr = p.road_address_name || p.address_name || '';
-        return '<div class="ns-search-result-item" onclick="selectKakaoPlace(' + idx + ')">' +
-               '<div class="ns-place-name">' + escapeHtml(p.place_name) + '</div>' +
-               '<div class="ns-place-address">' + escapeHtml(addr) + '</div></div>';
-      }).join('');
-      _placesSearchCache = items;
-      resultsEl.classList.add('open');
-    } else {
-      resultsEl.innerHTML = '<div class="ns-search-results-empty">검색 결과 없음 — 아래에 직접 입력해주세요</div>';
-      _placesSearchCache = null;
-      resultsEl.classList.add('open');
+    function nameSimilarity(a, b) {
+        if (!a || !b) return 0;
+        
+        const strA = String(a).replace(/[_ \s]+/g, "");
+        const strB = String(b).replace(/[_ \s]+/g, "");
+        
+        if (strA.length === 0 || strB.length === 0) return 0;
+        
+        const shorter = strA.length > strB.length ? strB : strA;
+        const longer  = strA.length > strB.length ? strA : strB;
+        
+        let matches = 0;
+        for (let i = 0; i < shorter.length; i++) {
+            if (longer.indexOf(shorter[i]) !== -1) {
+                matches++;
+            }
+        }
+        
+        return matches / shorter.length;
     }
-  }, options);
-}
 
-function selectKakaoPlace(idx) {
-  if (!_placesSearchCache || !_placesSearchCache[idx]) return;
-  const p = _placesSearchCache[idx];
-  const addr = p.road_address_name || p.address_name || '';
+    // ==========================================
+    // 7. MAP MARKERS LAYER MANAGING ENGINE
+    // ==========================================
+    function renderMarkersOnCluster() {
+        clusterer.clear();
+        clearAllMarkers();
 
-  _nsSelectedPlace = {
-    name: p.place_name,
-    address: addr,
-    lat: parseFloat(p.y),
-    lng: parseFloat(p.x)
-  };
+        activeMarkers = allStoresInView.map(store => {
+            const pos = new kakao.maps.LatLng(store.lat, store.lng);
+            
+            let status = "normal";
+            if (isAdminMode) {
+                status = store._adminStatus || "normal";
+            } else {
+                status = getVisitStatus(store._key);
+            }
 
-  document.getElementById('nsSelectedName').textContent = p.place_name;
-  document.getElementById('nsSelectedAddr').textContent = addr;
-  document.getElementById('nsSelectedPlace').classList.add('show');
+            if (isContractGrade(store.grade)) {
+                status = "contract";
+            }
 
-  document.getElementById('nsStoreName').value = p.place_name;
-  document.getElementById('nsAddress').value = addr;
+            const color = getStatusColorCode(status);
+            
+            const marker = new kakao.maps.Marker({
+                position: pos,
+                clickable: true
+            });
 
-  document.getElementById('nsSearchInput').value = '';
-  document.getElementById('nsSearchResults').classList.remove('open');
-}
+            kakao.maps.event.addListener(marker, 'click', () => {
+                presentStoreDetailSheet(store);
+            });
 
-function clearSelectedPlace() {
-  _nsSelectedPlace = null;
-  document.getElementById('nsSelectedPlace').classList.remove('show');
-}
+            const labelContent = `<div class="custom-pin-label" style="border-top: 3px solid ${color};">${escapeHtml(store.name)}</div>`;
+            const customOverlay = new kakao.maps.CustomOverlay({
+                position: pos,
+                content: labelContent,
+                yAnchor: 0
+            });
 
-function selectAdminType(btn) {
-  document.querySelectorAll('button[data-admintype]').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-  _nsSelectedAdminType = btn.dataset.admintype;
-}
+            customOverlay.setMap(map);
+            marker._overlay = customOverlay; 
 
-function selectSalesType(btn) {
-  document.querySelectorAll('button[data-salestype]').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-  _nsSelectedSalesType = btn.dataset.salestype;
-}
+            return marker;
+        });
 
-function selectOutcome(btn) {
-  document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-  _nsSelectedOutcome = btn.dataset.outcome;
-}
-
-async function submitNewStore() {
-  const storeName = document.getElementById('nsStoreName').value.trim();
-  const address = document.getElementById('nsAddress').value.trim();
-
-  if (!storeName) {
-    showNsToast('사업장명을 입력해주세요');
-    document.getElementById('nsStoreName').focus();
-    return;
-  }
-  if (!address) {
-    showNsToast('주소를 입력해주세요');
-    document.getElementById('nsAddress').focus();
-    return;
-  }
-  if (!currentUser || !currentUser.code) {
-    showNsToast('로그인 정보가 없습니다');
-    return;
-  }
-
-  const usedSearch = !!_nsSelectedPlace;
-  const lat = _nsSelectedPlace ? _nsSelectedPlace.lat : '';
-  const lng = _nsSelectedPlace ? _nsSelectedPlace.lng : '';
-
-  const payload = {
-    partnerName: currentUser.name || '',
-    partnerCode: currentUser.code,
-    storeName: storeName,
-    address: address,
-    lat: lat,
-    lng: lng,
-    usedSearch: usedSearch,
-    adminType: _nsSelectedAdminType,
-    salesType: _nsSelectedSalesType,
-    currentStoreName: document.getElementById('nsCurrentStoreName').value.trim(),
-    contact: document.getElementById('nsContact').value.trim(),
-    amount: document.getElementById('nsAmount').value.trim(),
-    price: document.getElementById('nsPrice').value.trim(),
-    suggestedPrice: document.getElementById('nsSuggestedPrice').value.trim(),
-    freq: document.getElementById('nsFreq').value.trim(),
-    bins: document.getElementById('nsBins').value.trim(),
-    vinyl: document.getElementById('nsVinyl').value,
-    truck: document.getElementById('nsTruck').value,
-    note: document.getElementById('nsNote').value.trim(),
-    outcome: _nsSelectedOutcome
-  };
-
-  const btn = document.getElementById('nsSubmitBtn');
-  btn.disabled = true;
-  btn.textContent = '등록 중...';
-
-  try {
-    const response = await fetch(NEW_STORE_ENDPOINT, {
-      method: 'POST',
-      mode: 'cors',
-      cache: 'no-cache',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload),
-      redirect: 'follow'
-    });
-
-    const result = await response.json();
-
-    if (result.ok) {
-      closeNewStoreModal();
-      showNsToast('신규 등록 업장은 검토 후 지도에 반영됩니다.', 4000);
-    } else {
-      console.error('Submit failed:', result);
-      showNsToast('등록 실패: ' + (result.error || '알 수 없는 오류'));
-      btn.disabled = false;
-      btn.textContent = '등록';
+        clusterer.addMarkers(activeMarkers);
     }
-  } catch(err) {
-    console.error('Submit error:', err);
-    showNsToast('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
-    btn.disabled = false;
-    btn.textContent = '등록';
-  }
-}
 
-function showNsToast(message, duration) {
-  duration = duration || 2500;
-  let toast = document.getElementById('nsToast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'nsToast';
-    toast.className = 'ns-toast';
-    document.body.appendChild(toast);
-  }
-  toast.textContent = message;
-  toast.classList.add('show');
-  setTimeout(function() { toast.classList.remove('show'); }, duration);
-}
+    function clearAllMarkers() {
+        activeMarkers.forEach(m => {
+            if (m._overlay) m._overlay.setMap(null);
+            m.setMap(null);
+        });
+        activeMarkers = [];
+    }
+
+    // ==========================================
+    // 8. INTERACTIVE DETAIL SHEET DRAWER INFRA
+    // ==========================================
+    async function presentStoreDetailSheet(store) {
+        selectedStoreData = store;
+        showLoadingMask("상세 거래처 원장 기록<br>실시간 로드 중...");
+
+        document.getElementById('sheet-store-name').innerText = store.name;
+        document.getElementById('sheet-store-grade').innerText = store.grade || "등급 정보 없음";
+        document.getElementById('sheet-store-vol').innerText = store.basic ? `${store.basic} (배출량: ${store.plus || 0}kg)` : "정보 없음";
+        document.getElementById('sheet-store-type').innerText = store.type || "미분류 업종";
+        document.getElementById('sheet-store-memo').innerText = store.memo || "등록된 특이사항 요약정보가 없습니다.";
+
+        const leadBtn = document.getElementById('action-set-lead-btn');
+        const currentStatus = getVisitStatus(store._key);
+        
+        if (currentStatus === "lead") {
+            leadBtn.innerText = "리드 해제하기";
+            leadBtn.style.background = varColorString('--danger');
+        } else {
+            leadBtn.innerText = "리드 지정";
+            leadBtn.style.background = varColorString('--primary');
+        }
+
+        const isActionDisabled = isContractGrade(store.grade) || (!isAdminMode && isClosedStore(store) && currentStatus !== "lead");
+        document.getElementById('action-add-visit-btn').disabled = isActionDisabled;
+        leadBtn.disabled = isActionDisabled;
+
+        const container = document.getElementById('sheet-history-container');
+        container.innerHTML = `<div class="no-visit-msg">이력을 불러오는 중입니다...</div>`;
+
+        try {
+            const res = await fetch(`https://upbox-salesmap-default-rtdb.firebaseio.com/stores/${store._key}.json`);
+            const remoteStore = await res.json();
+            
+            if(remoteStore) {
+                document.getElementById('sheet-store-address').innerText = remoteStore.address || store.address || "주소 미기재";
+                if(remoteStore.memo) document.getElementById('sheet-store-memo').innerText = remoteStore.memo;
+            } else {
+                document.getElementById('sheet-store-address').innerText = store.address || "주소 미기재";
+            }
+
+            const snap = await db.ref("visits").orderByChild("storeKey").equalTo(store._key).once("value");
+            const records = snap.val() || {};
+            
+            let html = "";
+            let sortedArr = Object.values(records).sort((a,b) => b.timestamp - a.timestamp);
+
+            if (sortedArr.length > 0) {
+                sortedArr.forEach(r => {
+                    const badgeColor = getStatusColorCode(r.status);
+                    const statusText = getStatusLabelText(r.status);
+                    html += `
+                        <div class="visit-card">
+                            <div class="visit-card-meta">
+                                <span style="color:${badgeColor}; font-weight:700;">[${statusText}] ${escapeHtml(r.partnerName)}</span>
+                                <span>${escapeHtml(r.dateStr)}</span>
+                            </div>
+                            <div class="visit-card-comment">${escapeHtml(r.comment || "내용 미기입")}</div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = `<div class="no-visit-msg">등록된 과거 상담 및 방문 접촉 이력이 없습니다.</div>`;
+            }
+        } catch(e) {
+            console.error("Failed fetching extended log history items:", e);
+            container.innerHTML = `<div class="no-visit-msg" style="color:var(--danger);">이력 데이터를 가져오지 못했습니다.</div>`;
+        } finally {
+            hideLoadingMask();
+            document.getElementById('detail-sheet').classList.add('open');
+        }
+    }
+
+    function closeStoreDetailSheet() {
+        document.getElementById('detail-sheet').classList.remove('open');
+        selectedStoreData = null;
+    }
+
+    // ==========================================
+    // 9. TRANSACTION LOG INPUT MODAL SUBMISSIONS
+    // ==========================================
+    function openVisitFormLogModal(isDirectLeadToggle = false) {
+        if (!selectedStoreData) return;
+
+        // Reset visual validation warning states
+        const commentArea = document.getElementById('form-visit-comment');
+        commentArea.style.borderColor = "#CBD5E1";
+
+        if (isDirectLeadToggle) {
+            const currentStatus = getVisitStatus(selectedStoreData._key);
+            if (currentStatus === "lead") {
+                document.getElementById('form-visit-status').value = "normal";
+                commentArea.value = "시스템 리드 수동 해제 조치 처리.";
+                submitVisitFormLogData();
+            } else {
+                document.getElementById('form-visit-status').value = "lead";
+                commentArea.value = "시스템 리드 관심고객 상향 지정 조치.";
+                document.getElementById('visit-form-modal').style.display = 'flex';
+            }
+        } else {
+            document.getElementById('form-visit-status').value = "visit";
+            commentArea.value = "";
+            document.getElementById('visit-form-modal').style.display = 'flex';
+        }
+    }
+
+    function closeVisitFormLogModal() {
+        document.getElementById('visit-form-modal').style.display = 'none';
+    }
+
+    async function submitVisitFormLogData() {
+        if (!selectedStoreData || !currentUser) return;
+
+        const status = document.getElementById('form-visit-status').value;
+        const commentArea = document.getElementById('form-visit-comment');
+        const comment = commentArea.value.trim();
+        
+        // Silent block with visual feedback instead of throwing annoying native alert windows
+        if (!comment) {
+            commentArea.style.borderColor = "var(--danger)";
+            commentArea.focus();
+            return;
+        }
+
+        showLoadingMask("새로운 방문 영업 기록<br>실시간 마스터 인덱스 트랜잭션 제출 중...");
+        closeVisitFormLogModal();
+
+        const timestamp = Date.now();
+        const dateStr = new Date().toISOString().split('T')[0];
+
+        const payload = {
+            storeKey: selectedStoreData._key,
+            storeName: selectedStoreData.name,
+            partnerKey: currentUser.key,
+            partnerName: currentUser.name,
+            partnerCode: currentUser.code,
+            status: status,
+            comment: comment,
+            timestamp: timestamp,
+            dateStr: dateStr
+        };
+
+        try {
+            await db.ref("visits").push(payload);
+            
+            myVisitedStoreData[selectedStoreData._key] = {
+                status: status,
+                comment: comment,
+                timestamp: timestamp,
+                dateStr: dateStr
+            };
+            
+            const cacheKey = CACHE.MY_VISITS.key + "_" + currentUser.key;
+            setStorageCacheItem(cacheKey, myVisitedStoreData);
+
+            localStorage.removeItem(CACHE.ADMIN_AGGREGATE.key);
+
+            closeStoreDetailSheet();
+            loadStoresInView();
+        } catch(e) {
+            console.error("Failed submitting operational telemetry chunk package:", e);
+        } finally {
+            hideLoadingMask();
+        }
+    }
+
+    // ==========================================
+    // 10. CLIENT SIDE PREFIX TEXT SEARCH MOTOR
+    // ==========================================
+    async function handleSearchInputQuery(e) {
+        const query = e.target.value.trim();
+        const panel = document.getElementById('search-results-panel');
+        const clearBtn = document.getElementById('search-clear-btn');
+
+        if (query.length < 2) {
+            panel.innerHTML = "";
+            panel.style.display = 'none';
+            clearBtn.style.display = 'none';
+            return;
+        }
+
+        clearBtn.style.display = 'block';
+
+        try {
+            const snap = await db.ref("stores_light")
+                .orderByChild("name")
+                .startAt(query)
+                .endAt(query + '\uf8ff')
+                .limitToFirst(30)
+                .once("value");
+
+            const records = snap.val() || {};
+            let matchItems = [];
+
+            for (const k in records) {
+                const s = records[k];
+                s._key = k;
+                matchItems.push(s);
+            }
+
+            if (matchItems.length === 0) {
+                panel.innerHTML = `<div class="search-item"><span class="search-item-name" style="font-weight:400; color:var(--text-sub);">검색 매칭 결과가 없습니다.</span></div>`;
+                panel.style.display = 'flex';
+                return;
+            }
+
+            let html = "";
+            matchItems.forEach(item => {
+                let badge = "";
+                if(isContractGrade(item.grade)) badge = `<span style="color:var(--contract); font-size:11px; margin-left:6px;">[기계약]</span>`;
+                else if(isClosedStore(item)) badge = `<span style="color:var(--danger); font-size:11px; margin-left:6px;">[폐업부재]</span>`;
+                
+                html += `
+                    <div class="search-item" data-key="${item._key}" data-lat="${item.lat}" data-lng="${item.lng}">
+                        <span class="search-item-name">${escapeHtml(item.name)}${badge}</span>
+                        <span class="search-item-addr">${escapeHtml(item.grade || "일반 등급")}</span>
+                    </div>
+                `;
+            });
+
+            panel.innerHTML = html;
+            panel.style.display = 'flex';
+
+            panel.querySelectorAll('.search-item').forEach(el => {
+                el.addEventListener('click', function() {
+                    const lat = parseFloat(this.getAttribute('data-lat'));
+                    const lng = parseFloat(this.getAttribute('data-lng'));
+                    const key = this.getAttribute('data-key');
+                    
+                    panel.style.display = 'none';
+                    if(isNaN(lat) || isNaN(lng)) return;
+
+                    const targetPos = new kakao.maps.LatLng(lat, lng);
+                    map.setCenter(targetPos);
+                    map.setLevel(3);
+
+                    const foundStore = allStoresInView.find(s => s._key === key) || matchItems.find(s => s._key === key);
+                    if(foundStore) presentStoreDetailSheet(foundStore);
+                });
+            });
+
+        } catch(e) {
+            console.error("Lexical query execution error stack context trace:", e);
+        }
+    }
+
+    // ==========================================
+    // 11. HELPER FUNCTIONS & AUXILIARY MODULES
+    // ==========================================
+    function isContractGrade(grade) {
+        if (!grade) return false;
+        return grade.indexOf("기계약") !== -1 || grade.indexOf("계약완료") !== -1;
+    }
+
+    function isClosedStore(store) {
+        if (!store) return false;
+        if (store.closed === true || store.closed === "true") return true;
+        if (store.memo && (store.memo.indexOf("폐업") !== -1 || store.memo.indexOf("철거") !== -1)) return true;
+        return false;
+    }
+
+    function getVisitStatus(storeKey) {
+        const h = myVisitedStoreData[storeKey];
+        return h ? h.status : "normal";
+    }
+
+    function isVisibleForProjectFilter(store, partnerKey) {
+        if(!myProjectStores || myProjectStores.length === 0) return false;
+        return myProjectStores.some(p => p.key === store._key);
+    }
+
+    function getStatusColorCode(status) {
+        switch(status) {
+            case 'lead': return '#10B981'; 
+            case 'visit': return '#3B82F6'; 
+            case 'success': return '#8B5CF6'; 
+            case 'fail': return '#9CA3AF'; 
+            case 'closed_request': return '#EF4444'; 
+            case 'contract': return '#F2AC57'; 
+            default: return '#1E3A8A'; 
+        }
+    }
+
+    function getStatusLabelText(status) {
+        switch(status) {
+            case 'lead': return '리드확보';
+            case 'visit': return '단순방문';
+            case 'success': return '계약성사';
+            case 'fail': return '영업실패';
+            case 'closed_request': return '폐업요청';
+            case 'contract': return '기계약';
+            default: return '미방문';
+        }
+    }
+
+    function moveToCurrentDevicePosition() {
+        getCurrentGeoLocationCoords().then(pos => {
+            const latLng = new kakao.maps.LatLng(pos.lat, pos.lng);
+            map.setCenter(latLng);
+            map.setLevel(5);
+        }).catch(() => {
+            console.log("Fallback center mapping resolution system applied safely.");
+        });
+    }
+
+    function moveToMyProjectStores() {
+        if (!myProjectStores || myProjectStores.length === 0) return;
+        
+        let sumLat = 0, sumLng = 0, count = 0;
+        myProjectStores.forEach(s => {
+            if(!isNaN(s.lat) && !isNaN(s.lng)) {
+                sumLat += s.lat; sumLng += s.lng; count++;
+            }
+        });
+
+        if (count > 0) {
+            map.setCenter(new kakao.maps.LatLng(sumLat / count, sumLng / count));
+            setTimeout(() => { if (map.getLevel() > 9) map.setLevel(9); }, 100);
+        }
+    }
+
+    function getCurrentGeoLocationCoords() {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) return reject();
+            navigator.geolocation.getCurrentPosition(
+                p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+                () => reject(),
+                { enableHighAccuracy: true, timeout: 7000 }
+            );
+        });
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; 
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    function getStorageCacheItem(key, ttlMs) {
+        const itemStr = localStorage.getItem(key);
+        if (!itemStr) return null;
+        try {
+            const item = JSON.parse(itemStr);
+            if (Date.now() > item.expiry) {
+                localStorage.removeItem(key);
+                return null;
+            }
+            return item.value;
+        } catch(e) {
+            return null;
+        }
+    }
+
+    function setStorageCacheItem(key, value) {
+        const entry = { value: value, expiry: Date.now() + 30 * 24 * 60 * 60 * 1000 }; 
+        try { localStorage.setItem(key, JSON.stringify(entry)); } catch(e) {}
+    }
+
+    function forcePurgeStorageSyncReload() {
+        localStorage.clear();
+        location.reload();
+    }
+
+    function logoutUserSessionSystem() {
+        localStorage.removeItem("upboxPartner");
+        forcePurgeStorageSyncReload();
+    }
+
+    function toggleSidebarMenuDrawer() {
+        const dim = document.getElementById('sidebar-dim-layer');
+        const side = document.getElementById('sidebar-drawer-menu');
+        if(dim.style.display === 'block') {
+            side.classList.remove('open');
+            setTimeout(() => dim.style.display = 'none', 200);
+        } else {
+            dim.style.display = 'block';
+            setTimeout(() => side.classList.add('open'), 10);
+        }
+    }
+
+    function showLoadingMask(text) {
+        if(text) document.getElementById('loading-text').innerHTML = text;
+        document.getElementById('loading-overlay').style.opacity = '1';
+        document.getElementById('loading-overlay').style.pointerEvents = 'auto';
+    }
+
+    function hideLoadingMask() {
+        document.getElementById('loading-overlay').style.opacity = '0';
+        document.getElementById('loading-overlay').style.pointerEvents = 'none';
+    }
+
+    function debounce(func, delay) {
+        let timer;
+        return function(...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+
+    function escapeHtml(str) {
+        if(!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function varColorString(varName) {
+        return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    }
 </script>
 </body>
 </html>
