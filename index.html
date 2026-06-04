@@ -552,7 +552,7 @@
   </div>
 
   <div id="searchBar">
-    <input type="text" id="searchInput" placeholder="업장명/지번/도로명주소 일부를 검색해주세요">
+    <input type="text" id="searchInput" placeholder="업장명 일부 혹은 동 단위 주소를 검색해주세요">
     <div id="searchResults"></div>
   </div>
 
@@ -795,7 +795,7 @@ const CACHE = {
   OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },
   MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
   ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v2',  ttlMs: 12 * 60 * 60 * 1000 },
-  SEARCH_INDEX:    { key: 'cache_search_index_v1',     ttlMs: 6 * 60 * 60 * 1000 }
+  SEARCH_INDEX:    { key: 'cache_search_index_v2',     ttlMs: 6 * 60 * 60 * 1000 }
 };
 
 function getCache(c) {
@@ -814,7 +814,7 @@ function setCache(c, data) {
     localStorage.setItem(c.key, JSON.stringify({ t: Date.now(), d: data }));
   } catch(e) {
     try {
-      const keys = ['cache_other_visits_v2', 'cache_my_projects_v3', 'cache_admin_aggregate_v2', 'cache_my_projects_v2', 'cache_admin_aggregate_v1', 'cache_other_visits', 'cache_my_projects', 'cache_search_index_v1'];
+      const keys = ['cache_other_visits_v2', 'cache_my_projects_v3', 'cache_admin_aggregate_v2', 'cache_my_projects_v2', 'cache_admin_aggregate_v1', 'cache_other_visits', 'cache_my_projects', 'cache_search_index_v1', 'cache_search_index_v2'];
       for (const k of keys) {
         if (k !== c.key && localStorage.getItem(k)) { localStorage.removeItem(k); break; }
       }
@@ -824,11 +824,11 @@ function setCache(c, data) {
 }
 
 function clearAllCaches() {
-  ['cache_other_visits_v2','cache_my_projects_v3','cache_my_projects_v2','cache_admin_aggregate_v2','cache_admin_aggregate_v1','cache_other_visits','cache_my_projects','cache_search_index_v1'].forEach(k => localStorage.removeItem(k));
+  ['cache_other_visits_v2','cache_my_projects_v3','cache_my_projects_v2','cache_admin_aggregate_v2','cache_admin_aggregate_v1','cache_other_visits','cache_my_projects','cache_search_index_v1','cache_search_index_v2'].forEach(k => localStorage.removeItem(k));
 }
 
 (function migrateOldCaches() {
-  ['cache_other_visits','cache_my_projects','cache_my_projects_v2','cache_admin_aggregate_v1'].forEach(k => {
+  ['cache_other_visits','cache_my_projects','cache_my_projects_v2','cache_admin_aggregate_v1','cache_search_index_v1'].forEach(k => {
     if (localStorage.getItem(k)) localStorage.removeItem(k);
   });
 })();
@@ -2742,6 +2742,14 @@ async function searchStores(q) {
   const queryVariants = expandQueryWithAliases(q);
   const candidates = [];
 
+  // v51.5: 본인의 프로젝트영업 업장 빠른 lookup용 Set
+  // search_index에는 projects 정보가 없어서 amIAssignedToProject() 가 못 씀.
+  // myProjectStores (이미 partner_projects 인덱스에서 로드된 데이터) 의 key 로 판정.
+  const myProjectStoresKeySet = new Set();
+  if (Array.isArray(myProjectStores)) {
+    myProjectStores.forEach(function(p) { if (p && p.key) myProjectStoresKeySet.add(p.key); });
+  }
+
   // 전체 인덱스 순회: 매치 등급 계산해서 후보 수집
   for (const fbKey in indexData) {
     const s = indexData[fbKey];
@@ -2762,6 +2770,10 @@ async function searchStores(q) {
       address: s.a,
       lat: s.lat,
       lng: s.lng,
+      // v51.5: search_index의 c 플래그를 grade로 풀어서 채워줌
+      // → 검색 결과 status 계산 시 getVisitStatus 의 isContractGrade() 검사가 정상 작동
+      grade: s.c === true ? '기계약' : '',
+      _isMyProject: myProjectStoresKeySet.has(fbKey),
       _matchGrade: grade,
       _distKm: dist
     });
@@ -2788,7 +2800,7 @@ function renderSearchResults(list) {
     const status = getEffectiveStatus(s);
     const statusColor = getStatusColor(status);
     const statusLabel = getStatusLabel(status);
-    const projectTag = amIAssignedToProject(s, currentUser.key) ? '<span class="search-project-tag">🎯</span>' : '';
+    const projectTag = s._isMyProject ? '<span class="search-project-tag">🎯</span>' : '';
     const addressLine = s.address
       ? '<div class="search-address">' + escapeHtml(s.address) + '</div>'
       : '';
