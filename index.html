@@ -2566,15 +2566,20 @@ async function saveVisit(store) {
     if (isAdminUser) renderAdminView(); else renderMarkers();
     updateChipCounts();
 
-    btn.textContent = "✓ 저장됨";
-    setTimeout(function() { btn.textContent = "저장"; btn.disabled = false; }, 1500);
+    // v51.6: 저장 성공 시 토스트로 새 상태 표시 (패널은 유지)
+    const newStatus = getVisitStatus(store);
+    const statusLabel = getStatusLabel(newStatus);
+    showNsToast('✓ 저장됨 — ' + statusLabel, 2500);
+
+    btn.textContent = "저장";
+    btn.disabled = false;
 
     const first = formatDate(payload.firstVisitAt);
     const last = formatDate(payload.lastUpdatedAt);
     const dateEl = document.getElementById("visitDates");
     if (dateEl) dateEl.textContent = first !== last ? '최초 방문: ' + first + ' · 마지막 수정: ' + last : '최초 방문: ' + first;
   } catch(e) {
-    alert("저장 실패: " + e.message);
+    showNsToast('⚠️ 저장 실패: ' + e.message, 4000);
     btn.textContent = "저장";
     btn.disabled = false;
   }
