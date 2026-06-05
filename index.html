@@ -2505,6 +2505,23 @@ function bindVisitForm(store) {
   if (!btn) return;
   btn.onclick = function() { saveVisit(store); };
 
+  // v51.6: 폼 입력이 수정되면 "✓ 저장됨" → "저장"으로 자동 복귀
+  const formFieldIds = [
+    'v_salesType','v_currentStoreName','v_contact','v_amount','v_price',
+    'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome'
+  ];
+  const resetSaveBtn = function() {
+    if (btn.textContent === '✓ 저장됨') {
+      btn.textContent = '저장';
+    }
+  };
+  formFieldIds.forEach(function(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', resetSaveBtn);
+    el.addEventListener('change', resetSaveBtn);
+  });
+
   const contactInput = document.getElementById("v_contact");
   if (contactInput) {
     contactInput.addEventListener("input", function(e) {
@@ -2571,7 +2588,7 @@ async function saveVisit(store) {
     const statusLabel = getStatusLabel(newStatus);
     showNsToast('✓ 저장됨 — ' + statusLabel, 2500);
 
-    btn.textContent = "저장";
+    btn.textContent = "✓ 저장됨";
     btn.disabled = false;
 
     const first = formatDate(payload.firstVisitAt);
