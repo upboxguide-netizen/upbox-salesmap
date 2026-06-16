@@ -791,12 +791,14 @@ function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
 }
 
-const CACHE = {
-  OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },
-  MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
-  ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v2',  ttlMs: 12 * 60 * 60 * 1000 },
-  SEARCH_INDEX:    { key: 'cache_search_index_v2',     ttlMs: 6 * 60 * 60 * 1000 }
-};
+// ── 외주(기계약 열람 전용) 파트너 ──
+const EXTERNAL_PARTNER_CODES = ['023567765'];
+const EXTERNAL_INIT_LEVEL = 11;     // 로그인 직후 전국 뷰
+const EXTERNAL_MAX_PINS = 1200;     // 한 화면에 그릴 기계약 핀 상한
+
+function isExternal(code) {
+  return code && EXTERNAL_PARTNER_CODES.indexOf(String(code).trim()) !== -1;
+}
 
 function getCache(c) {
   try {
@@ -933,6 +935,8 @@ let myProjectStores = [];
 
 let isAdminUser = false;
 let adminViewActive = false;
+let isExternalUser = false;
+let externalContracts = [];   // search_index에서 추출한 기계약 목록 (메모리 캐시)
 let visitsAggregate = null;
 let adminMasterStores = [];
 let selectedAdminPartner = 'all';
@@ -1084,6 +1088,28 @@ async function checkMyProjectAssignmentLegacy() {
 async function startApp() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("userInfo").textContent = currentUser.name;
+
+  // ── 외주(기계약 열람 전용) 모드: 관리자/일반 로직을 타지 않고 여기서 종료 ──
+  if (isExternal(currentUser.code)) {
+    isExternalUser = true;
+    document.getElementById('filterBar').style.display = 'none';
+    document.getElementById('addBtn').style.display = 'none';
+    const badge = document.getElementById('adminBadge');
+    if (badge) { badge.textContent = '기계약 열람'; badge.style.display = 'inline-block'; }
+    console.log('[외주 모드] 활성화 - ' + currentUser.name);
+
+    initMap();
+
+    try {
+      await loadExternalContracts();
+      renderExternalView();
+    } catch (e) {
+      console.error('[외주 모드] 기계약 로드 실패', e);
+      const sb = document.getElementById('statusBar');
+      if (sb) sb.textContent = '기계약 업장 로드 실패';
+    }
+    return;
+  }
 
   isAdminUser = isAdmin(currentUser.code);
   if (isAdminUser) {
@@ -1299,6 +1325,58 @@ async function renderAdminView() {
   renderMarkers();
 
   console.log('[관리자뷰] partner=' + selectedAdminPartner + ', filter=' + currentFilter + ', 총 ' + filtered.length + '개');
+}
+
+/* ════════════════════════════════════════════════════════════
+ *  외주(기계약 열람 전용) 뷰
+ *  - search_index에서 기계약(c:true)만 추출해 메모리 보관
+ *  - 현재 지도 영역 안의 기계약만 클러스터링하여 표시 (현재위치 무관)
+ * ════════════════════════════════════════════════════════════ */
+async function loadExternalContracts() {
+  const indexData = await loadSearchIndex();
+  externalContracts = [];
+  for (const fbKey in indexData) {
+    const s = indexData[fbKey];
+    if (!s || s.c !== true) continue;
+    if (isNaN(s.lat) || isNaN(s.lng)) continue;
+    externalContracts.push({
+      _key: fbKey, name: s.n, address: s.a,
+      lat: s.lat, lng: s.lng, grade: '기계약'
+    });
+  }
+  console.log('[외주 모드] 기계약 ' + externalContracts.length + '개 로드');
+}
+
+function renderExternalView() {
+  if (!isExternalUser || !map) return;
+
+  const bounds = map.getBounds();
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const latMin = sw.getLat(), latMax = ne.getLat();
+  const lngMin = sw.getLng(), lngMax = ne.getLng();
+
+  let inView = externalContracts.filter(function(s) {
+    return s.lat >= latMin && s.lat <= latMax && s.lng >= lngMin && s.lng <= lngMax;
+  });
+
+  // 상한 초과 시 지도 중심에서 가까운 순으로 컷
+  if (inView.length > EXTERNAL_MAX_PINS) {
+    const c = map.getCenter();
+    const cLat = c.getLat(), cLng = c.getLng();
+    inView.forEach(function(s) { s._d = haversine(cLat, cLng, s.lat, s.lng); });
+    inView.sort(function(a, b) { return a._d - b._d; });
+    inView = inView.slice(0, EXTERNAL_MAX_PINS);
+  }
+
+  // 열려있는 패널의 업장이 화면 밖이면 강제 포함
+  if (selectedStore) {
+    const exists = inView.some(function(s) { return s._key === selectedStore._key; });
+    if (!exists) inView.push(selectedStore);
+  }
+
+  allStoresInView = inView;
+  renderMarkers();
 }
 
 async function fetchContractsInCurrentBounds() {
@@ -1544,7 +1622,11 @@ function updateChipCounts() {
 function initMap() {
   const container = document.getElementById("map");
   let initialCenter, initialLevel;
-  if (isAdminUser) {
+  if (isExternalUser) {
+    initialCenter = new kakao.maps.LatLng(36.5, 127.8);
+    initialLevel = EXTERNAL_INIT_LEVEL;
+    console.log('[지도 초기화] 외주 - 전국 뷰');
+  } else if (isAdminUser) {
     initialCenter = new kakao.maps.LatLng(36.5, 127.8);
     initialLevel = ADMIN_INIT_LEVEL;
     console.log('[지도 초기화] 관리자 - 전국 뷰');
@@ -1558,14 +1640,20 @@ function initMap() {
   const options = { center: initialCenter, level: initialLevel };
   map = new kakao.maps.Map(container, options);
 
-  if (isAdminUser) {
+  if (isAdminUser || isExternalUser) {
     markerClusterer = createClusterer();
   }
 
-  startLocationTracking();
-  if (initialLocation) updateMyLocationMarker(initialLocation.lat, initialLocation.lng);
+  if (!isExternalUser) startLocationTracking();
+  if (initialLocation && !isExternalUser) updateMyLocationMarker(initialLocation.lat, initialLocation.lng);
 
-  if (isAdminUser) {
+  if (isExternalUser) {
+    let extIdleDebounce;
+    kakao.maps.event.addListener(map, "idle", function() {
+      clearTimeout(extIdleDebounce);
+      extIdleDebounce = setTimeout(function() { renderExternalView(); }, 300);
+    });
+  } else if (isAdminUser) {
     setTimeout(function() { renderAdminView(); }, 100);
 
     let adminIdleDebounce;
@@ -2091,9 +2179,9 @@ function renderMarkers() {
     markerByKey[store._key] = marker;
     shown++;
 
-    if (!isAdminUser) {
+    if (!isAdminUser && !isExternalUser) {
       directMarkers.push(marker);
-    } else if (isSelected || (adminViewActive && isContract)) {
+    } else if (isSelected || (isAdminUser && adminViewActive && isContract)) {
       directMarkers.push(marker);
     } else {
       clusterMarkers.push(marker);
@@ -2776,6 +2864,8 @@ async function searchStores(q) {
   for (const fbKey in indexData) {
     const s = indexData[fbKey];
     if (!s) continue;
+    // 외주 모드: 기계약 업장만 검색 노출
+    if (isExternalUser && s.c !== true) continue;
     const nameNorm = normalizeText(s.n);
     const addrNorm = normalizeText(s.a);
     const grade = getMatchGrade(nameNorm, addrNorm, queryVariants);
