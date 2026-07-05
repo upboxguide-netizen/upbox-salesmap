@@ -162,6 +162,12 @@
   .visit-form input:focus, .visit-form select:focus, .visit-form textarea:focus { outline: none; border-color: #F2AC57; }
   .save-btn { width: 100%; padding: 12px; margin-top: 14px; border: none; border-radius: 8px; background: #F2AC57; color: white; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  /* ★ 재탭핑우선순위 토글 */
+  .repriority-toggle { display: flex; gap: 6px; }
+  .repriority-toggle button { flex: 1; padding: 8px 0; border: 1.5px solid #DDD; border-radius: 8px; background: white; font-size: 13px; font-weight: 700; color: #666; cursor: pointer; font-family: inherit; }
+  .repriority-toggle button.sel { border-color: #E53935; color: #E53935; background: #FDECEA; }
+  /* ★ 타파트너영업중 태그 */
+  .other-active-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; background: #E0F7FA; color: #00838F; font-size: 11px; font-weight: 700; border: 1px solid #00838F; }
 
   #noticeModal { position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; }
   #noticeModal.show { display: flex; }
@@ -488,7 +494,7 @@ function isExternal(code) {
 
 // ★ CACHE 블록 — 삭제되면 searchStores·loadSearchIndex 전체가 에러남
 const CACHE = {
-  OTHER_VISITS:    { key: 'cache_other_visits_v2',     ttlMs: 24 * 60 * 60 * 1000 },
+  OTHER_VISITS:    { key: 'cache_other_visits_v3',     ttlMs: 24 * 60 * 60 * 1000 },
   MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
   ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v2',  ttlMs: 12 * 60 * 60 * 1000 },
   SEARCH_INDEX:    { key: 'cache_search_index_v2',     ttlMs: 6 * 60 * 60 * 1000 }
@@ -1202,13 +1208,26 @@ async function loadOtherPartnerContacts() {
         const storeKey = rec.storeKey;
         const ts = rec.lastUpdatedAt || rec.firstVisitAt || 0;
         if (!storeKey || !ts) continue;
-        if (!otherPartnerLastContactMap[storeKey] || otherPartnerLastContactMap[storeKey] < ts) {
-          otherPartnerLastContactMap[storeKey] = ts;
+        // ★ 가장 최근 접촉만 유지 + 그 접촉의 상태(status)도 함께 저장
+        const prev = otherPartnerLastContactMap[storeKey];
+        if (!prev || prev.ts < ts) {
+          otherPartnerLastContactMap[storeKey] = { ts: ts, status: classifyVisitCurrent(rec.current) };
         }
       }
     }
     setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
   } catch(e) {}
+}
+
+// ★ 타파트너가 '영업중'인지 판정: 내가 미방문 + 타파트너 최근접촉이 1개월 이내 + 그 상태가 단순방문/유효리드
+function isOtherPartnerActive(store) {
+  if (isExternalUser) return false;
+  const info = otherPartnerLastContactMap[store._key];
+  if (!info || !info.ts) return false;
+  if (info.status !== "visit" && info.status !== "lead") return false;
+  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+  if (Date.now() - info.ts > THIRTY_DAYS) return false;
+  return true;
 }
 
 async function loadMyVisits() {
@@ -1666,7 +1685,8 @@ async function loadStoresInView() {
     }
     list = list.filter(s => {
       if (!isClosed(s)) return true;
-      return getVisitStatus(s) === "lead";
+      // ★ 폐업이어도 내 방문기록이 있으면(상태 무관) 표시 — 기록 있는 폐업건은 살림
+      return getVisitStatus(s) !== "none";
     });
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
 
@@ -1874,7 +1894,15 @@ function createMarker(store, status, isSelected) {
     strokeColor = 'white'; strokeWidth = 1.6;
   }
 
-  const svg = buildPinSvg(w, h, color, strokeColor, strokeWidth, labelLines);
+  // ★ 타파트너영업중(내가 미방문 + 타파트너 최근 영업중): 청록 점선 테두리
+  let strokeDash = '';
+  if (!isSelected && status === "none" && isOtherPartnerActive(store)) {
+    strokeColor = '#00838F';
+    strokeWidth = 2;
+    strokeDash = '2.5,2';
+  }
+
+  const svg = buildPinSvg(w, h, color, strokeColor, strokeWidth, labelLines, strokeDash);
   const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
   const markerImage = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(w, h), { offset: new kakao.maps.Point(anchorX, anchorY) });
   const marker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: zIdx });
@@ -1896,7 +1924,7 @@ function createMarker(store, status, isSelected) {
   return marker;
 }
 
-function buildPinSvg(w, h, fillColor, strokeColor, strokeWidth, lines) {
+function buildPinSvg(w, h, fillColor, strokeColor, strokeWidth, lines, strokeDash) {
   if (!lines || lines.length === 0) lines = ['-'];
   let textElements = '';
   if (lines.length === 1) {
@@ -1906,9 +1934,10 @@ function buildPinSvg(w, h, fillColor, strokeColor, strokeWidth, lines) {
       '<text x="16" y="16" text-anchor="middle" font-size="9" font-weight="bold" fill="white">' + escapeXml(lines[0]) + '</text>' +
       '<text x="16" y="25" text-anchor="middle" font-size="9" font-weight="bold" fill="white">' + escapeXml(lines[1]) + '</text>';
   }
+  const dashAttr = strokeDash ? ' stroke-dasharray="' + strokeDash + '"' : '';
   return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 32 40">' +
          '<path d="M16 0.8 C7.4 0.8 0.8 7.4 0.8 16 C0.8 24.6 16 39.2 16 39.2 C16 39.2 31.2 24.6 31.2 16 C31.2 7.4 24.6 0.8 16 0.8 Z" ' +
-         'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="' + strokeWidth + '"/>' +
+         'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="' + strokeWidth + '"' + dashAttr + '/>' +
          textElements + '</svg>';
 }
 
@@ -1942,7 +1971,8 @@ function formatPartnerNameForPin(name) {
 function getStatusColor(status) {
   return {
     visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935",
-    contract:"#F2AC57", closedByMe:"#616161", none:"#9E9E9E"
+    contract:"#F2AC57", closedByMe:"#616161", none:"#9E9E9E",
+    simpleContact:"#A79FD1"
   }[status] || "#9E9E9E";
 }
 
@@ -1956,11 +1986,9 @@ function getGradeIcon(grade) {
   return "-";
 }
 
-function getVisitStatus(store) {
-  if (isContractGrade(store.grade)) return "contract";
-  const rec = myVisitedStoreData[store._key];
-  if (!rec) return "none";
-  const cur = rec.current || {};
+// ★ 방문기록(current) 하나를 상태로 분류하는 단일 함수 (핀 색상·타파트너 판정 공용)
+function classifyVisitCurrent(cur) {
+  cur = cur || {};
   const outcome = String(cur.outcome || "").trim();
   if (outcome === "성사") return "success";
   if (outcome === "실패") return "fail";
@@ -1974,7 +2002,23 @@ function getVisitStatus(store) {
   if (allVisitFilled && allLeadAdditionalFilled) return "lead";
   if (allVisitFilled) return "visit";
   if (outcome === "폐업") return "closedByMe";
+
+  // ★ 단순접촉: 위 조건 미달이지만 실제 접촉내용 필드가 하나라도 채워진 경우
+  //   (영업구분·재탭핑우선순위는 제외 — 접촉내용이 아니라 분류/계획값이므로)
+  const contactFields = [
+    cur.currentStoreName, cur.contact, cur.amount, cur.price,
+    cur.suggestedPrice, cur.freq, cur.bins, cur.vinyl, cur.truck, cur.note
+  ];
+  if (contactFields.some(v => String(v || "").trim().length > 0)) return "simpleContact";
+
   return "none";
+}
+
+function getVisitStatus(store) {
+  if (isContractGrade(store.grade)) return "contract";
+  const rec = myVisitedStoreData[store._key];
+  if (!rec) return "none";
+  return classifyVisitCurrent(rec.current);
 }
 
 async function openPanel(store) {
@@ -2027,9 +2071,13 @@ async function openPanel(store) {
     }
   }
 
-  // ★ v51.7: 외주는 타파트너 접촉일 숨김
-  const otherTs = otherPartnerLastContactMap[store._key];
-  const otherContactHtml = (!isExternalUser && otherTs) ? '<div class="contact-info">타파트너 마지막접촉일자: ' + formatDate(otherTs) + '</div>' : '';
+  // ★ v51.7: 외주는 타파트너 접촉일 숨김 / 구조 변경: otherInfo = {ts, status}
+  const otherInfo = otherPartnerLastContactMap[store._key];
+  let otherContactHtml = '';
+  if (!isExternalUser && otherInfo && otherInfo.ts) {
+    const activeTag = isOtherPartnerActive(store) ? ' <span class="other-active-tag">타파트너영업중</span>' : '';
+    otherContactHtml = '<div class="contact-info">타파트너 마지막접촉일자: ' + formatDate(otherInfo.ts) + activeTag + '</div>';
+  }
 
   let serviceHtml = '';
   if (!isContract) {
@@ -2184,6 +2232,13 @@ async function openPriceGuide() {
 function buildVisitForm() {
   return '<div class="visit-form">' +
     '<h3>방문기록</h3>' +
+    '<label>재탭핑우선순위</label>' +
+    '<div class="repriority-toggle" id="repriorityToggle">' +
+      '<button type="button" data-repriority="상">상</button>' +
+      '<button type="button" data-repriority="중">중</button>' +
+      '<button type="button" data-repriority="하">하</button>' +
+    '</div>' +
+    '<input type="hidden" id="v_repriority" value="">' +
     '<label>영업구분</label>' +
     '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
     '<div class="visit-dates" id="visitDates"></div>' +
@@ -2218,6 +2273,14 @@ function loadMyVisit(store) {
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
   });
+  // ★ 재탭핑우선순위 복원 (숨은 input + 버튼 하이라이트)
+  setVal('v_repriority', cur.repriority);
+  const rpToggleEl = document.getElementById('repriorityToggle');
+  if (rpToggleEl) {
+    rpToggleEl.querySelectorAll('button').forEach(function(b) {
+      b.classList.toggle('sel', b.dataset.repriority === (cur.repriority || ''));
+    });
+  }
   const first = rec.firstVisitAt ? formatDate(rec.firstVisitAt) : '';
   const last = rec.lastUpdatedAt ? formatDate(rec.lastUpdatedAt) : '';
   const dateText = first && last && first !== last ? '최초 방문: ' + first + ' · 마지막 수정: ' + last : (first ? '최초 방문: ' + first : '');
@@ -2248,6 +2311,22 @@ function bindVisitForm(store) {
     el.addEventListener('change', resetSaveBtn);
   });
 
+  // ★ 재탭핑우선순위 토글: 클릭 선택 / 같은 값 다시 클릭 시 해제
+  const rpToggle = document.getElementById('repriorityToggle');
+  if (rpToggle) {
+    rpToggle.querySelectorAll('button').forEach(function(b) {
+      b.addEventListener('click', function() {
+        const val = b.dataset.repriority;
+        const hidden = document.getElementById('v_repriority');
+        const already = hidden.value === val;
+        rpToggle.querySelectorAll('button').forEach(function(x) { x.classList.remove('sel'); });
+        hidden.value = already ? '' : val;
+        if (!already) b.classList.add('sel');
+        resetSaveBtn();
+      });
+    });
+  }
+
   const contactInput = document.getElementById("v_contact");
   if (contactInput) {
     contactInput.addEventListener("input", function(e) {
@@ -2277,6 +2356,8 @@ async function saveVisit(store) {
   });
   const salesTypeVal = getVal('v_salesType');
   if (salesTypeVal) currentData.salesType = salesTypeVal;
+  const repriorityVal = getVal('v_repriority');
+  if (repriorityVal) currentData.repriority = repriorityVal;
   currentData.updatedAt = Date.now();
 
   const recKey = "REC_" + currentUser.key + "_" + store._key;
@@ -2557,7 +2638,8 @@ function renderSearchResults(list) {
 function getStatusLabel(status) {
   return {
     visit: "단순방문", lead: "유효리드", success: "계약성사", fail: "최종불발",
-    closedByMe: "폐업", contract: "기계약", none: "미방문"
+    closedByMe: "폐업", contract: "기계약", none: "미방문",
+    simpleContact: "단순접촉"
   }[status] || "미방문";
 }
 
