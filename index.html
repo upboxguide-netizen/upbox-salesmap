@@ -1860,6 +1860,42 @@ function removeContractDuplicates(list) {
   return contracts.concat(filteredOthers);
 }
 
+ function removeContractDuplicates(list) {
+  const contracts = list.filter(s => isContractGrade(s.grade));
+  const others = list.filter(s => !isContractGrade(s.grade));
+
+  const filteredOthers = others.filter(function(o) {
+    if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
+
+    for (const c of contracts) {
+      const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
+      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) return false;
+    }
+    return true;
+  });
+
+  return contracts.concat(filteredOthers);
+}
+
+// ★ 검색 결과용: 지도의 removeContractDuplicates와 동일한 규칙을 검색 후보(candidates)에도 적용
+//   (같은 업장의 기계약/미방문 핀이 둘 다 뜨는 문제를 검색에서도 막기 위함)
+function removeContractDuplicatesForSearch(list) {
+  const contracts = list.filter(function(s) { return isContractGrade(s.grade); });
+  const others = list.filter(function(s) { return !isContractGrade(s.grade); });
+
+  const filteredOthers = others.filter(function(o) {
+    if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
+
+    for (const c of contracts) {
+      const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
+      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) return false;
+    }
+    return true;
+  });
+
+  return contracts.concat(filteredOthers);
+}
+
 function nameSimilarity(a, b) {
   if (!a || !b) return 0;
 
@@ -2911,6 +2947,9 @@ async function searchStores(q) {
       _distKm: dist
     });
   }
+
+  // ★ 신규: 같은 업장의 기계약/미방문 중복 제거 (지도와 동일 규칙)
+  candidates = removeContractDuplicatesForSearch(candidates);
 
   candidates.sort(function(a, b) {
     if (a._matchGrade !== b._matchGrade) return b._matchGrade - a._matchGrade;
