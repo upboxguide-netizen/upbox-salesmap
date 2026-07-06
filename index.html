@@ -2911,7 +2911,7 @@ async function searchStores(q) {
   }
 
   const queryVariants = expandQueryWithAliases(q);
-  const candidates = [];
+  let candidates = [];
 
   const myProjectStoresKeySet = new Set();
   if (Array.isArray(myProjectStores)) {
