@@ -50,12 +50,47 @@
   .search-project-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 3px; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; font-size: 10px; font-weight: 600; flex-shrink: 0; }
   .search-address { font-size: 11px; color: #999; margin-top: 3px; margin-left: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  #filterBar { display: flex; gap: 6px; padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; overflow-x: auto; white-space: nowrap; }
+  #filterBar { background: white; border-bottom: 1px solid #EEE; }
+  #quickChipRow { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; }
   .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
   .filter-chip.active { color: white; border: none; }
   .filter-chip-project { display: none; align-items: center; gap: 3px; }
   .filter-chip-project.visible { display: inline-flex; }
   .filter-chip-project.active { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%) !important; }
+  /* ★ 조합필터 (3단계: 네이버지도 스타일 1행 배치 + 하단 바텀시트 모달) */
+  .filter-icon-btn { display: flex; align-items: center; justify-content: center; gap: 2px; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #363859; color: #363859; font-size: 15px; background: white; font-family: inherit; cursor: pointer; flex-shrink: 0; padding: 0; position: relative; }
+  .filter-icon-btn.active { background: #363859; }
+  #comboFilterBadge { position: absolute; top: -4px; right: -4px; background: #E53935; color: white; border-radius: 8px; min-width: 15px; height: 15px; font-size: 9px; line-height: 15px; text-align: center; padding: 0 3px; }
+  #comboFilterBadge:empty { display: none; }
+  #appliedChipsRow { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 8px; }
+  #appliedChipsRow:empty { display: none; padding: 0; }
+  .applied-chip { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 14px; background: #F0F0F5; font-size: 11px; color: #444; cursor: pointer; font-family: inherit; border: none; }
+  .applied-chip .x { color: #999; font-weight: 700; }
+
+  /* 바텀시트 모달 */
+  #comboFilterBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 500; }
+  #comboFilterBackdrop.open { display: block; }
+  #comboFilterPanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 82vh; background: white; border-radius: 18px 18px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.2); z-index: 501; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.25s ease; }
+  #comboFilterPanel.open { transform: translateY(0); }
+  #comboFilterPanelHandle { width: 40px; height: 4px; border-radius: 2px; background: #DDD; margin: 10px auto 4px; flex-shrink: 0; }
+  #comboFilterPanelHeader { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 14px; border-bottom: 1px solid #EEE; font-size: 17px; font-weight: 700; color: #222; flex-shrink: 0; }
+  #comboFilterCloseBtn { border: none; background: none; font-size: 18px; color: #888; cursor: pointer; padding: 4px; font-family: inherit; }
+  #comboFilterPanelBody { padding: 16px; overflow-y: auto; flex: 1 1 auto; }
+  .cf-facet { margin-bottom: 18px; }
+  .cf-facet-title { font-size: 13px; font-weight: 700; color: #333; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .cf-facet-desc { font-weight: 400; color: #aaa; font-size: 10px; }
+  .cf-pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cf-pill { padding: 8px 14px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; color: #555; background: white; font-family: inherit; cursor: pointer; }
+  .cf-pill.sel { background: #363859; color: white; border-color: #363859; }
+  .cf-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; font-size: 13px; color: #333; border-top: 1px solid #ECECF2; }
+  .cf-switch { width: 34px; height: 18px; border-radius: 10px; background: #CCC; position: relative; border: none; cursor: pointer; flex-shrink: 0; }
+  .cf-switch.on { background: #43A047; }
+  .cf-switch::after { content: ""; position: absolute; width: 14px; height: 14px; background: white; border-radius: 50%; top: 2px; left: 2px; }
+  .cf-switch.on::after { left: auto; right: 2px; }
+  .cf-panel-actions { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #EEE; flex-shrink: 0; background: white; }
+  .cf-panel-actions button { padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; font-family: inherit; border: none; cursor: pointer; }
+  #cfResetBtn { background: white; border: 1px solid #CCC !important; color: #666; flex: 0 0 auto; padding: 13px 18px; }
+  #cfApplyBtn { background: #363859; color: white; flex: 1; }
 
   .chip-count { margin-left: 3px; font-weight: 600; opacity: 0.9; }
   .chip-count:empty { display: none; }
@@ -283,13 +318,55 @@
   </div>
 
   <div id="filterBar">
-    <button class="filter-chip active" data-filter="all" style="background:#363859;">전체</button>
-    <button class="filter-chip filter-chip-project" data-filter="project" id="filterProject">🎯 프로젝트영업</button>
-    <button class="filter-chip" data-filter="visit" style="background:transparent;">단순방문<span class="chip-count" data-count-for="visit"></span></button>
-    <button class="filter-chip" data-filter="lead" style="background:transparent;">유효리드<span class="chip-count" data-count-for="lead"></span></button>
-    <button class="filter-chip" data-filter="success" style="background:transparent;">계약성사<span class="chip-count" data-count-for="success"></span></button>
-    <button class="filter-chip" data-filter="fail" style="background:transparent;">최종불발<span class="chip-count" data-count-for="fail"></span></button>
-    <button class="filter-chip" data-filter="contract" style="background:transparent;">기계약</button>
+    <div id="quickChipRow">
+      <button id="comboFilterTrigger" class="filter-icon-btn" title="조회필터">⚙️<span id="comboFilterBadge"></span></button>
+      <button class="filter-chip active" data-filter="all" style="background:#363859;">전체</button>
+      <button class="filter-chip filter-chip-project" data-filter="project" id="filterProject">🎯 프로젝트영업</button>
+      <button class="filter-chip" data-filter="contract" style="background:transparent;">⭐ 기계약</button>
+    </div>
+    <div id="appliedChipsRow"></div>
+  </div>
+
+  <div id="comboFilterBackdrop"></div>
+  <div id="comboFilterPanel">
+    <div id="comboFilterPanelHandle"></div>
+    <div id="comboFilterPanelHeader">
+      <span>조회필터</span>
+      <button type="button" id="comboFilterCloseBtn">✕</button>
+    </div>
+    <div id="comboFilterPanelBody">
+      <div class="cf-facet">
+        <div class="cf-facet-title"><span>리드상태</span><span class="cf-facet-desc">여러 개 선택 가능</span></div>
+        <div class="cf-pill-group" data-facet="leadStatus">
+          <button type="button" class="cf-pill" data-val="none">미방문</button>
+          <button type="button" class="cf-pill" data-val="simpleContact">단순접촉</button>
+          <button type="button" class="cf-pill" data-val="visit">단순방문</button>
+          <button type="button" class="cf-pill" data-val="lead">유효리드</button>
+          <button type="button" class="cf-pill" data-val="success">계약성사</button>
+          <button type="button" class="cf-pill" data-val="fail">최종불발</button>
+        </div>
+      </div>
+      <div class="cf-facet">
+        <div class="cf-facet-title"><span>재탭핑우선순위</span><span class="cf-facet-desc">여러 개 선택 가능</span></div>
+        <div class="cf-pill-group" data-facet="repriority">
+          <button type="button" class="cf-pill" data-val="상">상</button>
+          <button type="button" class="cf-pill" data-val="중">중</button>
+          <button type="button" class="cf-pill" data-val="하">하</button>
+        </div>
+      </div>
+      <div class="cf-toggle-row">
+        <span>타파트너영업중 표시</span>
+        <button type="button" id="cfToggleOtherActive" class="cf-switch on"></button>
+      </div>
+      <div class="cf-toggle-row">
+        <span>베이직 ON 업장만 보기</span>
+        <button type="button" id="cfToggleBasicOnly" class="cf-switch off"></button>
+      </div>
+    </div>
+      <div class="cf-panel-actions">
+        <button type="button" id="cfResetBtn">초기화</button>
+        <button type="button" id="cfApplyBtn">적용</button>
+      </div>
   </div>
 
   <div id="map">
@@ -617,6 +694,8 @@ let markers = [];
 let markerByKey = {};
 let allStoresInView = [];
 let currentFilter = "all";
+// ★ 파트너 조합필터 상태 (currentFilter === 'all' + 파트너 화면일 때만 적용됨. 관리자/외주는 무관)
+let partnerComboFilter = { leadStatus: [], repriority: [], otherActive: true, basicOnly: false };
 let selectedStore = null;
 let searchTimer = null;
 let currentUserLocation = null;
@@ -1348,24 +1427,41 @@ function initMap() {
 
   document.querySelectorAll(".filter-chip").forEach(function(btn) {
     btn.onclick = function() {
+      const filter = btn.dataset.filter;
+
+      // ★ 기계약: 이미 켜진 상태에서 다시 누르면 지도 이동 없이 '전체'로 복귀 (토글)
+      if (filter === "contract" && currentFilter === "contract") {
+        document.querySelectorAll(".filter-chip").forEach(b => {
+          b.classList.remove("active");
+          b.style.background = b.dataset.filter === "project" ? "" : "transparent";
+        });
+        const allBtn = document.querySelector('.filter-chip[data-filter="all"]');
+        allBtn.classList.add("active");
+        allBtn.style.background = "#363859";
+        currentFilter = "all";
+        renderMarkers();
+        return;
+      }
+
       document.querySelectorAll(".filter-chip").forEach(b => {
         b.classList.remove("active");
         b.style.background = b.dataset.filter === "project" ? "" : "transparent";
       });
       btn.classList.add("active");
-      if (btn.dataset.filter !== "project") {
-        btn.style.background = getFilterColor(btn.dataset.filter);
+      if (filter !== "project") {
+        btn.style.background = getFilterColor(filter);
       }
-      currentFilter = btn.dataset.filter;
-      if (btn.dataset.filter === "project") {
+      currentFilter = filter;
+      if (filter === "project") {
         moveToMyProjectStores();
-      } else if (btn.dataset.filter === "all") {
-        renderMarkers();
       } else {
-        moveToFilteredStoresForPartner(btn.dataset.filter);
+        // ★ v3단계: '전체'·'기계약' 모두 지도 이동 없이 현재 로드된 핀 안에서만 필터링
+        renderMarkers();
       }
     };
   });
+
+  bindComboFilterUI();
 
   document.getElementById("searchInput").oninput = function(e) {
     clearTimeout(searchTimer);
@@ -1802,6 +1898,166 @@ function getEffectiveStatus(store) {
   return getVisitStatus(store);
 }
 
+// ★ 조합필터: DOM의 선택 상태를 읽어서 partnerComboFilter 객체로 변환
+function readComboFilterFromDOM() {
+  const leadStatus = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="leadStatus"] .cf-pill.sel')).map(function(b) { return b.dataset.val; });
+  const repriority = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="repriority"] .cf-pill.sel')).map(function(b) { return b.dataset.val; });
+  const otherActive = document.getElementById('cfToggleOtherActive').classList.contains('on');
+  const basicOnly = document.getElementById('cfToggleBasicOnly').classList.contains('on');
+  return { leadStatus: leadStatus, repriority: repriority, otherActive: otherActive, basicOnly: basicOnly };
+}
+
+// ★ 기본값과 다른 항목 개수 (트리거 버튼 배지용)
+function comboFilterActiveCount(f) {
+  let n = 0;
+  if (f.leadStatus.length) n++;
+  if (f.repriority.length) n++;
+  if (!f.otherActive) n++;
+  if (f.basicOnly) n++;
+  return n;
+}
+
+const COMBO_LEAD_LABELS = { none: "미방문", simpleContact: "단순접촉", visit: "단순방문", lead: "유효리드", success: "계약성사", fail: "최종불발" };
+
+// ★ 적용된 조건 칩 다시 그리기 (✕ 누르면 그 조건만 해제)
+function renderAppliedChipsRow() {
+  const row = document.getElementById('appliedChipsRow');
+  const f = partnerComboFilter;
+  const chips = [];
+  f.leadStatus.forEach(function(v) { chips.push({ key: 'leadStatus:' + v, label: COMBO_LEAD_LABELS[v] || v }); });
+  f.repriority.forEach(function(v) { chips.push({ key: 'repriority:' + v, label: '우선순위 ' + v }); });
+  if (!f.otherActive) chips.push({ key: 'otherActive', label: '타파트너영업중 숨김' });
+  if (f.basicOnly) chips.push({ key: 'basicOnly', label: '베이직ON만' });
+
+  row.innerHTML = '';
+  chips.forEach(function(c) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'applied-chip';
+    el.innerHTML = escapeHtml(c.label) + ' <span class="x">✕</span>';
+    el.onclick = function() { removeComboFilterChip(c.key); };
+    row.appendChild(el);
+  });
+}
+
+// ★ 적용된 조건 칩의 ✕ 클릭 시 해당 조건만 해제하고 즉시 재적용
+function removeComboFilterChip(key) {
+  if (key === 'otherActive') {
+    partnerComboFilter.otherActive = true;
+    document.getElementById('cfToggleOtherActive').classList.add('on');
+  } else if (key === 'basicOnly') {
+    partnerComboFilter.basicOnly = false;
+    document.getElementById('cfToggleBasicOnly').classList.remove('on');
+  } else {
+    const parts = key.split(':');
+    const facet = parts[0], val = parts[1];
+    partnerComboFilter[facet] = partnerComboFilter[facet].filter(function(v) { return v !== val; });
+    document.querySelectorAll('.cf-pill-group[data-facet="' + facet + '"] .cf-pill').forEach(function(b) {
+      if (b.dataset.val === val) b.classList.remove('sel');
+    });
+  }
+  updateComboFilterBadgeAndChips();
+  if (currentFilter === 'all') renderMarkers();
+}
+
+function updateComboFilterBadgeAndChips() {
+  const n = comboFilterActiveCount(partnerComboFilter);
+  const badge = document.getElementById('comboFilterBadge');
+  const trigger = document.getElementById('comboFilterTrigger');
+  badge.textContent = n > 0 ? String(n) : '';
+  trigger.classList.toggle('active', n > 0);
+  renderAppliedChipsRow();
+}
+
+// ★ 패널의 선택 상태를 마지막 적용값(partnerComboFilter) 기준으로 되돌림 (X/배경 클릭으로 닫을 때 사용)
+function syncPanelDOMFromState() {
+  const f = partnerComboFilter;
+  document.querySelectorAll('.cf-pill').forEach(function(b) {
+    const facet = b.closest('.cf-pill-group').dataset.facet;
+    b.classList.toggle('sel', f[facet].indexOf(b.dataset.val) !== -1);
+  });
+  document.getElementById('cfToggleOtherActive').classList.toggle('on', f.otherActive);
+  document.getElementById('cfToggleBasicOnly').classList.toggle('on', f.basicOnly);
+}
+
+// ★ 지금 패널에서 고르고 있는 조건대로 적용하면 몇 개 업장이 보일지 미리 계산 (네이버 "결과보기 999+"와 동일한 개념)
+function computeComboFilterMatchCount(f) {
+  let n = 0;
+  for (const store of allStoresInView) {
+    if (isContractGrade(store.grade)) { n++; continue; } // 기계약은 조합필터 영향 없음(항상 표시)
+    const status = getVisitStatus(store);
+    if (f.leadStatus.length && f.leadStatus.indexOf(status) === -1) continue;
+    if (f.repriority.length) {
+      const rec = myVisitedStoreData[store._key];
+      const rp = (rec && rec.current && rec.current.repriority) || "";
+      if (f.repriority.indexOf(rp) === -1) continue;
+    }
+    if (f.basicOnly && store.basic !== "ON") continue;
+    if (!f.otherActive && status === "none" && isOtherPartnerActive(store)) continue;
+    n++;
+  }
+  return n;
+}
+
+function updateApplyButtonCount() {
+  const draft = readComboFilterFromDOM();
+  const n = computeComboFilterMatchCount(draft);
+  document.getElementById('cfApplyBtn').textContent = n + '개 업장 보기';
+}
+
+function openComboFilterPanel() {
+  syncPanelDOMFromState();
+  updateApplyButtonCount();
+  document.getElementById('comboFilterBackdrop').classList.add('open');
+  document.getElementById('comboFilterPanel').classList.add('open');
+}
+
+function closeComboFilterPanel(shouldRevert) {
+  if (shouldRevert) syncPanelDOMFromState();
+  document.getElementById('comboFilterBackdrop').classList.remove('open');
+  document.getElementById('comboFilterPanel').classList.remove('open');
+}
+
+function bindComboFilterUI() {
+  document.querySelectorAll('.cf-pill').forEach(function(btn) {
+    btn.onclick = function() { btn.classList.toggle('sel'); updateApplyButtonCount(); };
+  });
+  document.getElementById('cfToggleOtherActive').onclick = function() { this.classList.toggle('on'); updateApplyButtonCount(); };
+  document.getElementById('cfToggleBasicOnly').onclick = function() { this.classList.toggle('on'); updateApplyButtonCount(); };
+
+  document.getElementById('comboFilterTrigger').onclick = function() { openComboFilterPanel(); };
+  document.getElementById('comboFilterCloseBtn').onclick = function() { closeComboFilterPanel(true); };
+  document.getElementById('comboFilterBackdrop').onclick = function() { closeComboFilterPanel(true); };
+
+  document.getElementById('cfResetBtn').onclick = function() {
+    document.querySelectorAll('.cf-pill.sel').forEach(function(b) { b.classList.remove('sel'); });
+    document.getElementById('cfToggleOtherActive').classList.add('on');
+    document.getElementById('cfToggleBasicOnly').classList.remove('on');
+    partnerComboFilter = { leadStatus: [], repriority: [], otherActive: true, basicOnly: false };
+    updateComboFilterBadgeAndChips();
+    updateApplyButtonCount();
+    closeComboFilterPanel(false);
+    if (currentFilter === 'all') renderMarkers();
+  };
+
+  document.getElementById('cfApplyBtn').onclick = function() {
+    partnerComboFilter = readComboFilterFromDOM();
+    updateComboFilterBadgeAndChips();
+    closeComboFilterPanel(false);
+    // 조합필터는 '전체' 모드에서만 반영되므로, 프로젝트/기계약 모드였다면 전체로 되돌림
+    if (currentFilter !== 'all') {
+      document.querySelectorAll('.filter-chip').forEach(function(b) {
+        b.classList.remove('active');
+        b.style.background = b.dataset.filter === 'project' ? '' : 'transparent';
+      });
+      const allBtn = document.querySelector('.filter-chip[data-filter="all"]');
+      if (allBtn) { allBtn.classList.add('active'); allBtn.style.background = '#363859'; }
+      currentFilter = 'all';
+    }
+    renderMarkers();
+  };
+}
+
 function renderMarkers() {
   if (markerClusterer) markerClusterer.clear();
   markers.forEach(m => m.setMap(null));
@@ -1822,6 +2078,17 @@ function renderMarkers() {
     } else if (currentFilter !== "all") {
       if (!isContract && status !== currentFilter) continue;
       if (currentFilter === "contract" && !isContract) continue;
+    } else if (!isAdminUser && !isExternalUser && !isContract) {
+      // ★ 조합필터: '전체' 모드 + 파트너 화면에서만 적용
+      const cf = partnerComboFilter;
+      if (cf.leadStatus.length && cf.leadStatus.indexOf(status) === -1) continue;
+      if (cf.repriority.length) {
+        const rec = myVisitedStoreData[store._key];
+        const rp = (rec && rec.current && rec.current.repriority) || "";
+        if (cf.repriority.indexOf(rp) === -1) continue;
+      }
+      if (cf.basicOnly && store.basic !== "ON") continue;
+      if (!cf.otherActive && status === "none" && isOtherPartnerActive(store)) continue;
     }
 
     const isSelected = selectedStore && selectedStore._key === store._key;
