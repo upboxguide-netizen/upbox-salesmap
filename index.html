@@ -1897,9 +1897,9 @@ function createMarker(store, status, isSelected) {
   // ★ 타파트너영업중(내가 미방문 + 타파트너 최근 영업중): 청록 점선 테두리
   let strokeDash = '';
   if (!isSelected && status === "none" && isOtherPartnerActive(store)) {
-    strokeColor = '#00838F';
-    strokeWidth = 2;
-    strokeDash = '2.5,2';
+    strokeColor = '#07e81a';
+    strokeWidth = 3;
+    strokeDash = '3,2';
   }
 
   const svg = buildPinSvg(w, h, color, strokeColor, strokeWidth, labelLines, strokeDash);
@@ -2003,11 +2003,12 @@ function classifyVisitCurrent(cur) {
   if (allVisitFilled) return "visit";
   if (outcome === "폐업") return "closedByMe";
 
-  // ★ 단순접촉: 위 조건 미달이지만 실제 접촉내용 필드가 하나라도 채워진 경우
-  //   (영업구분·재탭핑우선순위는 제외 — 접촉내용이 아니라 분류/계획값이므로)
+  // ★ 단순접촉: 위 조건 미달이지만 접촉내용 필드가 하나라도 채워진 경우
+  //   (재탭핑우선순위 포함 / 영업구분은 제외)
   const contactFields = [
     cur.currentStoreName, cur.contact, cur.amount, cur.price,
-    cur.suggestedPrice, cur.freq, cur.bins, cur.vinyl, cur.truck, cur.note
+    cur.suggestedPrice, cur.freq, cur.bins, cur.vinyl, cur.truck, cur.note,
+    cur.repriority
   ];
   if (contactFields.some(v => String(v || "").trim().length > 0)) return "simpleContact";
 
