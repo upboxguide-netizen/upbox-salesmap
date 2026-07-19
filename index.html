@@ -1786,6 +1786,9 @@ async function loadStoresInView() {
     });
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
 
+    // ★ v52: 신규업장추가로 등록된 업장은 등록 파트너에게만 노출 (관리자는 전체 노출)
+    list = list.filter(s => isVisibleForNewStoreOwner_(s));
+
     list = removeContractDuplicates(list);
 
     if (currentUserLocation) {
@@ -1812,6 +1815,16 @@ function isVisibleForProject(store, currentPartnerKey) {
     if (codes.indexOf(currentPartnerKey) !== -1) return true;
   }
   return false;
+}
+
+// ★ v52: 신규업장추가로 등록된 업장(regBy 있음)은 등록한 파트너 본인에게만 노출.
+// 마스터DB 유래 업장(regBy 없음)은 기존과 동일하게 항상 노출.
+// 관리자는 검토를 위해 전체 노출.
+function isVisibleForNewStoreOwner_(store) {
+  if (!store.regBy) return true;
+  if (isAdminUser) return true;
+  const myCode = currentUser ? String(currentUser.code || '').trim() : '';
+  return String(store.regBy).trim() === myCode;
 }
 
 function amIAssignedToProject(store, currentPartnerKey) {
@@ -2925,6 +2938,11 @@ async function searchStores(q) {
     if (dupSuppressedSearch[fbKey]) continue;
     const s = indexData[fbKey];
     if (!s) continue;
+    // ★ v52: 신규업장추가 유래 업장은 등록 파트너 본인에게만 검색 노출 (관리자 제외)
+    if (s.regBy && !isAdminUser) {
+      const myCode = currentUser ? String(currentUser.code || '').trim() : '';
+      if (String(s.regBy).trim() !== myCode) continue;
+    }
     const nameNorm = normalizeText(s.n);
     const addrNorm = normalizeText(s.a);
     const grade = getMatchGrade(nameNorm, addrNorm, queryVariants);
