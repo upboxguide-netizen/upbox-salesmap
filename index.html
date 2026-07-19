@@ -569,6 +569,49 @@ function isExternal(code) {
   return code && EXTERNAL_PARTNER_CODES.indexOf(String(code).trim()) !== -1;
 }
 
+// ★ v53: 폐기물 종류 — 음식물류폐기물이 레거시 기본값 (recKey 접미사 없음, 기존 데이터 100% 호환)
+const WASTE_TYPES = [
+  { code: 'FOOD',    label: '음식물류폐기물' },
+  { code: 'PLASTIC', label: '폐합성수지' },
+  { code: 'OIL',     label: '폐식용유' }
+];
+const WASTE_TYPE_DEFAULT = 'FOOD';
+
+// 폐기물별 라벨 오버라이드
+const WASTE_FIELD_LABELS = {
+  FOOD:    { amount: '월 예상배출량 (L)',  price: '현재 단가 (원/L)',   suggestedPrice: '제안 단가 (원/L)' },
+  PLASTIC: { amount: '월 예상배출량 (KG)', price: '현재 단가 (원/장당)', suggestedPrice: '제안 단가 (원/장당)' },
+  OIL:     { amount: '월 예상배출량 (통)', price: '현재 단가 (원/통당)', suggestedPrice: '제안 단가 (원/통당)' }
+};
+
+// 폐기물별로 숨길 필드 (숨긴 필드는 저장 시 빈값 처리)
+const WASTE_HIDDEN_FIELDS = {
+  FOOD:    [],
+  PLASTIC: ['bins', 'vinyl'],
+  OIL:     ['bins', 'vinyl']
+};
+
+// 레거시 recKey(접미사 없음)는 항상 음식물류폐기물로 취급 → 기존 데이터 무손실
+function buildWasteRecKey_(partnerKey, storeKey, wasteType) {
+  const suffix = (wasteType && wasteType !== WASTE_TYPE_DEFAULT) ? ('_' + wasteType) : '';
+  return 'REC_' + partnerKey + '_' + storeKey + suffix;
+}
+
+// 여러 폐기물 기록 중 지도 핀/칩 카운트에 쓸 대표 기록 선택
+// 우선순위: 계약성사 > 유효리드 > 단순방문 > 단순접촉 > 최종불발 > 폐업처리 > 미방문
+const WASTE_STATUS_PRIORITY = ['success', 'lead', 'visit', 'simpleContact', 'fail', 'closedByMe', 'none'];
+function pickRepresentativeVisitRecord_(recordsByType) {
+  let best = null, bestRank = WASTE_STATUS_PRIORITY.length;
+  for (const t in recordsByType) {
+    const rec = recordsByType[t];
+    const status = classifyVisitCurrent(rec.current);
+    const rank = WASTE_STATUS_PRIORITY.indexOf(status);
+    const effectiveRank = rank === -1 ? WASTE_STATUS_PRIORITY.length : rank;
+    if (effectiveRank < bestRank) { bestRank = effectiveRank; best = rec; }
+  }
+  return best;
+}
+
 // ★ CACHE 블록 — 삭제되면 searchStores·loadSearchIndex 전체가 에러남
 const CACHE = {
   OTHER_VISITS:    { key: 'cache_other_visits_v3',     ttlMs: 24 * 60 * 60 * 1000 },
@@ -709,6 +752,7 @@ let currentRvState = 'collapsed';
 
 let otherPartnerLastContactMap = {};
 let myVisitedStoreData = {};
+let myVisitedStoreDataByType = {}; // ★ v53: storeKey -> { wasteType: record }
 let hasMyProjects = false;
 let myProjectStores = [];
 
@@ -1309,14 +1353,23 @@ function isOtherPartnerActive(store) {
   return true;
 }
 
+// ★ v53: 폐기물 유형별 다중 기록 지원. myVisitedStoreData는 대표 기록(핀색상/칩카운트 등 기존 로직 호환용)
 async function loadMyVisits() {
   try {
     const snap = await db.ref("visits/" + currentUser.key).once("value");
     const all = snap.val() || {};
     myVisitedStoreData = {};
+    myVisitedStoreDataByType = {};
     for (const recKey in all) {
       const rec = all[recKey];
-      if (rec && rec.storeKey) myVisitedStoreData[rec.storeKey] = rec;
+      if (!rec || !rec.storeKey) continue;
+
+      const wasteType = (rec.current && rec.current.wasteType) || WASTE_TYPE_DEFAULT;
+      if (!myVisitedStoreDataByType[rec.storeKey]) myVisitedStoreDataByType[rec.storeKey] = {};
+      myVisitedStoreDataByType[rec.storeKey][wasteType] = rec;
+    }
+    for (const storeKey in myVisitedStoreDataByType) {
+      myVisitedStoreData[storeKey] = pickRepresentativeVisitRecord_(myVisitedStoreDataByType[storeKey]);
     }
   } catch(e) {}
 }
@@ -1857,23 +1910,6 @@ function haversine(lat1, lng1, lat2, lng2) {
 }
 
 function removeContractDuplicates(list) {
-  const contracts = list.filter(s => isContractGrade(s.grade));
-  const others = list.filter(s => !isContractGrade(s.grade));
-
-  const filteredOthers = others.filter(function(o) {
-    if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
-
-    for (const c of contracts) {
-      const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
-      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) return false;
-    }
-    return true;
-  });
-
-  return contracts.concat(filteredOthers);
-}
-
- function removeContractDuplicates(list) {
   const contracts = list.filter(s => isContractGrade(s.grade));
   const others = list.filter(s => !isContractGrade(s.grade));
 
@@ -2613,7 +2649,12 @@ async function openPriceGuide() {
   }
 }
 
+// ★ v53: 폐기물 종류 드롭다운 + 동적 라벨 id 추가
 function buildVisitForm() {
+  const wasteOptions = WASTE_TYPES.map(function(w) {
+    return '<option value="' + w.code + '">' + w.label + '</option>';
+  }).join('');
+
   return '<div class="visit-form">' +
     '<h3>방문기록</h3>' +
     '<label>재탭핑우선순위</label>' +
@@ -2625,19 +2666,21 @@ function buildVisitForm() {
     '<input type="hidden" id="v_repriority" value="">' +
     '<label>영업구분</label>' +
     '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
+    '<label>폐기물 선택</label>' +
+    '<select id="v_wasteType">' + wasteOptions + '</select>' +
     '<div class="visit-dates" id="visitDates"></div>' +
     '<label><span style="color:#E53935;">*</span> 현재 수거업체명</label>' +
     '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (없을경우 사유기재)">' +
     '<label>담당자 연락처</label>' +
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
-    '<label>월 예상배출량 (L)</label><input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500">' +
-    '<label>현재 단가 (원/L)</label><input id="v_price" type="text" inputmode="numeric" placeholder="예: 180">' +
-    '<label>제안 단가 (원/L)</label><input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170">' +
+    '<label id="lbl_amount">월 예상배출량 (L)</label><input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500">' +
+    '<label id="lbl_price">현재 단가 (원/L)</label><input id="v_price" type="text" inputmode="numeric" placeholder="예: 180">' +
+    '<label id="lbl_suggestedPrice">제안 단가 (원/L)</label><input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170">' +
     '<label>현재 주 수거횟수</label><input id="v_freq" type="text" inputmode="numeric" placeholder="예: 3">' +
-    '<label><span style="color:#E53935;">*</span> 현재 통 갯수</label>' +
-    '<input id="v_bins" type="text" inputmode="numeric" placeholder="예: 4">' +
-    '<label><span style="color:#E53935;">*</span> 비닐 사용여부</label>' +
-    '<select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="지자체">지자체</option><option value="처리기">처리기</option></select>' +
+    '<div id="grp_bins"><label><span style="color:#E53935;">*</span> 현재 통 갯수</label>' +
+    '<input id="v_bins" type="text" inputmode="numeric" placeholder="예: 4"></div>' +
+    '<div id="grp_vinyl"><label><span style="color:#E53935;">*</span> 비닐 사용여부</label>' +
+    '<select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="지자체">지자체</option><option value="처리기">처리기</option></select></div>' +
     '<label><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>' +
     '<select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select>' +
     '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
@@ -2646,13 +2689,47 @@ function buildVisitForm() {
     '<button class="save-btn" id="saveVisitBtn">저장</button></div>';
 }
 
-function loadMyVisit(store) {
-  const rec = myVisitedStoreData[store._key];
+// ★ v53: 선택된 폐기물 종류에 맞춰 라벨 텍스트/필드 숨김 적용
+function applyWasteTypeUI(wasteType) {
+  const labels = WASTE_FIELD_LABELS[wasteType] || WASTE_FIELD_LABELS[WASTE_TYPE_DEFAULT];
+  const setLabel = function(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; };
+  setLabel('lbl_amount', labels.amount);
+  setLabel('lbl_price', labels.price);
+  setLabel('lbl_suggestedPrice', labels.suggestedPrice);
+
+  const hidden = WASTE_HIDDEN_FIELDS[wasteType] || [];
+  const groupMap = { bins: 'grp_bins', vinyl: 'grp_vinyl' };
+  for (const key in groupMap) {
+    const groupEl = document.getElementById(groupMap[key]);
+    if (groupEl) groupEl.style.display = hidden.indexOf(key) !== -1 ? 'none' : '';
+  }
+}
+
+// ★ v53: wasteType 지정 시 그 유형의 기록만 로드. 없으면 저장된 유형 중 하나, 그것도 없으면 기본값(FOOD)
+function loadMyVisit(store, wasteType) {
+  const byType = (myVisitedStoreDataByType && myVisitedStoreDataByType[store._key]) || {};
+
+  if (!wasteType) {
+    const savedTypes = Object.keys(byType);
+    wasteType = savedTypes.length > 0 ? savedTypes[0] : WASTE_TYPE_DEFAULT;
+  }
+
+  setVal('v_wasteType', wasteType);
+  applyWasteTypeUI(wasteType);
+
+  const rec = byType[wasteType];
   if (!rec) {
+    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
+      setVal('v_' + k, '');
+    });
+    setVal('v_repriority', '');
+    const rpEl = document.getElementById('repriorityToggle');
+    if (rpEl) rpEl.querySelectorAll('button').forEach(function(b) { b.classList.remove('sel'); });
     const dateEl = document.getElementById("visitDates");
     if (dateEl) dateEl.textContent = "";
     return;
   }
+
   const cur = rec.current || {};
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
@@ -2679,8 +2756,18 @@ function bindVisitForm(store) {
   if (!btn) return;
   btn.onclick = function() { saveVisit(store); };
 
+  // ★ v53: 폐기물 종류 변경 시 해당 유형의 기존 기록으로 폼 전환 (저장 안 된 새 폼이면 빈 값)
+  const wasteSelect = document.getElementById('v_wasteType');
+  if (wasteSelect) {
+    wasteSelect.addEventListener('change', function() {
+      loadMyVisit(store, wasteSelect.value);
+      btn.textContent = '저장';
+      btn.disabled = false;
+    });
+  }
+
   const formFieldIds = [
-    'v_salesType','v_currentStoreName','v_contact','v_amount','v_price',
+    'v_salesType','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
     'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome'
   ];
   const resetSaveBtn = function() {
@@ -2734,17 +2821,23 @@ async function saveVisit(store) {
   btn.disabled = true;
   btn.textContent = "저장 중...";
 
+  // ★ v53: 폐기물 종류에 따라 recKey 분기 + 숨긴 필드는 저장 안 함
+  const wasteType = getVal('v_wasteType') || WASTE_TYPE_DEFAULT;
+  const hiddenFields = WASTE_HIDDEN_FIELDS[wasteType] || [];
+
   const currentData = {};
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome'].forEach(function(k) {
-    currentData[k] = getVal('v_' + k);
+    currentData[k] = hiddenFields.indexOf(k) !== -1 ? '' : getVal('v_' + k);
   });
+  currentData.wasteType = wasteType; // ★ v53
   const salesTypeVal = getVal('v_salesType');
   if (salesTypeVal) currentData.salesType = salesTypeVal;
   const repriorityVal = getVal('v_repriority');
   if (repriorityVal) currentData.repriority = repriorityVal;
   currentData.updatedAt = Date.now();
 
-  const recKey = "REC_" + currentUser.key + "_" + store._key;
+  // ★ v53: 음식물류폐기물(기본값)은 레거시 recKey 그대로(REC_파트너_업장), 나머지는 접미사 추가
+  const recKey = buildWasteRecKey_(currentUser.key, store._key, wasteType);
   const recRef = db.ref("visits/" + currentUser.key + "/" + recKey);
 
   try {
@@ -2770,7 +2863,10 @@ async function saveVisit(store) {
       };
     }
     await recRef.set(payload);
-    myVisitedStoreData[store._key] = payload;
+    // ★ v53: 폐기물 유형별 캐시 갱신 후, 대표 기록(핀 색상/칩카운트용) 재계산
+    if (!myVisitedStoreDataByType[store._key]) myVisitedStoreDataByType[store._key] = {};
+    myVisitedStoreDataByType[store._key][wasteType] = payload;
+    myVisitedStoreData[store._key] = pickRepresentativeVisitRecord_(myVisitedStoreDataByType[store._key]);
     if (isAdminUser) renderAdminView(); else renderMarkers();
     updateChipCounts();
 
