@@ -354,6 +354,10 @@
           <button type="button" class="cf-pill" data-val="하">하</button>
         </div>
       </div>
+      <div class="cf-facet">
+        <div class="cf-facet-title"><span>폐기물 종류</span><span class="cf-facet-desc">내가 기록한 유형 기준 · 여러 개 선택 가능</span></div>
+        <div class="cf-pill-group" data-facet="wasteType" id="cfWasteTypeGroup"></div>
+      </div>
       <div class="cf-toggle-row">
         <span>타파트너영업중 표시</span>
         <button type="button" id="cfToggleOtherActive" class="cf-switch on"></button>
@@ -743,7 +747,9 @@ let markerByKey = {};
 let allStoresInView = [];
 let currentFilter = "all";
 // ★ 파트너 조합필터 상태 (currentFilter === 'all' + 파트너 화면일 때만 적용됨. 관리자/외주는 무관)
-let partnerComboFilter = { leadStatus: [], repriority: [], otherActive: true, basicOnly: false };
+let partnerComboFilter = { leadStatus: [], repriority: [], wasteType: [], otherActive: true, basicOnly: false };
+// ★ v54: 기계약 오버레이 토글 (독립적 on/off, 전체/프로젝트영업과 함께 켤 수 있음)
+let showContractOverlay = false;
 let selectedStore = null;
 let searchTimer = null;
 let currentUserLocation = null;
@@ -1487,21 +1493,17 @@ function initMap() {
     btn.onclick = function() {
       const filter = btn.dataset.filter;
 
-      // ★ 기계약: 이미 켜진 상태에서 다시 누르면 지도 이동 없이 '전체'로 복귀 (토글)
-      if (filter === "contract" && currentFilter === "contract") {
-        document.querySelectorAll(".filter-chip").forEach(b => {
-          b.classList.remove("active");
-          b.style.background = b.dataset.filter === "project" ? "" : "transparent";
-        });
-        const allBtn = document.querySelector('.filter-chip[data-filter="all"]');
-        allBtn.classList.add("active");
-        allBtn.style.background = "#363859";
-        currentFilter = "all";
+      // ★ v54: 기계약은 독립 오버레이 토글 — 전체/프로젝트영업 상태를 건드리지 않고 켜고 끔
+      if (filter === "contract") {
+        showContractOverlay = !showContractOverlay;
+        btn.classList.toggle("active", showContractOverlay);
+        btn.style.background = showContractOverlay ? getFilterColor("contract") : "transparent";
         renderMarkers();
         return;
       }
 
       document.querySelectorAll(".filter-chip").forEach(b => {
+        if (b.dataset.filter === "contract") return; // ★ v54: 기계약 칩 상태는 독립적이라 건드리지 않음
         b.classList.remove("active");
         b.style.background = b.dataset.filter === "project" ? "" : "transparent";
       });
@@ -1513,7 +1515,6 @@ function initMap() {
       if (filter === "project") {
         moveToMyProjectStores();
       } else {
-        // ★ v3단계: '전체'·'기계약' 모두 지도 이동 없이 현재 로드된 핀 안에서만 필터링
         renderMarkers();
       }
     };
@@ -1992,9 +1993,10 @@ function getEffectiveStatus(store) {
 function readComboFilterFromDOM() {
   const leadStatus = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="leadStatus"] .cf-pill.sel')).map(function(b) { return b.dataset.val; });
   const repriority = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="repriority"] .cf-pill.sel')).map(function(b) { return b.dataset.val; });
+  const wasteType = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="wasteType"] .cf-pill.sel')).map(function(b) { return b.dataset.val; }); // ★ v54
   const otherActive = document.getElementById('cfToggleOtherActive').classList.contains('on');
   const basicOnly = document.getElementById('cfToggleBasicOnly').classList.contains('on');
-  return { leadStatus: leadStatus, repriority: repriority, otherActive: otherActive, basicOnly: basicOnly };
+  return { leadStatus: leadStatus, repriority: repriority, wasteType: wasteType, otherActive: otherActive, basicOnly: basicOnly };
 }
 
 // ★ 기본값과 다른 항목 개수 (트리거 버튼 배지용)
@@ -2002,6 +2004,7 @@ function comboFilterActiveCount(f) {
   let n = 0;
   if (f.leadStatus.length) n++;
   if (f.repriority.length) n++;
+  if (f.wasteType.length) n++;
   if (!f.otherActive) n++;
   if (f.basicOnly) n++;
   return n;
@@ -2016,6 +2019,10 @@ function renderAppliedChipsRow() {
   const chips = [];
   f.leadStatus.forEach(function(v) { chips.push({ key: 'leadStatus:' + v, label: COMBO_LEAD_LABELS[v] || v }); });
   f.repriority.forEach(function(v) { chips.push({ key: 'repriority:' + v, label: '우선순위 ' + v }); });
+  f.wasteType.forEach(function(v) { // ★ v54
+    const w = WASTE_TYPES.find(function(x) { return x.code === v; });
+    chips.push({ key: 'wasteType:' + v, label: w ? w.label : v });
+  });
   if (!f.otherActive) chips.push({ key: 'otherActive', label: '타파트너영업중 숨김' });
   if (f.basicOnly) chips.push({ key: 'basicOnly', label: '베이직ON만' });
 
@@ -2139,13 +2146,19 @@ function computeComboFilterMatchCount(f) {
   const suppressed = computeDupSuppressedKeys();
   for (const store of allStoresInView) {
     if (suppressed[store._key]) continue;
-    if (isContractGrade(store.grade)) { n++; continue; } // 기계약은 조합필터 영향 없음(항상 표시)
+    // ★ v54: 기계약도 이제 오버레이 토글을 따름 (꺼져있으면 카운트에서도 제외)
+    if (isContractGrade(store.grade)) { if (showContractOverlay) n++; continue; }
     const status = getVisitStatus(store);
     if (f.leadStatus.length && f.leadStatus.indexOf(status) === -1) continue;
     if (f.repriority.length) {
       const rec = myVisitedStoreData[store._key];
       const rp = (rec && rec.current && rec.current.repriority) || "";
       if (f.repriority.indexOf(rp) === -1) continue;
+    }
+    if (f.wasteType.length) { // ★ v54
+      const byType = myVisitedStoreDataByType[store._key] || {};
+      const hasMatch = f.wasteType.some(function(wt) { return !!byType[wt]; });
+      if (!hasMatch) continue;
     }
     if (f.basicOnly && store.basic !== "ON") continue;
     if (!f.otherActive && status === "none" && isOtherPartnerActive(store)) continue;
@@ -2173,7 +2186,18 @@ function closeComboFilterPanel(shouldRevert) {
   document.getElementById('comboFilterPanel').classList.remove('open');
 }
 
+// ★ v54: 폐기물 종류 필터 팩셋 옵션을 WASTE_TYPES 배열로 자동 채움 (라벨 중복 관리 방지)
+function populateWasteTypeFilterPills_() {
+  const group = document.getElementById('cfWasteTypeGroup');
+  if (!group || group.children.length > 0) return;
+  group.innerHTML = WASTE_TYPES.map(function(w) {
+    return '<button type="button" class="cf-pill" data-val="' + w.code + '">' + w.label + '</button>';
+  }).join('');
+}
+
 function bindComboFilterUI() {
+  populateWasteTypeFilterPills_(); // ★ v54
+
   document.querySelectorAll('.cf-pill').forEach(function(btn) {
     btn.onclick = function() { btn.classList.toggle('sel'); updateApplyButtonCount(); };
   });
@@ -2188,7 +2212,7 @@ function bindComboFilterUI() {
     document.querySelectorAll('.cf-pill.sel').forEach(function(b) { b.classList.remove('sel'); });
     document.getElementById('cfToggleOtherActive').classList.add('on');
     document.getElementById('cfToggleBasicOnly').classList.remove('on');
-    partnerComboFilter = { leadStatus: [], repriority: [], otherActive: true, basicOnly: false };
+    partnerComboFilter = { leadStatus: [], repriority: [], wasteType: [], otherActive: true, basicOnly: false };
     updateComboFilterBadgeAndChips();
     updateApplyButtonCount();
     closeComboFilterPanel(false);
@@ -2230,11 +2254,14 @@ function renderMarkers() {
     const status = getEffectiveStatus(store);
     const isContract = isContractGrade(store.grade);
 
+    // ★ v54: 파트너 화면에서 기계약은 독립 오버레이. 꺼져있으면 기계약 핀은 렌더링 대상에서 제외
+    // (관리자/외주는 기존 로직 그대로 — 이 토글의 영향을 받지 않음)
+    if (!isAdminUser && !isExternalUser && isContract && !showContractOverlay) continue;
+
     if (currentFilter === "project") {
       if (isContract || !amIAssignedToProject(store, currentUser.key)) continue;
     } else if (currentFilter !== "all") {
       if (!isContract && status !== currentFilter) continue;
-      if (currentFilter === "contract" && !isContract) continue;
     } else if (!isAdminUser && !isExternalUser && !isContract) {
       // ★ 조합필터: '전체' 모드 + 파트너 화면에서만 적용
       const cf = partnerComboFilter;
@@ -2243,6 +2270,12 @@ function renderMarkers() {
         const rec = myVisitedStoreData[store._key];
         const rp = (rec && rec.current && rec.current.repriority) || "";
         if (cf.repriority.indexOf(rp) === -1) continue;
+      }
+      // ★ v54: 폐기물 종류 필터 — 이 업장에 선택한 폐기물 유형 중 하나라도 내 기록이 있으면 통과
+      if (cf.wasteType.length) {
+        const byType = myVisitedStoreDataByType[store._key] || {};
+        const hasMatch = cf.wasteType.some(function(wt) { return !!byType[wt]; });
+        if (!hasMatch) continue;
       }
       if (cf.basicOnly && store.basic !== "ON") continue;
       if (!cf.otherActive && status === "none" && isOtherPartnerActive(store)) continue;
