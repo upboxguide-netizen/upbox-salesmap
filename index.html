@@ -443,12 +443,17 @@
         <input type="text" id="nsAddress" placeholder="검색 시 자동 입력 / 직접 입력 가능">
       </div>
 
-      <div class="ns-form-group">
+     <div class="ns-form-group">
         <label>영업구분</label>
         <div class="ns-admin-type-buttons">
           <button type="button" data-salestype="인바운드" onclick="selectSalesType(this)">인바운드</button>
           <button type="button" data-salestype="아웃바운드" onclick="selectSalesType(this)">아웃바운드</button>
         </div>
+      </div>
+
+      <div class="ns-form-group">
+        <label>폐기물 선택</label>
+        <select id="nsWasteType" onchange="applyNsWasteTypeUI(this.value)"></select>
       </div>
 
       <div class="ns-form-group">
@@ -472,7 +477,7 @@
 
       <div class="ns-form-row">
         <div class="ns-form-group">
-          <label>월 예상배출량 (L)</label>
+          <label id="lbl_nsAmount">월 예상배출량 (L)</label>
           <input type="text" id="nsAmount" inputmode="numeric" placeholder="예: 500">
         </div>
         <div class="ns-form-group">
@@ -483,21 +488,21 @@
 
       <div class="ns-form-row">
         <div class="ns-form-group">
-          <label>현재 단가 (원/L)</label>
+          <label id="lbl_nsPrice">현재 단가 (원/L)</label>
           <input type="text" id="nsPrice" inputmode="numeric" placeholder="예: 180">
         </div>
         <div class="ns-form-group">
-          <label>제안 단가 (원/L)</label>
+          <label id="lbl_nsSuggestedPrice">제안 단가 (원/L)</label>
           <input type="text" id="nsSuggestedPrice" inputmode="numeric" placeholder="예: 170">
         </div>
       </div>
 
       <div class="ns-form-row">
-        <div class="ns-form-group">
+        <div class="ns-form-group" id="grp_nsBins">
           <label>현재 통 갯수</label>
           <input type="text" id="nsBins" inputmode="numeric" placeholder="예: 4">
         </div>
-        <div class="ns-form-group">
+        <div class="ns-form-group" id="grp_nsVinyl">
           <label>비닐 사용여부</label>
           <select id="nsVinyl">
             <option value="">선택</option>
@@ -3171,6 +3176,12 @@ function resetNewStoreForm() {
   _nsSelectedPlace = null;
   document.getElementById('nsSelectedPlace').classList.remove('show');
 
+  // ★ v53-2: 폐기물 드롭다운 초기화
+  populateNsWasteTypeOptions();
+  const wasteSel = document.getElementById('nsWasteType');
+  if (wasteSel) wasteSel.value = WASTE_TYPE_DEFAULT;
+  applyNsWasteTypeUI(WASTE_TYPE_DEFAULT);
+
   ['nsStoreName', 'nsAddress', 'nsCurrentStoreName', 'nsContact',
    'nsAmount', 'nsFreq', 'nsPrice', 'nsSuggestedPrice',
    'nsBins', 'nsNote'].forEach(function(id) {
@@ -3283,6 +3294,31 @@ function selectAdminType(btn) {
   _nsSelectedAdminType = btn.dataset.admintype;
 }
 
+// ★ v53-2: 신규업장추가 모달 — 폐기물 드롭다운 옵션 채우기 (기존 WASTE_TYPES 재사용)
+function populateNsWasteTypeOptions() {
+  const sel = document.getElementById('nsWasteType');
+  if (!sel || sel.options.length > 0) return; // 이미 채워져 있으면 스킵
+  sel.innerHTML = WASTE_TYPES.map(function(w) {
+    return '<option value="' + w.code + '">' + w.label + '</option>';
+  }).join('');
+}
+
+// ★ v53-2: 신규업장추가 모달 — 폐기물 종류에 따라 라벨/필드 숨김 적용 (핀 클릭 폼과 동일 로직)
+function applyNsWasteTypeUI(wasteType) {
+  const labels = WASTE_FIELD_LABELS[wasteType] || WASTE_FIELD_LABELS[WASTE_TYPE_DEFAULT];
+  const setLabel = function(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; };
+  setLabel('lbl_nsAmount', labels.amount);
+  setLabel('lbl_nsPrice', labels.price);
+  setLabel('lbl_nsSuggestedPrice', labels.suggestedPrice);
+
+  const hidden = WASTE_HIDDEN_FIELDS[wasteType] || [];
+  const groupMap = { bins: 'grp_nsBins', vinyl: 'grp_nsVinyl' };
+  for (const key in groupMap) {
+    const groupEl = document.getElementById(groupMap[key]);
+    if (groupEl) groupEl.style.display = hidden.indexOf(key) !== -1 ? 'none' : '';
+  }
+}
+
 function selectSalesType(btn) {
   document.querySelectorAll('button[data-salestype]').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
@@ -3318,6 +3354,10 @@ async function submitNewStore() {
   const lat = _nsSelectedPlace ? _nsSelectedPlace.lat : '';
   const lng = _nsSelectedPlace ? _nsSelectedPlace.lng : '';
 
+  // ★ v53-2: 폐기물 종류에 따라 숨긴 필드(bins/vinyl)는 제출하지 않음
+  const nsWasteType = document.getElementById('nsWasteType').value || WASTE_TYPE_DEFAULT;
+  const nsHiddenFields = WASTE_HIDDEN_FIELDS[nsWasteType] || [];
+
   const payload = {
     partnerName: currentUser.name || '',
     partnerCode: currentUser.code,
@@ -3328,14 +3368,15 @@ async function submitNewStore() {
     usedSearch: usedSearch,
     adminType: _nsSelectedAdminType,
     salesType: _nsSelectedSalesType,
+    wasteType: nsWasteType,
     currentStoreName: document.getElementById('nsCurrentStoreName').value.trim(),
     contact: document.getElementById('nsContact').value.trim(),
     amount: document.getElementById('nsAmount').value.trim(),
     price: document.getElementById('nsPrice').value.trim(),
     suggestedPrice: document.getElementById('nsSuggestedPrice').value.trim(),
     freq: document.getElementById('nsFreq').value.trim(),
-    bins: document.getElementById('nsBins').value.trim(),
-    vinyl: document.getElementById('nsVinyl').value,
+    bins: nsHiddenFields.indexOf('bins') !== -1 ? '' : document.getElementById('nsBins').value.trim(),
+    vinyl: nsHiddenFields.indexOf('vinyl') !== -1 ? '' : document.getElementById('nsVinyl').value,
     truck: document.getElementById('nsTruck').value,
     note: document.getElementById('nsNote').value.trim(),
     outcome: _nsSelectedOutcome
