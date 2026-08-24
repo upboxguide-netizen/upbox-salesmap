@@ -4,21 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>업박스 영업 지도</title>
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services,clusterer"></script>
-
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Noto Sans KR', sans-serif; overflow: hidden; }
   #app { width: 100vw; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
-
   #loginScreen { position: fixed; inset: 0; z-index: 9999; background: #363859; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .login-box { background: white; border-radius: 16px; padding: 36px 28px; max-width: 380px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
   .login-box h1 { font-size: 22px; color: #363859; margin-bottom: 6px; text-align: center; }
@@ -27,7 +22,6 @@
   .login-box input:focus { outline: none; border-color: #F2AC57; }
   .login-box button { width: 100%; padding: 13px; border: none; border-radius: 8px; background: #363859; color: white; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; }
   .login-error { color: #E53935; font-size: 12px; margin-top: 8px; text-align: center; }
-
   #header { background: #363859; color: white; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
   #header .title { font-size: 15px; font-weight: 700; flex: 1; display: flex; align-items: center; gap: 6px; }
   #header .admin-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #F2AC57; color: white; font-size: 10px; font-weight: 700; }
@@ -35,7 +29,6 @@
   #header .user { font-size: 11px; color: #CCC; }
   #header .header-btn { background: none; border: 1px solid #666; color: #CCC; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: inherit; }
   #header .header-btn:hover { background: rgba(255,255,255,0.1); }
-
   #searchBar { padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; position: relative; }
   #searchInput { width: 100%; padding: 10px 12px; border: 1px solid #DDD; border-radius: 8px; font-size: 14px; font-family: inherit; }
   #searchInput:focus { outline: none; border-color: #F2AC57; }
@@ -49,7 +42,6 @@
   .search-status-label { font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex-shrink: 0; color: white; }
   .search-project-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 3px; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; font-size: 10px; font-weight: 600; flex-shrink: 0; }
   .search-address { font-size: 11px; color: #999; margin-top: 3px; margin-left: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
   #filterBar { background: white; border-bottom: 1px solid #EEE; }
   #quickChipRow { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; }
   .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
@@ -66,7 +58,6 @@
   #appliedChipsRow:empty { display: none; padding: 0; }
   .applied-chip { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 14px; background: #F0F0F5; font-size: 11px; color: #444; cursor: pointer; font-family: inherit; border: none; }
   .applied-chip .x { color: #999; font-weight: 700; }
-
   /* 바텀시트 모달 */
   #comboFilterBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 500; }
   #comboFilterBackdrop.open { display: block; }
@@ -91,10 +82,8 @@
   .cf-panel-actions button { padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; font-family: inherit; border: none; cursor: pointer; }
   #cfResetBtn { background: white; border: 1px solid #CCC !important; color: #666; flex: 0 0 auto; padding: 13px 18px; }
   #cfApplyBtn { background: #363859; color: white; flex: 1; }
-
   .chip-count { margin-left: 3px; font-weight: 600; opacity: 0.9; }
   .chip-count:empty { display: none; }
-
   #adminStatsBar {
     display: none;
     padding: 8px 10px;
@@ -120,7 +109,6 @@
   .admin-stat-dot { width: 7px; height: 7px; border-radius: 50%; }
   .admin-stat-name { font-size: 11px; color: #EEE; }
   .admin-stat-value { font-size: 12px; font-weight: 700; color: white; }
-
   .admin-partner-selector { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; background: rgba(255,255,255,0.2); border: 1.5px solid transparent; flex-shrink: 0; cursor: pointer; transition: all 0.15s; position: relative; user-select: none; }
   .admin-partner-selector:hover { background: rgba(255,255,255,0.3); }
   .admin-partner-selector.active { background: rgba(242, 172, 87, 0.45); border-color: #F2AC57; box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5); }
@@ -134,14 +122,11 @@
   .admin-partner-option .partner-record-count { color: #888; font-size: 10px; }
   .admin-partner-option.selected .partner-record-count { color: #F2AC57; }
   .admin-stats-contract-hint { font-size: 11px; color: #F2AC57; flex-shrink: 0; padding: 3px 8px; border-radius: 12px; background: rgba(242, 172, 87, 0.15); border: 1px solid rgba(242, 172, 87, 0.3); }
-
   #map { flex: 1; position: relative; }
   #statusBar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(54, 56, 89, 0.9); color: white; padding: 6px 14px; border-radius: 16px; font-size: 12px; text-align: center; z-index: 50; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-
   #addBtn { position: absolute; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; height: 44px; padding: 0 18px; border: none; border-radius: 22px; background: #F2AC57; color: white; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 4px; font-family: inherit; }
   #addBtn:hover { background: #e89a3e; }
   #locBtn { position: absolute; bottom: calc(126px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; width: 48px; height: 48px; border-radius: 50%; border: none; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-
   #storePanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 67vh; height: 67vh; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); transform: translateY(100%); transition: transform 0.3s; z-index: 200; overflow-y: auto; overscroll-behavior: contain; }
   #storePanel.open { transform: translateY(0); }
   #panelDrag { width: 40px; height: 4px; background: #CCC; border-radius: 2px; margin: 8px auto; cursor: pointer; }
@@ -156,24 +141,19 @@
   #panelContent .badge-grade { background: #F5F5F5; color: #666; }
   #panelContent .badge-contract { background: #FFF3E0; color: #F2AC57; font-weight: 700; }
   #panelContent .badge-closed { background: #E0E0E0; color: #424242; font-weight: 600; }
-
   .admin-info-box { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 12px; line-height: 1.6; }
   .admin-info-box .admin-info-label { color: #F2AC57; font-weight: 700; margin-right: 6px; }
-
   .multi-projects { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; margin-bottom: 10px; }
   .project-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; box-shadow: 0 1px 3px rgba(54, 56, 89, 0.3); }
   .project-badge-icon { font-size: 13px; }
-
   .contact-info { font-size: 12px; color: #888; margin-bottom: 10px; padding: 6px 10px; background: #FAFAFA; border-radius: 6px; }
   .service { display: flex; gap: 8px; margin-bottom: 14px; }
   .service-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: #F5F5F5; color: #666; }
   .service-badge.on { background: #E8F5E9; color: #43A047; }
-
   /* ★ v55: 영업중인 폐기물 배지 (2안) */
   .waste-badges-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
   .waste-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px 5px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
   .waste-badge-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
   .roadview-section { border: 1px solid #EEE; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
   .roadview-header { padding: 10px 14px; background: #F8F8F8; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; color: #555; font-weight: 500; }
   .roadview-header:hover { background: #F0F0F0; }
@@ -183,16 +163,13 @@
   #roadview { width: 100%; height: 100%; }
   .rv-loading, .rv-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #888; font-size: 13px; background: #F5F5F5; }
   .rv-external { position: absolute; bottom: 8px; right: 8px; background: rgba(54,56,89,0.9); color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 11px; z-index: 10; }
-
   .info-table { border-top: 1px solid #EEE; padding-top: 12px; margin-bottom: 14px; }
   .info-row { display: flex; gap: 10px; font-size: 13px; padding: 4px 0; }
   .info-key { color: #999; min-width: 80px; }
   .info-value { color: #333; flex: 1; }
   .memo { background: #FFF9E6; border-left: 3px solid #F5B800; padding: 8px 12px; font-size: 12px; color: #8C6900; border-radius: 4px; margin-bottom: 14px; line-height: 1.5; }
-
   .priceGuideBtn { display: block; width: 100%; padding: 11px; border: none; border-radius: 8px; background: #363859; color: white; font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; margin-bottom: 8px; font-family: inherit; }
   .navBtn { display: block; width: 100%; padding: 11px; border: 1px solid #363859; border-radius: 8px; background: white; color: #363859; font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; margin-bottom: 14px; font-family: inherit; }
-
   .visit-form { border-top: 1px solid #EEE; padding-top: 14px; margin-top: 4px; }
   .visit-form h3 { font-size: 14px; color: #363859; margin-bottom: 4px; }
   .visit-dates { font-size: 11px; color: #999; margin-bottom: 12px; }
@@ -208,7 +185,6 @@
   .repriority-toggle button.sel { border-color: #E53935; color: #E53935; background: #FDECEA; }
   /* ★ 타파트너영업중 태그 */
   .other-active-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; background: #E0F7FA; color: #00838F; font-size: 11px; font-weight: 700; border: 1px solid #00838F; }
-
   #noticeModal { position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; }
   #noticeModal.show { display: flex; }
   .notice-box { background: white; border-radius: 16px; padding: 28px 24px; max-width: 360px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: noticePopup 0.3s ease-out; }
@@ -222,7 +198,6 @@
   .notice-btn-primary:hover { background: #e89a3e; }
   .notice-btn-secondary { background: #EEE; color: #555; }
   .notice-btn-secondary:hover { background: #DDD; }
-
   .new-store-modal { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 10000; justify-content: center; align-items: flex-start; overflow-y: auto; padding: 20px 0; -webkit-overflow-scrolling: touch; }
   .new-store-modal.open { display: flex; }
   .new-store-content { background: #fff; width: 100%; max-width: 480px; border-radius: 16px; margin: 20px; padding: 0; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
@@ -275,7 +250,6 @@
 </style>
 </head>
 <body>
-
 <div id="app">
   <div id="header">
     <div class="title">
@@ -285,12 +259,10 @@
     <div class="user" id="userInfo"></div>
     <button class="header-btn" id="logoutBtn">로그아웃</button>
   </div>
-
   <div id="searchBar">
     <input type="text" id="searchInput" placeholder="업장명/지번/도로명 주소 일부를 검색해주세요">
     <div id="searchResults"></div>
   </div>
-
   <div id="adminStatsBar">
     <span class="admin-partner-selector" id="adminPartnerSelector">
       <span class="admin-stats-label-icon">📊</span>
@@ -321,7 +293,6 @@
     <span class="admin-stats-contract-hint">★ 기계약업장 줌인 시 노출</span>
     <span class="admin-stats-version" id="adminStatsVersion"></span>
   </div>
-
   <div id="filterBar">
     <div id="quickChipRow">
       <button id="comboFilterTrigger" class="filter-icon-btn" title="조회필터">⚙️<span id="comboFilterBadge"></span></button>
@@ -331,7 +302,6 @@
     </div>
     <div id="appliedChipsRow"></div>
   </div>
-
   <div id="comboFilterBackdrop"></div>
   <div id="comboFilterPanel">
     <div id="comboFilterPanelHandle"></div>
@@ -377,14 +347,12 @@
         <button type="button" id="cfApplyBtn">적용</button>
       </div>
   </div>
-
   <div id="map">
     <div id="statusBar">업장 로딩 중...</div>
     <button id="locBtn" title="현재 위치">📍</button>
     <button id="addBtn" title="업장 추가">＋ 업장추가</button>
   </div>
 </div>
-
 <div id="loginScreen" style="display:none;">
   <div class="login-box">
     <h1>업박스 영업 지도</h1>
@@ -395,13 +363,11 @@
     <div class="login-error" id="loginError"></div>
   </div>
 </div>
-
 <div id="storePanel">
   <div id="panelDrag"></div>
   <button id="panelClose" type="button" aria-label="닫기">✕</button>
   <div id="panelContent"></div>
 </div>
-
 <div id="noticeModal">
   <div class="notice-box">
     <div class="notice-icon" id="noticeIcon">📢</div>
@@ -413,7 +379,6 @@
     </div>
   </div>
 </div>
-
 <div id="newStoreModal" class="new-store-modal">
   <div class="new-store-content">
     <div class="new-store-header">
@@ -425,7 +390,6 @@
         <span>📍</span>
         <span>업장 검색 후에 나오지 않는 곳만 등록해주세요!<br>(사업자명 변경은 상담내용에 기입)</span>
       </div>
-
       <div class="ns-form-group">
         <label>사업장명 / 주소 검색 <span class="required">*</span></label>
         <div class="ns-search-wrapper">
@@ -434,24 +398,20 @@
         </div>
         <div class="ns-helper">검색 결과가 없으면 아래 사업장명/주소를 직접 입력하세요</div>
       </div>
-
       <div id="nsSelectedPlace" class="ns-selected-place">
         <button class="ns-sp-clear" onclick="clearSelectedPlace()" type="button">변경</button>
         <div class="ns-sp-label">선택된 장소</div>
         <div class="ns-sp-name" id="nsSelectedName"></div>
         <div class="ns-sp-addr" id="nsSelectedAddr"></div>
       </div>
-
       <div class="ns-form-group">
         <label>사업장명 <span class="required">*</span></label>
         <input type="text" id="nsStoreName" placeholder="검색 시 자동 입력 / 직접 입력 가능">
       </div>
-
       <div class="ns-form-group">
         <label>주소 <span class="required">*</span></label>
         <input type="text" id="nsAddress" placeholder="검색 시 자동 입력 / 직접 입력 가능">
       </div>
-
      <div class="ns-form-group">
         <label>영업구분</label>
         <div class="ns-admin-type-buttons">
@@ -459,12 +419,10 @@
           <button type="button" data-salestype="아웃바운드" onclick="selectSalesType(this)">아웃바운드</button>
         </div>
       </div>
-
       <div class="ns-form-group">
         <label>폐기물 선택</label>
         <select id="nsWasteType" onchange="applyNsWasteTypeUI(this.value)"></select>
       </div>
-
       <div class="ns-form-group">
         <label>행정신고구분</label>
         <div class="ns-admin-type-buttons">
@@ -473,17 +431,14 @@
           <button type="button" data-admintype="일반사업장" onclick="selectAdminType(this)">일반사업장</button>
         </div>
       </div>
-
       <div class="ns-form-group">
         <label>현재 수거업체명</label>
         <input type="text" id="nsCurrentStoreName" placeholder="이미 거래 중인 업체가 있다면">
       </div>
-
       <div class="ns-form-group">
         <label>담당자 연락처</label>
         <input type="tel" id="nsContact" inputmode="numeric" placeholder="010-0000-0000" maxlength="13">
       </div>
-
       <div class="ns-form-row">
         <div class="ns-form-group">
           <label id="lbl_nsAmount">월 예상배출량 (L)</label>
@@ -494,7 +449,6 @@
           <input type="text" id="nsFreq" inputmode="numeric" placeholder="예: 3">
         </div>
       </div>
-
       <div class="ns-form-row">
         <div class="ns-form-group">
           <label id="lbl_nsPrice">현재 단가 (원/L)</label>
@@ -505,7 +459,6 @@
           <input type="text" id="nsSuggestedPrice" inputmode="numeric" placeholder="예: 170">
         </div>
       </div>
-
       <div class="ns-form-row">
         <div class="ns-form-group" id="grp_nsBins">
           <label>현재 통 갯수</label>
@@ -522,7 +475,6 @@
           </select>
         </div>
       </div>
-
       <div class="ns-form-group">
         <label>5톤 차량 진입 가능여부</label>
         <select id="nsTruck">
@@ -531,12 +483,10 @@
           <option value="불가능">불가능</option>
         </select>
       </div>
-
       <div class="ns-form-group">
         <label>상세 상담내용</label>
         <textarea id="nsNote" placeholder="상담 내용을 기록하세요"></textarea>
       </div>
-
       <div class="ns-form-group">
         <label>최종영업결과</label>
         <div class="ns-outcome-buttons">
@@ -545,7 +495,6 @@
           <button type="button" data-outcome="실패" class="fail" onclick="selectOutcome(this)">실패</button>
         </div>
       </div>
-
       <div class="ns-submit-row">
         <button class="ns-btn-cancel" onclick="closeNewStoreModal()" type="button">취소</button>
         <button class="ns-btn-submit" id="nsSubmitBtn" onclick="submitNewStore()" type="button">등록</button>
@@ -553,18 +502,15 @@
     </div>
   </div>
 </div>
-
 <script>
 const firebaseConfig = {
   databaseURL: "https://salespartners-map-67daf-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
 const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec';
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 const NEW_STORE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzSBmYw2I2NBTb8TwGtQe2r5hG0THf60eIROO7kbLWckHBGbYufoA8odWghYjs_sGJuNA/exec';
-
 const ADMIN_CODES = ['1111', '0001', '0002', '0003', '0004', '0005', '0006', '0007'];
 const CLUSTER_MIN_LEVEL = 7;
 const FILTER_MOVE_MAX_PINS = 500;
@@ -572,17 +518,14 @@ const ADMIN_INIT_LEVEL = 11;
 const ADMIN_CONTRACT_ZOOM_LEVEL = 8;
 const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
-
 function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
 }
-
 // ★ v51.7: 외주 모드 (기계약 열람 전용)
 const EXTERNAL_PARTNER_CODES = ['023567765'];
 function isExternal(code) {
   return code && EXTERNAL_PARTNER_CODES.indexOf(String(code).trim()) !== -1;
 }
-
 // ★ v53: 폐기물 종류 — 음식물류폐기물이 레거시 기본값 (recKey 접미사 없음, 기존 데이터 100% 호환)
 const WASTE_TYPES = [
   { code: 'FOOD',    label: '음식물류폐기물' },
@@ -590,27 +533,23 @@ const WASTE_TYPES = [
   { code: 'OIL',     label: '폐식용유' }
 ];
 const WASTE_TYPE_DEFAULT = 'FOOD';
-
 // 폐기물별 라벨 오버라이드
 const WASTE_FIELD_LABELS = {
   FOOD:    { amount: '월 예상배출량 (L)',  price: '현재 단가 (원/L)',   suggestedPrice: '제안 단가 (원/L)' },
   PLASTIC: { amount: '월 예상배출량 (KG)', price: '현재 단가 (원/장당)', suggestedPrice: '제안 단가 (원/장당)' },
   OIL:     { amount: '월 예상배출량 (통)', price: '현재 단가 (원/통당)', suggestedPrice: '제안 단가 (원/통당)' }
 };
-
 // 폐기물별로 숨길 필드 (숨긴 필드는 저장 시 빈값 처리)
 const WASTE_HIDDEN_FIELDS = {
   FOOD:    [],
   PLASTIC: ['bins', 'vinyl'],
   OIL:     ['bins', 'vinyl']
 };
-
 // 레거시 recKey(접미사 없음)는 항상 음식물류폐기물로 취급 → 기존 데이터 무손실
 function buildWasteRecKey_(partnerKey, storeKey, wasteType) {
   const suffix = (wasteType && wasteType !== WASTE_TYPE_DEFAULT) ? ('_' + wasteType) : '';
   return 'REC_' + partnerKey + '_' + storeKey + suffix;
 }
-
 // 여러 폐기물 기록 중 지도 핀/칩 카운트에 쓸 대표 기록 선택
 // 우선순위: 계약성사 > 유효리드 > 단순방문 > 단순접촉 > 최종불발 > 폐업처리 > 미방문
 const WASTE_STATUS_PRIORITY = ['success', 'lead', 'visit', 'simpleContact', 'fail', 'closedByMe', 'none'];
@@ -625,15 +564,14 @@ function pickRepresentativeVisitRecord_(recordsByType) {
   }
   return best;
 }
-
 // ★ CACHE 블록 — 삭제되면 searchStores·loadSearchIndex 전체가 에러남
+// ★ 패치1: 캐시 키 승격 v3 → v4
 const CACHE = {
   OTHER_VISITS:    { key: 'cache_other_visits_v3',     ttlMs: 24 * 60 * 60 * 1000 },
   MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
   ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v2',  ttlMs: 12 * 60 * 60 * 1000 },
-  SEARCH_INDEX:    { key: 'cache_search_index_v3',     ttlMs: 6 * 60 * 60 * 1000 }
+  SEARCH_INDEX:    { key: 'cache_search_index_v4',     ttlMs: 6 * 60 * 60 * 1000 }
 };
-
 function getCache(c) {
   try {
     const raw = localStorage.getItem(c.key);
@@ -644,13 +582,15 @@ function getCache(c) {
     return obj.d;
   } catch(e) { return null; }
 }
-
 function setCache(c, data) {
   try {
     localStorage.setItem(c.key, JSON.stringify({ t: Date.now(), d: data }));
   } catch(e) {
     try {
-      const keys = ['cache_other_visits_v2', 'cache_my_projects_v3', 'cache_admin_aggregate_v2', 'cache_my_projects_v2', 'cache_admin_aggregate_v1', 'cache_other_visits', 'cache_my_projects', 'cache_search_index_v1', 'cache_search_index_v2'];
+      const keys = ['cache_other_visits_v2', 'cache_my_projects_v3', 'cache_admin_aggregate_v2',
+                    'cache_my_projects_v2', 'cache_admin_aggregate_v1', 'cache_other_visits',
+                    'cache_my_projects', 'cache_search_index_v1', 'cache_search_index_v2',
+                    'cache_search_index_v3'];
       for (const k of keys) {
         if (k !== c.key && localStorage.getItem(k)) { localStorage.removeItem(k); break; }
       }
@@ -658,24 +598,23 @@ function setCache(c, data) {
     } catch(e2) {}
   }
 }
-
 function clearAllCaches() {
-  ['cache_other_visits_v2','cache_my_projects_v3','cache_my_projects_v2','cache_admin_aggregate_v2','cache_admin_aggregate_v1','cache_other_visits','cache_my_projects','cache_search_index_v1','cache_search_index_v2'].forEach(k => localStorage.removeItem(k));
+  ['cache_other_visits_v2','cache_my_projects_v3','cache_my_projects_v2','cache_admin_aggregate_v2',
+   'cache_admin_aggregate_v1','cache_other_visits','cache_my_projects',
+   'cache_search_index_v1','cache_search_index_v2','cache_search_index_v3'].forEach(k => localStorage.removeItem(k));
 }
-
 (function migrateOldCaches() {
-  ['cache_other_visits','cache_my_projects','cache_my_projects_v2','cache_admin_aggregate_v1','cache_search_index_v1'].forEach(k => {
+  ['cache_other_visits','cache_my_projects','cache_my_projects_v2','cache_admin_aggregate_v1',
+   'cache_search_index_v1','cache_search_index_v2','cache_search_index_v3'].forEach(k => {
     if (localStorage.getItem(k)) localStorage.removeItem(k);
   });
 })();
-
 const NOTICE_TYPES = {
   projectAssignments: { icon: '🎯', title: '프로젝트 배정 변경', cacheKeysToClear: ['cache_my_projects_v3'] },
   contractStores: { icon: '⭐', title: '기계약 업장 변경', cacheKeysToClear: [] },
   general: { icon: '📢', title: '공지사항', cacheKeysToClear: [] }
 };
 const NOTICE_SEEN_PREFIX = 'notice_seen_';
-
 async function checkNotices() {
   try {
     const snap = await db.ref('notices').once('value');
@@ -691,22 +630,17 @@ async function checkNotices() {
     if (queue.length > 0) showNoticesSequentially(queue);
   } catch(e) {}
 }
-
 function showNoticesSequentially(queue) {
   if (queue.length === 0) return;
   const item = queue.shift();
   showNoticeModal(item.type, item.notice, function() { showNoticesSequentially(queue); });
 }
-
 function showNoticeModal(type, notice, onClose) {
   const meta = NOTICE_TYPES[type] || { icon: '📢', title: '안내', cacheKeysToClear: [] };
   const modal = document.getElementById('noticeModal');
-
   document.getElementById('noticeIcon').textContent = meta.icon;
-
   const displayTitle = (type === 'general' && notice.title) ? notice.title : meta.title;
   document.getElementById('noticeTitle').textContent = displayTitle;
-
   const messageEl = document.getElementById('noticeMessage');
   messageEl.textContent = notice.message;
   if (type === 'general') {
@@ -716,10 +650,8 @@ function showNoticeModal(type, notice, onClose) {
     messageEl.style.whiteSpace = '';
     messageEl.style.textAlign = '';
   }
-
   const laterBtn = document.getElementById('noticeBtnLater');
   const applyBtn = document.getElementById('noticeBtnApply');
-
   if (type === 'general') {
     laterBtn.style.display = 'none';
     applyBtn.textContent = '확인';
@@ -742,10 +674,8 @@ function showNoticeModal(type, notice, onClose) {
       if (onClose) setTimeout(onClose, 200);
     };
   }
-
   modal.classList.add('show');
 }
-
 let map, currentUser = null;
 let markers = [];
 let markerByKey = {};
@@ -760,50 +690,40 @@ let searchTimer = null;
 let currentUserLocation = null;
 const CONTRACT_RADIUS_KM = 3;
 const DUPLICATE_RADIUS_M = 8;
-
 let myLocationMarker = null;
 let geoWatchId = null;
 let rvInstance = null;
 let currentRvState = 'collapsed';
-
 let otherPartnerLastContactMap = {};
 let myVisitedStoreData = {};
 let myVisitedStoreDataByType = {}; // ★ v53: storeKey -> { wasteType: record }
 let hasMyProjects = false;
 let myProjectStores = [];
-
 let isAdminUser = false;
 let adminViewActive = false;
 let visitsAggregate = null;
 let adminMasterStores = [];
 let selectedAdminPartner = 'all';
-
 // ★ v51.7: 외주 모드 전역
 let isExternalUser = false;
 let externalContracts = [];
-
 let contractsCache = { center: null, data: [], ts: 0 };
 const CONTRACTS_CACHE_TTL_MS = 30 * 1000;
 const CONTRACTS_CACHE_MOVE_THRESHOLD_KM = 2;
-
 let markerClusterer = null;
 let initialLocation = null;
 let suppressNextIdle = false;
-
 let _searchIndexData = null;
 let _searchIndexLoadPromise = null;
-
 let _placesSearchCache = null;
 let _placesSearchTimer = null;
 let _nsSelectedPlace = null;
 let _nsSelectedAdminType = '';
 let _nsSelectedSalesType = '';
 let _nsSelectedOutcome = '';
-
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
 document.getElementById("logoutBtn").onclick = logout;
-
 async function tryLogin() {
   const name = document.getElementById("loginName").value.trim();
   const code = document.getElementById("loginCode").value.trim();
@@ -825,14 +745,12 @@ async function tryLogin() {
     errEl.textContent = "로그인 오류: " + e.message;
   }
 }
-
 function logout() {
   stopLocationTracking();
   localStorage.removeItem("upboxPartner");
   clearAllCaches();
   location.reload();
 }
-
 (function autoLogin() {
   const saved = localStorage.getItem("upboxPartner");
   if (saved) {
@@ -842,7 +760,6 @@ function logout() {
     document.getElementById("loginScreen").style.display = "flex";
   }
 })();
-
 async function fetchInitialLocation() {
   return new Promise(function(resolve) {
     if (!navigator.geolocation) { resolve(null); return; }
@@ -853,21 +770,17 @@ async function fetchInitialLocation() {
     );
   });
 }
-
 async function loadMyProjectsFromIndex() {
   try {
     const snap = await db.ref('partner_projects/' + currentUser.key).once('value');
     const data = snap.val();
-
     if (!data) {
       console.warn('[partner_projects] 인덱스 없음 → fallback');
       await checkMyProjectAssignmentLegacy();
       return;
     }
-
     hasMyProjects = data.hasAny === true;
     myProjectStores = [];
-
     if (hasMyProjects && data.stores) {
       for (const k in data.stores) {
         const s = data.stores[k];
@@ -876,21 +789,17 @@ async function loadMyProjectsFromIndex() {
         }
       }
     }
-
     setCache(CACHE.MY_PROJECTS, { hasMyProjects: hasMyProjects, myProjectStores: myProjectStores });
-
     if (hasMyProjects) {
       const projChip = document.getElementById('filterProject');
       if (projChip) projChip.classList.add('visible');
     }
-
     console.log('[partner_projects] 인덱스 로드 완료: hasAny=' + hasMyProjects + ', stores=' + myProjectStores.length);
   } catch(e) {
     console.warn('[partner_projects] 로드 실패, fallback:', e);
     await checkMyProjectAssignmentLegacy();
   }
 }
-
 async function checkMyProjectAssignmentLegacy() {
   try {
     const snap = await db.ref("stores_light").once("value");
@@ -924,11 +833,9 @@ async function checkMyProjectAssignmentLegacy() {
     }
   } catch(e) { console.warn("프로젝트 배정 확인 실패:", e); }
 }
-
 async function startApp() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("userInfo").textContent = currentUser.name;
-
   isAdminUser = isAdmin(currentUser.code);
   if (isAdminUser) {
     adminViewActive = true;
@@ -936,9 +843,7 @@ async function startApp() {
     document.getElementById('filterBar').style.display = 'none';
     console.log('[관리자 모드] 자동 활성화 - ' + currentUser.name);
   }
-
   const locationPromise = fetchInitialLocation();
-
   // ★ v51.7: 외주 모드 분기 (기계약 열람 전용) — 캐시/방문 로딩 전에 조기 탈출
   isExternalUser = isExternal(currentUser.code);
   if (isExternalUser) {
@@ -954,11 +859,9 @@ async function startApp() {
     initMap();
     return; // 외주는 여기서 종료 — 이후 파트너/관리자 로직 실행 안 함
   }
-
   const cachedOtherVisits = getCache(CACHE.OTHER_VISITS);
   const cachedMyProjects = getCache(CACHE.MY_PROJECTS);
   const cachedAggregate = isAdminUser ? getCache(CACHE.ADMIN_AGGREGATE) : null;
-
   if (cachedOtherVisits) otherPartnerLastContactMap = cachedOtherVisits;
   if (cachedMyProjects) {
     hasMyProjects = cachedMyProjects.hasMyProjects;
@@ -969,28 +872,22 @@ async function startApp() {
     }
   }
   if (cachedAggregate) visitsAggregate = cachedAggregate;
-
   await loadMyVisits();
   updateChipCounts();
-
   if (isAdminUser && cachedAggregate) {
     await loadAdminMasterStores();
     updateAdminStatsBar();
     bindAdminStatsFilters();
     buildAdminPartnerDropdown();
   }
-
   initialLocation = await Promise.race([
     locationPromise,
     new Promise(resolve => setTimeout(() => resolve(null), 3000))
   ]);
   if (initialLocation) currentUserLocation = initialLocation;
-
   initMap();
-
   setTimeout(async function() {
     const tasks = [];
-
     if (!cachedOtherVisits) {
       tasks.push(loadOtherPartnerContacts());
     }
@@ -1007,17 +904,14 @@ async function startApp() {
         if (adminViewActive) renderAdminView();
       })());
     }
-
     await Promise.all(tasks);
     checkNotices();
   }, 100);
 }
-
 function bindAdminStatsFilters() {
   document.querySelectorAll('.admin-stat-item[data-admin-filter]').forEach(function(el) {
     el.addEventListener('click', function() {
       const filter = el.dataset.adminFilter;
-
       if (currentFilter === filter) {
         currentFilter = 'all';
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
@@ -1026,13 +920,11 @@ function bindAdminStatsFilters() {
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
       }
-
       console.log('[관리자 필터]', currentFilter);
       resetAdminViewZoom();
       renderAdminView();
     });
   });
-
   document.addEventListener('click', function(e) {
     const selector = document.getElementById('adminPartnerSelector');
     const dropdown = document.getElementById('adminPartnerDropdown');
@@ -1040,7 +932,6 @@ function bindAdminStatsFilters() {
       dropdown.classList.remove('show');
     }
   });
-
   const selectorEl = document.getElementById('adminPartnerSelector');
   if (selectorEl) {
     selectorEl.addEventListener('click', function(e) {
@@ -1050,15 +941,11 @@ function bindAdminStatsFilters() {
     });
   }
 }
-
 function buildAdminPartnerDropdown() {
   if (!isAdminUser || !visitsAggregate) return;
-
   const dropdown = document.getElementById('adminPartnerDropdown');
   if (!dropdown) return;
-
   const byPartner = visitsAggregate.byPartner || {};
-
   const partnerList = Object.keys(byPartner).map(function(key) {
     const p = byPartner[key];
     return {
@@ -1067,23 +954,19 @@ function buildAdminPartnerDropdown() {
       count: (p.summary && p.summary.totalUniqueStores) || 0
     };
   }).sort(function(a, b) { return b.count - a.count; });
-
   let html = '<div class="admin-partner-option ' + (selectedAdminPartner === 'all' ? 'selected' : '') + '" data-partner="all">';
   html += '<span>📊 전체</span>';
   if (visitsAggregate.summary && visitsAggregate.summary.totalUniqueStores) {
     html += '<span class="partner-record-count">' + visitsAggregate.summary.totalUniqueStores + '</span>';
   }
   html += '</div>';
-
   partnerList.forEach(function(p) {
     html += '<div class="admin-partner-option ' + (selectedAdminPartner === p.key ? 'selected' : '') + '" data-partner="' + escapeHtml(p.key) + '">';
     html += '<span>👤 ' + escapeHtml(p.name) + '</span>';
     html += '<span class="partner-record-count">' + p.count + '</span>';
     html += '</div>';
   });
-
   dropdown.innerHTML = html;
-
   dropdown.querySelectorAll('.admin-partner-option').forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -1093,10 +976,8 @@ function buildAdminPartnerDropdown() {
     });
   });
 }
-
 function selectAdminPartner(partnerKey) {
   selectedAdminPartner = partnerKey;
-
   const labelEl = document.getElementById('adminPartnerLabel');
   const selectorEl = document.getElementById('adminPartnerSelector');
   if (partnerKey === 'all') {
@@ -1108,36 +989,29 @@ function selectAdminPartner(partnerKey) {
     labelEl.textContent = (p && p.partnerName) ? p.partnerName : partnerKey;
     if (selectorEl) selectorEl.classList.add('active');
   }
-
   document.querySelectorAll('.admin-partner-option').forEach(function(el) {
     if (el.dataset.partner === partnerKey) el.classList.add('selected');
     else el.classList.remove('selected');
   });
-
   loadAdminMasterStores().then(function() {
     updateAdminStatsBar();
     resetAdminViewZoom();
     renderAdminView();
   });
 }
-
 function resetAdminViewZoom() {
   if (!map) return;
   map.setCenter(new kakao.maps.LatLng(36.5, 127.8));
   map.setLevel(ADMIN_INIT_LEVEL);
 }
-
 async function renderAdminView() {
   if (!isAdminUser) return;
-
   let filtered = adminMasterStores.slice();
-
   if (currentFilter !== 'all' && currentFilter !== 'project') {
     filtered = filtered.filter(function(s) {
       return getEffectiveStatus(s) === currentFilter;
     });
   }
-
   let contractsAdded = 0;
   if (map && map.getLevel() <= ADMIN_CONTRACT_ZOOM_LEVEL) {
     try {
@@ -1153,20 +1027,16 @@ async function renderAdminView() {
       console.log('[기계약 추가됨] ' + contractsAdded + '개');
     } catch(e) { console.warn('[기계약 동적 로드] 실패:', e); }
   }
-
   filtered = removeContractDuplicates(filtered);
   allStoresInView = filtered;
   renderMarkers();
-
   console.log('[관리자뷰] partner=' + selectedAdminPartner + ', filter=' + currentFilter + ', 총 ' + filtered.length + '개');
 }
-
 async function fetchContractsInCurrentBounds() {
   if (!map) return [];
   const center = map.getCenter();
   const centerLat = center.getLat();
   const centerLng = center.getLng();
-
   if (contractsCache.center && contractsCache.data.length > 0) {
     const elapsed = Date.now() - contractsCache.ts;
     const moved = haversine(contractsCache.center.lat, contractsCache.center.lng, centerLat, centerLng);
@@ -1175,61 +1045,50 @@ async function fetchContractsInCurrentBounds() {
       return contractsCache.data;
     }
   }
-
   const bounds = map.getBounds();
   const sw = bounds.getSouthWest();
   const ne = bounds.getNorthEast();
   let latMin = sw.getLat(), latMax = ne.getLat();
   let lngMin = sw.getLng(), lngMax = ne.getLng();
-
   const radiusKm = ADMIN_CONTRACT_RADIUS_KM;
   const radiusLatDeg = radiusKm / 111;
   const radiusLngDeg = radiusKm / (111 * Math.cos(centerLat * Math.PI / 180));
-
   latMin = Math.min(latMin, centerLat - radiusLatDeg);
   latMax = Math.max(latMax, centerLat + radiusLatDeg);
   lngMin = Math.min(lngMin, centerLng - radiusLngDeg);
   lngMax = Math.max(lngMax, centerLng + radiusLngDeg);
-
   try {
     const snap = await db.ref('stores_light').orderByChild('lat').startAt(latMin).endAt(latMax).once('value');
     const raw = snap.val() || {};
     const contracts = [];
-
     for (const k in raw) {
       const s = raw[k];
       if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
       if (s.lng < lngMin || s.lng > lngMax) continue;
       if (!isContractGrade(s.grade)) continue;
-
       const dist = haversine(centerLat, centerLng, s.lat, s.lng);
       const inRadius = dist <= radiusKm;
       const inBounds = (s.lat >= sw.getLat() && s.lat <= ne.getLat() &&
                         s.lng >= sw.getLng() && s.lng <= ne.getLng());
       if (!inRadius && !inBounds) continue;
-
       s._key = k;
       s._isContract = true;
       s._distFromCenter = dist;
       contracts.push(s);
     }
-
     contracts.sort(function(a, b) { return a._distFromCenter - b._distFromCenter; });
     const limited = contracts.slice(0, ADMIN_CONTRACT_MAX_PINS);
-
     contractsCache = {
       center: { lat: centerLat, lng: centerLng },
       data: limited,
       ts: Date.now()
     };
-
     return limited;
   } catch(e) {
     console.error('[기계약 fetch 실패]', e);
     return [];
   }
 }
-
 async function loadVisitsAggregate() {
   try {
     const snap = await db.ref('visits_aggregate').once('value');
@@ -1245,14 +1104,12 @@ async function loadVisitsAggregate() {
     visitsAggregate = { stores: {}, summary: {}, byPartner: {}, version: '오류', updatedAt: 0 };
   }
 }
-
 async function loadAdminMasterStores() {
   if (!visitsAggregate) {
     visitsAggregate = { stores: {}, summary: {}, byPartner: {} };
     adminMasterStores = [];
     return;
   }
-
   let targetStoresMap;
   if (selectedAdminPartner === 'all') {
     targetStoresMap = visitsAggregate.stores || {};
@@ -1261,10 +1118,8 @@ async function loadAdminMasterStores() {
     const pData = byPartner[selectedAdminPartner];
     targetStoresMap = (pData && pData.stores) || {};
   }
-
   const aggKeys = Object.keys(targetStoresMap);
   console.log('[관리자 마스터] partner=' + selectedAdminPartner + ', ' + aggKeys.length + '개 fetch 시작');
-
   try {
     const fetchPromises = aggKeys.map(function(k) {
       return db.ref('stores_light/' + k).once('value').then(function(snap) {
@@ -1291,13 +1146,11 @@ async function loadAdminMasterStores() {
     adminMasterStores = [];
   }
 }
-
 function updateAdminStatsBar() {
   if (!isAdminUser || !adminViewActive || !visitsAggregate) {
     document.getElementById('adminStatsBar').classList.remove('visible');
     return;
   }
-
   let summary;
   if (selectedAdminPartner === 'all') {
     summary = visitsAggregate.summary || {};
@@ -1306,12 +1159,10 @@ function updateAdminStatsBar() {
     const pData = byPartner[selectedAdminPartner];
     summary = (pData && pData.summary) || {};
   }
-
   document.getElementById('adminStat-visit').textContent = summary.visit || 0;
   document.getElementById('adminStat-lead').textContent = summary.lead || 0;
   document.getElementById('adminStat-success').textContent = summary.success || 0;
   document.getElementById('adminStat-fail').textContent = summary.fail || 0;
-
   const v = visitsAggregate.version || '미집계';
   const ts = visitsAggregate.updatedAt;
   let versionText = 'v' + v;
@@ -1326,7 +1177,6 @@ function updateAdminStatsBar() {
   document.getElementById('adminStatsVersion').textContent = versionText;
   document.getElementById('adminStatsBar').classList.add('visible');
 }
-
 function moveToMyProjectStores() {
   if (!myProjectStores || myProjectStores.length === 0) return;
   fitToCoords(myProjectStores);
@@ -1334,7 +1184,6 @@ function moveToMyProjectStores() {
     if (map.getLevel() > 10) map.setLevel(10);
   }, 100);
 }
-
 async function loadOtherPartnerContacts() {
   try {
     const snap = await db.ref("visits").once("value");
@@ -1357,7 +1206,6 @@ async function loadOtherPartnerContacts() {
     setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
   } catch(e) {}
 }
-
 // ★ 타파트너가 '영업중'인지 판정: 내가 미방문 + 타파트너 최근접촉이 1개월 이내 + 그 상태가 단순방문/유효리드
 function isOtherPartnerActive(store) {
   if (isExternalUser) return false;
@@ -1368,7 +1216,6 @@ function isOtherPartnerActive(store) {
   if (Date.now() - info.ts > THIRTY_DAYS) return false;
   return true;
 }
-
 // ★ v53: 폐기물 유형별 다중 기록 지원. myVisitedStoreData는 대표 기록(핀색상/칩카운트 등 기존 로직 호환용)
 async function loadMyVisits() {
   try {
@@ -1379,7 +1226,6 @@ async function loadMyVisits() {
     for (const recKey in all) {
       const rec = all[recKey];
       if (!rec || !rec.storeKey) continue;
-
       const wasteType = (rec.current && rec.current.wasteType) || WASTE_TYPE_DEFAULT;
       if (!myVisitedStoreDataByType[rec.storeKey]) myVisitedStoreDataByType[rec.storeKey] = {};
       myVisitedStoreDataByType[rec.storeKey][wasteType] = rec;
@@ -1389,7 +1235,6 @@ async function loadMyVisits() {
     }
   } catch(e) {}
 }
-
 function computeMyVisitCounts() {
   const counts = { visit: 0, lead: 0, success: 0, fail: 0 };
   for (const storeKey in myVisitedStoreData) {
@@ -1398,18 +1243,15 @@ function computeMyVisitCounts() {
     const outcome = String(cur.outcome || "").trim();
     if (outcome === "성사") { counts.success++; continue; }
     if (outcome === "실패") { counts.fail++; continue; }
-
     const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
     const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
     const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
     const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-
     if (allVisitFilled && allLeadAdditionalFilled) { counts.lead++; continue; }
     if (allVisitFilled) { counts.visit++; continue; }
   }
   return counts;
 }
-
 function updateChipCounts() {
   if (isAdminUser) {
     document.querySelectorAll('.chip-count').forEach(el => { el.textContent = ''; });
@@ -1422,11 +1264,9 @@ function updateChipCounts() {
     el.textContent = n > 0 ? '(' + n + ')' : '';
   });
 }
-
 function initMap() {
   const container = document.getElementById("map");
   let initialCenter, initialLevel;
-
   // ★ v51.7: 외주도 전국 뷰로 초기화
   if (isAdminUser || isExternalUser) {
     initialCenter = new kakao.maps.LatLng(36.5, 127.8);
@@ -1441,18 +1281,14 @@ function initMap() {
   }
   const options = { center: initialCenter, level: initialLevel };
   map = new kakao.maps.Map(container, options);
-
   // ★ v51.7: 외주도 클러스터러 생성
   if (isAdminUser || isExternalUser) {
     markerClusterer = createClusterer();
   }
-
   startLocationTracking();
   if (initialLocation) updateMyLocationMarker(initialLocation.lat, initialLocation.lng);
-
   if (isAdminUser) {
     setTimeout(function() { renderAdminView(); }, 100);
-
     let adminIdleDebounce;
     let lastZoomLevel = ADMIN_INIT_LEVEL;
     kakao.maps.event.addListener(map, "idle", function() {
@@ -1461,7 +1297,6 @@ function initMap() {
         const currentLevel = map.getLevel();
         const wasInContractZone = lastZoomLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
         const isInContractZone = currentLevel <= ADMIN_CONTRACT_ZOOM_LEVEL;
-
         if (isInContractZone || wasInContractZone) {
           console.log('[관리자 idle] level ' + lastZoomLevel + ' → ' + currentLevel);
           renderAdminView();
@@ -1480,24 +1315,19 @@ function initMap() {
       moveDebounce = setTimeout(function() { loadStoresInView(); }, 400);
     });
   }
-
   kakao.maps.event.addListener(map, "click", function() { closePanel(true); });
-
   document.getElementById("locBtn").onclick = moveToMyLocation;
   // ★ v51.7: 외주는 addBtn 숨겨져 있으므로 onclick 불필요
   if (!isExternalUser) document.getElementById("addBtn").onclick = openNewStoreModal;
-
   const newStoreModal = document.getElementById('newStoreModal');
   if (newStoreModal && !isExternalUser) {
     newStoreModal.addEventListener('click', function(e) {
       if (e.target === newStoreModal) closeNewStoreModal();
     });
   }
-
   document.querySelectorAll(".filter-chip").forEach(function(btn) {
     btn.onclick = function() {
       const filter = btn.dataset.filter;
-
       // ★ v54: 기계약은 독립 오버레이 토글 — 전체/프로젝트영업 상태를 건드리지 않고 켜고 끔
       if (filter === "contract") {
         showContractOverlay = !showContractOverlay;
@@ -1506,7 +1336,6 @@ function initMap() {
         renderMarkers();
         return;
       }
-
       document.querySelectorAll(".filter-chip").forEach(b => {
         if (b.dataset.filter === "contract") return; // ★ v54: 기계약 칩 상태는 독립적이라 건드리지 않음
         b.classList.remove("active");
@@ -1524,9 +1353,7 @@ function initMap() {
       }
     };
   });
-
   bindComboFilterUI();
-
   document.getElementById("searchInput").oninput = function(e) {
     clearTimeout(searchTimer);
     const q = e.target.value.trim();
@@ -1540,17 +1367,14 @@ function initMap() {
       document.getElementById("searchResults").style.display = "none";
     }
   });
-
   document.getElementById("panelClose").onclick = function(e) {
     e.stopPropagation();
     closePanel(false);
   };
-
   const panel = document.getElementById("storePanel");
   let touchStartY = 0;
   let isDragging = false;
   let dragStartedAtTop = false;
-
   panel.addEventListener("touchstart", function(e) {
     touchStartY = e.touches[0].clientY;
     const target = e.target;
@@ -1559,21 +1383,17 @@ function initMap() {
     dragStartedAtTop = isHeaderArea || atTop;
     isDragging = true;
   }, { passive: true });
-
   panel.addEventListener("touchmove", function(e) {
     if (!isDragging || !dragStartedAtTop) return;
     const deltaY = e.touches[0].clientY - touchStartY;
     if (deltaY > 80) { closePanel(false); isDragging = false; }
   }, { passive: true });
-
   panel.addEventListener("touchend", function() { isDragging = false; dragStartedAtTop = false; }, { passive: true });
   document.getElementById("panelDrag").onclick = function() { closePanel(false); };
 }
-
 function getFilterColor(f) {
   return { all:"#363859", visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935", contract:"#F2AC57" }[f] || "#363859";
 }
-
 function createClusterer() {
   const baseStyle = {
     color: 'white', border: '3px solid white', borderRadius: '50%',
@@ -1593,7 +1413,6 @@ function createClusterer() {
   kakao.maps.event.addListener(clusterer, 'clusterclick', function(cluster) { handleClusterClick(cluster); });
   return clusterer;
 }
-
 function handleClusterClick(cluster) {
   try {
     const ms = cluster.getMarkers ? cluster.getMarkers() : [];
@@ -1604,13 +1423,11 @@ function handleClusterClick(cluster) {
       if (isAdminUser) setTimeout(function() { renderAdminView(); }, 400);
       return;
     }
-
     const positions = ms.map(function(m) { return m.getPosition(); });
     const lats = positions.map(function(p) { return p.getLat(); });
     const lngs = positions.map(function(p) { return p.getLng(); });
     const latRange = Math.max.apply(null, lats) - Math.min.apply(null, lats);
     const lngRange = Math.max.apply(null, lngs) - Math.min.apply(null, lngs);
-
     if (latRange > 1 || lngRange > 1) {
       const center = cluster.getCenter ? cluster.getCenter() : positions[0];
       map.setCenter(center);
@@ -1618,7 +1435,6 @@ function handleClusterClick(cluster) {
       if (isAdminUser) setTimeout(function() { renderAdminView(); }, 400);
       return;
     }
-
     const bounds = new kakao.maps.LatLngBounds();
     positions.forEach(function(p) { bounds.extend(p); });
     map.setBounds(bounds, 80, 80, 80, 80);
@@ -1630,7 +1446,6 @@ function handleClusterClick(cluster) {
     console.warn('[클러스터 클릭] 처리 실패:', e);
   }
 }
-
 function applyClusterColors(clusters) {
   if (!clusters || clusters.length === 0) return;
   const filterColorMap = {
@@ -1664,7 +1479,6 @@ function applyClusterColors(clusters) {
     } catch(e) {}
   });
 }
-
 function computeDominantClusterColor(cluster) {
   const ms = cluster.getMarkers ? cluster.getMarkers() : [];
   if (ms.length === 0) return '#363859';
@@ -1681,14 +1495,11 @@ function computeDominantClusterColor(cluster) {
   }
   return getStatusColor(dominant);
 }
-
 async function moveToFilteredStoresForPartner(filter) {
   const statusBar = document.getElementById('statusBar');
   if (statusBar) statusBar.textContent = '필터 적용 중...';
-
   if (filter === 'all') { renderMarkers(); return; }
   if (filter === 'contract') { await moveToContractStores(); return; }
-
   const targetKeys = [];
   for (const storeKey in myVisitedStoreData) {
     const rec = myVisitedStoreData[storeKey];
@@ -1702,23 +1513,19 @@ async function moveToFilteredStoresForPartner(filter) {
       const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
       const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
       const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-
       if (allVisitFilled && allLeadAdditionalFilled) status = 'lead';
       else if (allVisitFilled) status = 'visit';
       else if (outcome === '폐업') status = 'closedByMe';
     }
     if (status === filter) targetKeys.push(storeKey);
   }
-
   if (targetKeys.length === 0) {
     if (statusBar) statusBar.textContent = '해당 상태 업장 없음';
     renderMarkers();
     return;
   }
-
   await fitMapToStoreKeys(targetKeys, filter);
 }
-
 async function moveToContractStores() {
   const statusBar = document.getElementById('statusBar');
   try {
@@ -1744,7 +1551,6 @@ async function moveToContractStores() {
     fitToCoords(coords);
   } catch(e) { renderMarkers(); }
 }
-
 async function fitMapToStoreKeys(targetKeys, filterLabel) {
   const statusBar = document.getElementById('statusBar');
   if (statusBar) statusBar.textContent = '필터 적용 중... (' + targetKeys.length + '개)';
@@ -1767,7 +1573,6 @@ async function fitMapToStoreKeys(targetKeys, filterLabel) {
     fitToCoords(validCoords);
   } catch(e) { renderMarkers(); }
 }
-
 function fitToCoords(coords) {
   if (!coords || coords.length === 0) return;
   if (coords.length === 1) {
@@ -1780,7 +1585,6 @@ function fitToCoords(coords) {
     setTimeout(function() { if (map.getLevel() < 4) map.setLevel(4); }, 100);
   }
 }
-
 function startLocationTracking() {
   if (!navigator.geolocation || geoWatchId !== null) return;
   geoWatchId = navigator.geolocation.watchPosition(
@@ -1792,12 +1596,10 @@ function startLocationTracking() {
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
   );
 }
-
 function stopLocationTracking() {
   if (geoWatchId !== null) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; }
   if (myLocationMarker) { myLocationMarker.setMap(null); myLocationMarker = null; }
 }
-
 function updateMyLocationMarker(lat, lng) {
   const position = new kakao.maps.LatLng(lat, lng);
   if (myLocationMarker) { myLocationMarker.setPosition(position); return; }
@@ -1807,7 +1609,6 @@ function updateMyLocationMarker(lat, lng) {
   myLocationMarker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: 9999 });
   myLocationMarker.setMap(map);
 }
-
 function moveToMyLocation() {
   if (currentUserLocation) {
     map.setCenter(new kakao.maps.LatLng(currentUserLocation.lat, currentUserLocation.lng));
@@ -1824,7 +1625,6 @@ function moveToMyLocation() {
     alert("현재 위치를 가져올 수 없습니다.\n위치 권한을 허용해주세요.");
   });
 }
-
 async function loadStoresInView() {
   const bounds = map.getBounds();
   const sw = bounds.getSouthWest();
@@ -1849,12 +1649,9 @@ async function loadStoresInView() {
       return getVisitStatus(s) !== "none";
     });
     list = list.filter(s => isVisibleForProject(s, currentUser.key));
-
     // ★ v52: 신규업장추가로 등록된 업장은 등록 파트너에게만 노출 (관리자는 전체 노출)
     list = list.filter(s => isVisibleForNewStoreOwner_(s));
-
     list = removeContractDuplicates(list);
-
     if (currentUserLocation) {
       list = list.filter(function(s) {
         if (!isContractGrade(s.grade)) return true;
@@ -1862,14 +1659,12 @@ async function loadStoresInView() {
         return dist <= CONTRACT_RADIUS_KM;
       });
     }
-
     allStoresInView = list;
     renderMarkers();
   } catch(e) {
     document.getElementById("statusBar").textContent = "로딩 실패";
   }
 }
-
 function isVisibleForProject(store, currentPartnerKey) {
   if (!store.projects) return true;
   const keys = Object.keys(store.projects);
@@ -1880,7 +1675,6 @@ function isVisibleForProject(store, currentPartnerKey) {
   }
   return false;
 }
-
 // ★ v52: 신규업장추가로 등록된 업장(regBy 있음)은 등록한 파트너 본인에게만 노출.
 // 마스터DB 유래 업장(regBy 없음)은 기존과 동일하게 항상 노출.
 // 관리자는 검토를 위해 전체 노출.
@@ -1890,7 +1684,6 @@ function isVisibleForNewStoreOwner_(store) {
   const myCode = currentUser ? String(currentUser.code || '').trim() : '';
   return String(store.regBy).trim() === myCode;
 }
-
 function amIAssignedToProject(store, currentPartnerKey) {
   if (!store.projects) return false;
   const keys = Object.keys(store.projects);
@@ -1903,15 +1696,12 @@ function amIAssignedToProject(store, currentPartnerKey) {
   }
   return false;
 }
-
 function isContractGrade(g) {
   if (!g) return false;
   const s = String(g).trim();
   return s === "기계약" || s === "업박스기계약업장" || s.indexOf("기계약") !== -1;
 }
-
 function isClosed(store) { return store && store.closed === true; }
-
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -1919,62 +1709,77 @@ function haversine(lat1, lng1, lat2, lng2) {
   const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng/2) * Math.sin(dLng/2);
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+// ★ 2026-08-20: 마스터DB 이관 이후 — 신규(다량배출사업장_/사업장폐기물_) vs
+//   구DB(GG_/일반사업장_ 등, 방문기록 보존으로 살아남은 행) 중복 핀 제거.
+//   기계약 dedup과 동일한 규칙: 신규가 우선 노출, 내 방문기록 있는 구행은 그래도 보임.
+const MASTER_SOURCE_PREFIXES_ = ['다량배출사업장_', '사업장폐기물_'];
+function isMasterSourced_(key) {
+  const k = String(key || '');
+  for (let i = 0; i < MASTER_SOURCE_PREFIXES_.length; i++) {
+    if (k.indexOf(MASTER_SOURCE_PREFIXES_[i]) === 0) return true;
+  }
+  return false;
+}
 
+function filterLegacyDuplicatesAgainstMaster_(list) {
+  const masters = list.filter(function(s) { return isMasterSourced_(s._key); });
+  if (masters.length === 0) return list;
+  const rest = list.filter(function(s) { return !isMasterSourced_(s._key); });
+
+  const filteredRest = rest.filter(function(o) {
+    if (isContractGrade(o.grade)) return true;                          // 기계약은 별도 규칙, 여기선 항상 통과
+    if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;  // 내 방문기록 있으면 보존
+
+    for (const m of masters) {
+      const distM = haversine(o.lat, o.lng, m.lat, m.lng) * 1000;
+      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, m.name) >= 0.5) return false;
+    }
+    return true;
+  });
+
+  return masters.concat(filteredRest);
+}
 function removeContractDuplicates(list) {
   const contracts = list.filter(s => isContractGrade(s.grade));
   const others = list.filter(s => !isContractGrade(s.grade));
-
   const filteredOthers = others.filter(function(o) {
     if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
-
     for (const c of contracts) {
       const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
       if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) return false;
     }
     return true;
   });
-
-  return contracts.concat(filteredOthers);
+  return contracts.concat(filterLegacyDuplicatesAgainstMaster_(filteredOthers));
 }
-
 // ★ 검색 결과용: 지도의 removeContractDuplicates와 동일한 규칙을 검색 후보(candidates)에도 적용
 //   (같은 업장의 기계약/미방문 핀이 둘 다 뜨는 문제를 검색에서도 막기 위함)
 function removeContractDuplicatesForSearch(list) {
   const contracts = list.filter(function(s) { return isContractGrade(s.grade); });
   const others = list.filter(function(s) { return !isContractGrade(s.grade); });
-
   const filteredOthers = others.filter(function(o) {
     if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
-
     for (const c of contracts) {
       const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
       if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) return false;
     }
     return true;
   });
-
-  return contracts.concat(filteredOthers);
+  return contracts.concat(filterLegacyDuplicatesAgainstMaster_(filteredOthers));
 }
-
 function nameSimilarity(a, b) {
   if (!a || !b) return 0;
-
   a = String(a).replace(/[\s_]+/g, "");
   b = String(b).replace(/[\s_]+/g, "");
-
   const longer = a.length > b.length ? a : b;
   const shorter = a.length > b.length ? b : a;
-
   if (shorter.length === 0) return 1;
-
   let matches = 0;
   for (let i = 0; i < shorter.length; i++) {
     if (longer.indexOf(shorter[i]) !== -1) matches++;
   }
-
   return matches / shorter.length;
 }
-
 function getEffectiveStatus(store) {
   if (isAdminUser && adminViewActive && visitsAggregate) {
     let targetStoresMap;
@@ -1993,7 +1798,6 @@ function getEffectiveStatus(store) {
   }
   return getVisitStatus(store);
 }
-
 // ★ 조합필터: DOM의 선택 상태를 읽어서 partnerComboFilter 객체로 변환
 function readComboFilterFromDOM() {
   const leadStatus = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="leadStatus"] .cf-pill.sel')).map(function(b) { return b.dataset.val; });
@@ -2003,7 +1807,6 @@ function readComboFilterFromDOM() {
   const basicOnly = document.getElementById('cfToggleBasicOnly').classList.contains('on');
   return { leadStatus: leadStatus, repriority: repriority, wasteType: wasteType, otherActive: otherActive, basicOnly: basicOnly };
 }
-
 // ★ 기본값과 다른 항목 개수 (트리거 버튼 배지용)
 function comboFilterActiveCount(f) {
   let n = 0;
@@ -2014,9 +1817,7 @@ function comboFilterActiveCount(f) {
   if (f.basicOnly) n++;
   return n;
 }
-
 const COMBO_LEAD_LABELS = { none: "미방문", simpleContact: "단순접촉", visit: "단순방문", lead: "유효리드", success: "계약성사", fail: "최종불발" };
-
 // ★ 적용된 조건 칩 다시 그리기 (✕ 누르면 그 조건만 해제)
 function renderAppliedChipsRow() {
   const row = document.getElementById('appliedChipsRow');
@@ -2030,7 +1831,6 @@ function renderAppliedChipsRow() {
   });
   if (!f.otherActive) chips.push({ key: 'otherActive', label: '타파트너영업중 숨김' });
   if (f.basicOnly) chips.push({ key: 'basicOnly', label: '베이직ON만' });
-
   row.innerHTML = '';
   chips.forEach(function(c) {
     const el = document.createElement('button');
@@ -2041,7 +1841,6 @@ function renderAppliedChipsRow() {
     row.appendChild(el);
   });
 }
-
 // ★ 적용된 조건 칩의 ✕ 클릭 시 해당 조건만 해제하고 즉시 재적용
 function removeComboFilterChip(key) {
   if (key === 'otherActive') {
@@ -2061,7 +1860,6 @@ function removeComboFilterChip(key) {
   updateComboFilterBadgeAndChips();
   if (currentFilter === 'all') renderMarkers();
 }
-
 function updateComboFilterBadgeAndChips() {
   const n = comboFilterActiveCount(partnerComboFilter);
   const badge = document.getElementById('comboFilterBadge');
@@ -2070,7 +1868,6 @@ function updateComboFilterBadgeAndChips() {
   trigger.classList.toggle('active', n > 0);
   renderAppliedChipsRow();
 }
-
 // ★ 패널의 선택 상태를 마지막 적용값(partnerComboFilter) 기준으로 되돌림 (X/배경 클릭으로 닫을 때 사용)
 function syncPanelDOMFromState() {
   const f = partnerComboFilter;
@@ -2081,7 +1878,6 @@ function syncPanelDOMFromState() {
   document.getElementById('cfToggleOtherActive').classList.toggle('on', f.otherActive);
   document.getElementById('cfToggleBasicOnly').classList.toggle('on', f.basicOnly);
 }
-
 // ★ 중복그룹 내 특정 UID에 "기록"이 있는지 판단 (나 또는 타파트너, 단순접촉 이상만 인정)
 //   완전히 빈 값으로 저장된 기록(status===none)은 기록으로 안 침
 function isRecordedForDup(storeKey) {
@@ -2091,7 +1887,6 @@ function isRecordedForDup(storeKey) {
   if (other && other.status && other.status !== "none") return true;
   return false;
 }
-
 // ★ 중복의심 그룹(items 배열, 각 항목에 dup·key 존재) 안에서 감춰야 할 key 목록 계산 (지도/검색 공용)
 //   규칙: 그룹 내에 기록(단순접촉 이상) 있는 UID가 있으면 그것들 전부 살리고, 나머지만 숨김
 //        아무도 기록 없으면 key(사전순) 가장 앞선 것 하나만 대표로 남김
@@ -2103,11 +1898,9 @@ function computeDupSuppressedKeysFromList(items, getKey) {
     if (!groups[item.dup]) groups[item.dup] = [];
     groups[item.dup].push(item);
   });
-
   for (const groupId in groups) {
     const members = groups[groupId];
     if (members.length < 2) continue;
-
     const recorded = members.filter(function(m) { return isRecordedForDup(getKey(m)); });
     let keep;
     if (recorded.length > 0) {
@@ -2127,13 +1920,11 @@ function computeDupSuppressedKeysFromList(items, getKey) {
   }
   return suppressed;
 }
-
 // ★ 지도용: allStoresInView 기준 (관리자/외주는 적용 안 함)
 function computeDupSuppressedKeys() {
   if (isAdminUser || isExternalUser) return {};
   return computeDupSuppressedKeysFromList(allStoresInView, function(s) { return s._key; });
 }
-
 // ★ 검색용: search_index 전체 기준 (관리자/외주는 적용 안 함)
 function computeDupSuppressedKeysForSearch(indexData) {
   if (isAdminUser || isExternalUser) return {};
@@ -2144,7 +1935,6 @@ function computeDupSuppressedKeysForSearch(indexData) {
   }
   return computeDupSuppressedKeysFromList(items, function(s) { return s._key; });
 }
-
 // ★ 지금 패널에서 고르고 있는 조건대로 적용하면 몇 개 업장이 보일지 미리 계산 (네이버 "결과보기 999+"와 동일한 개념)
 function computeComboFilterMatchCount(f) {
   let n = 0;
@@ -2171,26 +1961,22 @@ function computeComboFilterMatchCount(f) {
   }
   return n;
 }
-
 function updateApplyButtonCount() {
   const draft = readComboFilterFromDOM();
   const n = computeComboFilterMatchCount(draft);
   document.getElementById('cfApplyBtn').textContent = n + '개 업장 보기';
 }
-
 function openComboFilterPanel() {
   syncPanelDOMFromState();
   updateApplyButtonCount();
   document.getElementById('comboFilterBackdrop').classList.add('open');
   document.getElementById('comboFilterPanel').classList.add('open');
 }
-
 function closeComboFilterPanel(shouldRevert) {
   if (shouldRevert) syncPanelDOMFromState();
   document.getElementById('comboFilterBackdrop').classList.remove('open');
   document.getElementById('comboFilterPanel').classList.remove('open');
 }
-
 // ★ v54: 폐기물 종류 필터 팩셋 옵션을 WASTE_TYPES 배열로 자동 채움 (라벨 중복 관리 방지)
 function populateWasteTypeFilterPills_() {
   const group = document.getElementById('cfWasteTypeGroup');
@@ -2199,20 +1985,16 @@ function populateWasteTypeFilterPills_() {
     return '<button type="button" class="cf-pill" data-val="' + w.code + '">' + w.label + '</button>';
   }).join('');
 }
-
 function bindComboFilterUI() {
   populateWasteTypeFilterPills_(); // ★ v54
-
   document.querySelectorAll('.cf-pill').forEach(function(btn) {
     btn.onclick = function() { btn.classList.toggle('sel'); updateApplyButtonCount(); };
   });
   document.getElementById('cfToggleOtherActive').onclick = function() { this.classList.toggle('on'); updateApplyButtonCount(); };
   document.getElementById('cfToggleBasicOnly').onclick = function() { this.classList.toggle('on'); updateApplyButtonCount(); };
-
   document.getElementById('comboFilterTrigger').onclick = function() { openComboFilterPanel(); };
   document.getElementById('comboFilterCloseBtn').onclick = function() { closeComboFilterPanel(true); };
   document.getElementById('comboFilterBackdrop').onclick = function() { closeComboFilterPanel(true); };
-
   document.getElementById('cfResetBtn').onclick = function() {
     document.querySelectorAll('.cf-pill.sel').forEach(function(b) { b.classList.remove('sel'); });
     document.getElementById('cfToggleOtherActive').classList.add('on');
@@ -2223,7 +2005,6 @@ function bindComboFilterUI() {
     closeComboFilterPanel(false);
     if (currentFilter === 'all') renderMarkers();
   };
-
   document.getElementById('cfApplyBtn').onclick = function() {
     partnerComboFilter = readComboFilterFromDOM();
     updateComboFilterBadgeAndChips();
@@ -2241,28 +2022,23 @@ function bindComboFilterUI() {
     renderMarkers();
   };
 }
-
 function renderMarkers() {
   if (markerClusterer) markerClusterer.clear();
   markers.forEach(m => m.setMap(null));
   markers = [];
   markerByKey = {};
-
   let shown = 0;
   let selectedRendered = false;
   const clusterMarkers = [];
   const directMarkers = [];
   const dupSuppressed = computeDupSuppressedKeys();
-
   for (const store of allStoresInView) {
     if (dupSuppressed[store._key]) continue; // ★ 중복의심 업장: 대표(기록 있는 UID들) 외에는 숨김
     const status = getEffectiveStatus(store);
     const isContract = isContractGrade(store.grade);
-
     // ★ v54: 파트너 화면에서 기계약은 독립 오버레이. 꺼져있으면 기계약 핀은 렌더링 대상에서 제외
     // (관리자/외주는 기존 로직 그대로 — 이 토글의 영향을 받지 않음)
     if (!isAdminUser && !isExternalUser && isContract && !showContractOverlay) continue;
-
     if (currentFilter === "project") {
       if (isContract || !amIAssignedToProject(store, currentUser.key)) continue;
     } else if (currentFilter !== "all") {
@@ -2285,14 +2061,12 @@ function renderMarkers() {
       if (cf.basicOnly && store.basic !== "ON") continue;
       if (!cf.otherActive && status === "none" && isOtherPartnerActive(store)) continue;
     }
-
     const isSelected = selectedStore && selectedStore._key === store._key;
     if (isSelected) selectedRendered = true;
     const marker = createMarker(store, status, isSelected);
     markers.push(marker);
     markerByKey[store._key] = marker;
     shown++;
-
     // ★ v51.7: 외주도 클러스터러 사용 (선택된 핀만 직접 표시)
     if (!isAdminUser && !isExternalUser) {
       directMarkers.push(marker);
@@ -2302,7 +2076,6 @@ function renderMarkers() {
       clusterMarkers.push(marker);
     }
   }
-
   if (selectedStore && !selectedRendered) {
     const status = getEffectiveStatus(selectedStore);
     const marker = createMarker(selectedStore, status, true);
@@ -2310,7 +2083,6 @@ function renderMarkers() {
     markerByKey[selectedStore._key] = marker;
     directMarkers.push(marker);
   }
-
   if (markerClusterer && clusterMarkers.length > 0) {
     markerClusterer.addMarkers(clusterMarkers);
     setTimeout(function() {
@@ -2321,14 +2093,11 @@ function renderMarkers() {
     }, 100);
   }
   directMarkers.forEach(function(m) { m.setMap(map); });
-
   document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
 }
-
 function createMarker(store, status, isSelected) {
   const position = new kakao.maps.LatLng(store.lat, store.lng);
   const color = getStatusColor(status);
-
   let labelLines;
   if (isAdminUser && adminViewActive && !isContractGrade(store.grade)) {
     let partnerName = '';
@@ -2343,7 +2112,6 @@ function createMarker(store, status, isSelected) {
   } else {
     labelLines = [getGradeIcon(store.grade)];
   }
-
   let w, h, anchorX, anchorY, zIdx, strokeColor, strokeWidth;
   if (isSelected) {
     w = 34; h = 42; anchorX = 17; anchorY = 42; zIdx = 1000;
@@ -2355,7 +2123,6 @@ function createMarker(store, status, isSelected) {
     w = 22; h = 28; anchorX = 11; anchorY = 28; zIdx = 1;
     strokeColor = 'white'; strokeWidth = 1.6;
   }
-
   // ★ 타파트너영업중(내가 미방문 + 타파트너 최근 영업중): 청록 점선 테두리
   let strokeDash = '';
   if (!isSelected && status === "none" && isOtherPartnerActive(store)) {
@@ -2363,7 +2130,6 @@ function createMarker(store, status, isSelected) {
     strokeWidth = 3;
     strokeDash = '3,2';
   }
-
   const svg = buildPinSvg(w, h, color, strokeColor, strokeWidth, labelLines, strokeDash);
   const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
   const markerImage = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(w, h), { offset: new kakao.maps.Point(anchorX, anchorY) });
@@ -2385,7 +2151,6 @@ function createMarker(store, status, isSelected) {
   });
   return marker;
 }
-
 function buildPinSvg(w, h, fillColor, strokeColor, strokeWidth, lines, strokeDash) {
   if (!lines || lines.length === 0) lines = ['-'];
   let textElements = '';
@@ -2402,21 +2167,17 @@ function buildPinSvg(w, h, fillColor, strokeColor, strokeWidth, lines, strokeDas
          'fill="' + fillColor + '" stroke="' + strokeColor + '" stroke-width="' + strokeWidth + '"' + dashAttr + '/>' +
          textElements + '</svg>';
 }
-
 function escapeXml(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
-
 function formatPartnerNameForPin(name) {
   if (!name) return ['-'];
   const clean = String(name).trim().replace(/\s+/g, '');
   if (clean.length === 0) return ['-'];
   if (clean.length <= 2) return [clean];
-
   const surnamesSingle = '김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주구원우진민방천표채공현함변여염도어';
   const surnamesDouble = ['남궁', '제갈', '독고', '황보', '선우', '서문', '사공', '동방', '망절'];
-
   if (clean.length === 4) {
     const firstTwo = clean.substring(0, 2);
     if (surnamesDouble.indexOf(firstTwo) !== -1) return [clean.substring(2)];
@@ -2429,7 +2190,6 @@ function formatPartnerNameForPin(name) {
   }
   return [clean.substring(0, 2)];
 }
-
 function getStatusColor(status) {
   return {
     visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935",
@@ -2437,7 +2197,6 @@ function getStatusColor(status) {
     simpleContact:"#A79FD1"
   }[status] || "#9E9E9E";
 }
-
 function getGradeIcon(grade) {
   if (!grade) return "-";
   const g = String(grade).trim();
@@ -2447,24 +2206,19 @@ function getGradeIcon(grade) {
   if (g === "C등급") return "C";
   return "-";
 }
-
 // ★ 방문기록(current) 하나를 상태로 분류하는 단일 함수 (핀 색상·타파트너 판정 공용)
 function classifyVisitCurrent(cur) {
   cur = cur || {};
   const outcome = String(cur.outcome || "").trim();
   if (outcome === "성사") return "success";
   if (outcome === "실패") return "fail";
-
   const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
   const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
-
   const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
   const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-
   if (allVisitFilled && allLeadAdditionalFilled) return "lead";
   if (allVisitFilled) return "visit";
   if (outcome === "폐업") return "closedByMe";
-
   // ★ 단순접촉: 위 조건 미달이지만 접촉내용 필드가 하나라도 채워진 경우
   //   (재탭핑우선순위 포함 / 영업구분은 제외)
   const contactFields = [
@@ -2473,17 +2227,14 @@ function classifyVisitCurrent(cur) {
     cur.repriority
   ];
   if (contactFields.some(v => String(v || "").trim().length > 0)) return "simpleContact";
-
   return "none";
 }
-
 function getVisitStatus(store) {
   if (isContractGrade(store.grade)) return "contract";
   const rec = myVisitedStoreData[store._key];
   if (!rec) return "none";
   return classifyVisitCurrent(rec.current);
 }
-
 // ★ v55: "영업중인 폐기물" 배지 — 기록 있는 유형만, 상태색으로 진행도 표시 (2안)
 function buildWasteBadgesHtml_(store) {
   const byType = (myVisitedStoreDataByType && myVisitedStoreDataByType[store._key]) || {};
@@ -2502,37 +2253,30 @@ function buildWasteBadgesHtml_(store) {
   if (items.length === 0) return '';
   return '<div class="waste-badges-row">' + items.join('') + '</div>';
 }
-
 async function openPanel(store) {
   rvInstance = null;
   currentRvState = 'collapsed';
-
   const previousKey = selectedStore ? selectedStore._key : null;
   selectedStore = store;
   if (previousKey !== store._key) refreshMarkerSelection(previousKey, store._key);
-
   const panel = document.getElementById("storePanel");
   const content = document.getElementById("panelContent");
   content.innerHTML = '<h2 style="color:#999;">업장 정보 불러오는 중...</h2>';
   panel.classList.add("open");
-
   try {
     const detailSnap = await db.ref("stores/" + store._key).once("value");
     const detail = detailSnap.val();
     if (detail) store = Object.assign({}, detail, store);
   } catch(e) {}
   selectedStore = store;
-
   const isContract = isContractGrade(store.grade);
   const closedFlag = isClosed(store);
-
   const adminBadge = store.adminType ? '<span class="badge badge-admin">' + escapeHtml(store.adminType) + '</span>' : '';
   // ★ v55: 등급 공백 시 미노출 (adminBadge와 동일한 방식으로 통일)
   const gradeBadge = isContract
     ? '<span class="badge badge-contract">★ 기계약</span>'
     : (store.grade ? '<span class="badge badge-grade">' + escapeHtml(store.grade) + '</span>' : '');
   const closedBadge = closedFlag ? '<span class="badge badge-closed">⚠️ 폐업</span>' : '';
-
   let projectsBadgeHtml = '';
   if (!isExternalUser && amIAssignedToProject(store, currentUser.key)) {
     const projectNames = Object.keys(store.projects);
@@ -2540,7 +2284,6 @@ async function openPanel(store) {
       return '<div class="project-badge"><span class="project-badge-icon">🎯</span><span>' + escapeHtml(name) + '</span></div>';
     }).join('') + '</div>';
   }
-
   // ★ v51.7: 외주는 관리자 정보 숨김
   let adminInfoHtml = '';
   if (!isExternalUser && isAdminUser && adminViewActive && visitsAggregate && visitsAggregate.stores) {
@@ -2555,7 +2298,6 @@ async function openPanel(store) {
         '</div>';
     }
   }
-
   // ★ v51.7: 외주는 타파트너 접촉일 숨김 / 구조 변경: otherInfo = {ts, status}
   const otherInfo = otherPartnerLastContactMap[store._key];
   let otherContactHtml = '';
@@ -2563,7 +2305,6 @@ async function openPanel(store) {
     const activeTag = isOtherPartnerActive(store) ? ' <span class="other-active-tag">타파트너영업중</span>' : '';
     otherContactHtml = '<div class="contact-info">타파트너 마지막접촉일자: ' + formatDate(otherInfo.ts) + activeTag + '</div>';
   }
-
   let serviceHtml = '';
   if (!isContract) {
     const basicClass = store.basic === 'ON' ? 'service-badge on' : 'service-badge';
@@ -2572,24 +2313,19 @@ async function openPanel(store) {
     const plusText = store.plus && store.plus !== '' ? store.plus : '-';
     serviceHtml = '<div class="service"><span class="' + basicClass + '">베이직 ' + escapeHtml(basicText) + '</span><span class="' + plusClass + '">플러스 ' + escapeHtml(plusText) + '</span></div>';
   }
-
   const roadviewHtml = isContract ? '' : '<div class="roadview-section"><div class="roadview-header" onclick="toggleRoadview()"><span id="rvHeaderText">🌆 현장 로드뷰 (클릭하여 보기)</span><span class="roadview-header-toggle" id="rvToggleArrow">▼</span></div><div class="roadview-body" id="rvBody"><div class="rv-loading" id="rvLoading" style="display:none;">로드 중...</div><div id="roadview"></div><div class="rv-empty" id="rvEmpty" style="display:none;">로드뷰 없음</div><a href="https://map.kakao.com/link/roadview/' + store.lat + ',' + store.lng + '" target="_blank" class="rv-external">카카오맵에서 보기 →</a></div></div>';
-
   const infoRows = [];
   if (store.bizType) infoRows.push({k:"업종", v:store.bizType});
   if (store.area) infoRows.push({k:"면적", v:store.area});
   if (store.phone) infoRows.push({k:"전화번호", v:store.phone});
   if (store.volume) infoRows.push({k:"예상배출량", v:store.volume});
   const infoHtml = infoRows.length === 0 ? '' : '<div class="info-table">' + infoRows.map(r => '<div class="info-row"><span class="info-key">' + r.k + '</span><span class="info-value">' + escapeHtml(r.v) + '</span></div>').join('') + '</div>';
-
   const memoHtml = store.memo ? '<div class="memo">📝 ' + escapeHtml(store.memo) + '</div>' : '';
   const priceGuideBtnHtml = isContract ? '' : '<button class="priceGuideBtn" onclick="openPriceGuide()">📊 영업기준표 확인</button>';
   const navBtnHtml = isContract ? '' : '<button class="navBtn" type="button" onclick="openKakaoNav(selectedStore)">🧭 카카오맵 길찾기</button>';
   const visitFormHtml = isContract ? '' : buildVisitForm();
-
   // ★ v55: 순서 재배치 — 업장명 → 주소 → 폐기물배지 → 로드뷰 → 배지/서비스 → 정보테이블(회색라인 포함)
   const wasteBadgesHtml = buildWasteBadgesHtml_(store);
-
   content.innerHTML =
     '<h2>' + escapeHtml(store.name || '(이름 없음)') + '</h2>' +
     '<div class="addr">' + escapeHtml(store.address || '') + '</div>' +
@@ -2598,10 +2334,8 @@ async function openPanel(store) {
     '<div class="badges">' + adminBadge + gradeBadge + closedBadge + '</div>' +
     projectsBadgeHtml + adminInfoHtml + otherContactHtml + serviceHtml +
     infoHtml + memoHtml + priceGuideBtnHtml + navBtnHtml + visitFormHtml;
-
   if (!isContract) { loadMyVisit(store); bindVisitForm(store); }
 }
-
 function refreshMarkerSelection(previousKey, newKey) {
   if (isAdminUser) {
     renderAdminView();
@@ -2612,7 +2346,6 @@ function refreshMarkerSelection(previousKey, newKey) {
     renderMarkers();
   }
 }
-
 function closePanel(clearSelection) {
   document.getElementById("storePanel").classList.remove("open");
   rvInstance = null;
@@ -2624,7 +2357,6 @@ function closePanel(clearSelection) {
     else renderMarkers();
   }
 }
-
 function toggleRoadview() {
   const body = document.getElementById("rvBody");
   const arrow = document.getElementById("rvToggleArrow");
@@ -2643,7 +2375,6 @@ function toggleRoadview() {
     currentRvState = 'collapsed';
   }
 }
-
 function loadRoadviewForCurrentStore() {
   if (!selectedStore) return;
   const rvLoading = document.getElementById("rvLoading");
@@ -2661,12 +2392,10 @@ function loadRoadviewForCurrentStore() {
     rvInstance.setPanoId(panoId, position);
   });
 }
-
 function buildKakaoNavUrl(store) {
   const name = String(store.name || '업장').replace(/[,/]/g, ' ').trim();
   return 'https://map.kakao.com/link/to/' + name + ',' + store.lat + ',' + store.lng;
 }
-
 function openKakaoNav(store) {
   const appScheme = 'kakaomap://route?ep=' + store.lat + ',' + store.lng + '&by=car';
   const webFallback = buildKakaoNavUrl(store);
@@ -2686,7 +2415,6 @@ function openKakaoNav(store) {
   });
   window.location.href = appScheme;
 }
-
 async function generateSSOToken(partnerName, partnerCode) {
   const now = new Date();
   const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
@@ -2697,7 +2425,6 @@ async function generateSSOToken(partnerName, partnerCode) {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(hashBuffer)).slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
 }
-
 async function openPriceGuide() {
   if (!selectedStore || !currentUser) return;
   try {
@@ -2718,13 +2445,11 @@ async function openPriceGuide() {
     alert('영업기준표를 여는 중 오류가 발생했습니다.');
   }
 }
-
 // ★ v53: 폐기물 종류 드롭다운 + 동적 라벨 id 추가
 function buildVisitForm() {
   const wasteOptions = WASTE_TYPES.map(function(w) {
     return '<option value="' + w.code + '">' + w.label + '</option>';
   }).join('');
-
   return '<div class="visit-form">' +
     '<h3>방문기록</h3>' +
     '<label>재탭핑우선순위</label>' +
@@ -2758,7 +2483,6 @@ function buildVisitForm() {
     '<select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option><option value="폐업">폐업</option></select>' +
     '<button class="save-btn" id="saveVisitBtn">저장</button></div>';
 }
-
 // ★ v53: 선택된 폐기물 종류에 맞춰 라벨 텍스트/필드 숨김 적용
 function applyWasteTypeUI(wasteType) {
   const labels = WASTE_FIELD_LABELS[wasteType] || WASTE_FIELD_LABELS[WASTE_TYPE_DEFAULT];
@@ -2766,7 +2490,6 @@ function applyWasteTypeUI(wasteType) {
   setLabel('lbl_amount', labels.amount);
   setLabel('lbl_price', labels.price);
   setLabel('lbl_suggestedPrice', labels.suggestedPrice);
-
   const hidden = WASTE_HIDDEN_FIELDS[wasteType] || [];
   const groupMap = { bins: 'grp_bins', vinyl: 'grp_vinyl' };
   for (const key in groupMap) {
@@ -2774,19 +2497,15 @@ function applyWasteTypeUI(wasteType) {
     if (groupEl) groupEl.style.display = hidden.indexOf(key) !== -1 ? 'none' : '';
   }
 }
-
 // ★ v53: wasteType 지정 시 그 유형의 기록만 로드. 없으면 저장된 유형 중 하나, 그것도 없으면 기본값(FOOD)
 function loadMyVisit(store, wasteType) {
   const byType = (myVisitedStoreDataByType && myVisitedStoreDataByType[store._key]) || {};
-
   if (!wasteType) {
     const savedTypes = Object.keys(byType);
     wasteType = savedTypes.length > 0 ? savedTypes[0] : WASTE_TYPE_DEFAULT;
   }
-
   setVal('v_wasteType', wasteType);
   applyWasteTypeUI(wasteType);
-
   const rec = byType[wasteType];
   if (!rec) {
     ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
@@ -2799,7 +2518,6 @@ function loadMyVisit(store, wasteType) {
     if (dateEl) dateEl.textContent = "";
     return;
   }
-
   const cur = rec.current || {};
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
@@ -2818,14 +2536,11 @@ function loadMyVisit(store, wasteType) {
   const dateEl = document.getElementById("visitDates");
   if (dateEl) dateEl.textContent = dateText;
 }
-
 function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v || ""; }
-
 function bindVisitForm(store) {
   const btn = document.getElementById("saveVisitBtn");
   if (!btn) return;
   btn.onclick = function() { saveVisit(store); };
-
   // ★ v53: 폐기물 종류 변경 시 해당 유형의 기존 기록으로 폼 전환 (저장 안 된 새 폼이면 빈 값)
   const wasteSelect = document.getElementById('v_wasteType');
   if (wasteSelect) {
@@ -2835,7 +2550,6 @@ function bindVisitForm(store) {
       btn.disabled = false;
     });
   }
-
   const formFieldIds = [
     'v_salesType','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
     'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome'
@@ -2851,7 +2565,6 @@ function bindVisitForm(store) {
     el.addEventListener('input', resetSaveBtn);
     el.addEventListener('change', resetSaveBtn);
   });
-
   // ★ 재탭핑우선순위 토글: 클릭 선택 / 같은 값 다시 클릭 시 해제
   const rpToggle = document.getElementById('repriorityToggle');
   if (rpToggle) {
@@ -2867,7 +2580,6 @@ function bindVisitForm(store) {
       });
     });
   }
-
   const contactInput = document.getElementById("v_contact");
   if (contactInput) {
     contactInput.addEventListener("input", function(e) {
@@ -2885,16 +2597,13 @@ function bindVisitForm(store) {
     });
   }
 }
-
 async function saveVisit(store) {
   const btn = document.getElementById("saveVisitBtn");
   btn.disabled = true;
   btn.textContent = "저장 중...";
-
   // ★ v53: 폐기물 종류에 따라 recKey 분기 + 숨긴 필드는 저장 안 함
   const wasteType = getVal('v_wasteType') || WASTE_TYPE_DEFAULT;
   const hiddenFields = WASTE_HIDDEN_FIELDS[wasteType] || [];
-
   const currentData = {};
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome'].forEach(function(k) {
     currentData[k] = hiddenFields.indexOf(k) !== -1 ? '' : getVal('v_' + k);
@@ -2905,11 +2614,9 @@ async function saveVisit(store) {
   const repriorityVal = getVal('v_repriority');
   if (repriorityVal) currentData.repriority = repriorityVal;
   currentData.updatedAt = Date.now();
-
   // ★ v53: 음식물류폐기물(기본값)은 레거시 recKey 그대로(REC_파트너_업장), 나머지는 접미사 추가
   const recKey = buildWasteRecKey_(currentUser.key, store._key, wasteType);
   const recRef = db.ref("visits/" + currentUser.key + "/" + recKey);
-
   try {
     const existingSnap = await recRef.once("value");
     const existing = existingSnap.val();
@@ -2939,14 +2646,11 @@ async function saveVisit(store) {
     myVisitedStoreData[store._key] = pickRepresentativeVisitRecord_(myVisitedStoreDataByType[store._key]);
     if (isAdminUser) renderAdminView(); else renderMarkers();
     updateChipCounts();
-
     const newStatus = getVisitStatus(store);
     const statusLabel = getStatusLabel(newStatus);
     showNsToast('✓ 저장됨 — ' + statusLabel, 2500);
-
     btn.textContent = "✓ 저장됨";
     btn.disabled = false;
-
     const first = formatDate(payload.firstVisitAt);
     const last = formatDate(payload.lastUpdatedAt);
     const dateEl = document.getElementById("visitDates");
@@ -2957,16 +2661,12 @@ async function saveVisit(store) {
     btn.disabled = false;
   }
 }
-
 function getVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ""; }
-
 // ============================================================
 // v51.4: search_index 기반 통합 검색
 // ============================================================
-
 const SEARCH_MAX_RESULTS = 15;
 const SEARCH_MIN_QUERY_LEN = 2;
-
 const SIDO_ALIAS_MAP = {
   '서울': '서울특별시', '서울특별시': '서울',
   '부산': '부산광역시', '부산광역시': '부산',
@@ -2986,28 +2686,23 @@ const SIDO_ALIAS_MAP = {
   '경남': '경상남도', '경상남도': '경남',
   '제주': '제주특별자치도', '제주특별자치도': '제주'
 };
-
 function normalizeText(s) {
   if (!s) return '';
   return String(s).replace(/[\s_]+/g, '');
 }
-
 function normalizeQuery(q) {
   let s = normalizeText(q);
   s = s.replace(/번지$/, '');
   return s;
 }
-
 function isNumericOnlyQuery(q) {
   const normalized = normalizeText(q);
   return /^\d+(-\d+)?$/.test(normalized);
 }
-
 function expandQueryWithAliases(q) {
   const normalized = normalizeQuery(q);
   const candidates = new Set();
   candidates.add(normalized);
-
   for (const key in SIDO_ALIAS_MAP) {
     const keyNorm = normalizeText(key);
     if (normalized.indexOf(keyNorm) !== -1) {
@@ -3018,30 +2713,37 @@ function expandQueryWithAliases(q) {
   }
   return Array.from(candidates);
 }
-
-function getMatchGrade(nameNorm, addrNorm, queryVariants) {
+// ★ 지번(a) / 도로명(r) 양쪽에 대해 매칭.
+//   반환값이 숫자 → 객체로 바뀌었습니다. searchStores도 함께 수정되어 있습니다(패치 3).
+//   roadOnly = 도로명에서만 걸린 경우 → 검색결과에 도로명주소를 보여주기 위한 플래그
+function getMatchGrade(nameNorm, addrNorm, roadNorm, queryVariants) {
   let bestGrade = 0;
+  let addrHit = false, roadHit = false;
+
   for (const qv of queryVariants) {
     if (!qv) continue;
-    if (nameNorm.indexOf(qv) === 0) return 2;
-    if (addrNorm.indexOf(qv) === 0) bestGrade = Math.max(bestGrade, 2);
-    if (nameNorm.indexOf(qv) !== -1) bestGrade = Math.max(bestGrade, 1);
-    if (addrNorm.indexOf(qv) !== -1) bestGrade = Math.max(bestGrade, 1);
-  }
-  return bestGrade;
-}
 
+    if (nameNorm.indexOf(qv) === 0) return { grade: 2, roadOnly: false };
+
+    if (addrNorm.indexOf(qv) === 0) { bestGrade = Math.max(bestGrade, 2); addrHit = true; }
+    if (roadNorm && roadNorm.indexOf(qv) === 0) { bestGrade = Math.max(bestGrade, 2); roadHit = true; }
+
+    if (nameNorm.indexOf(qv) !== -1) bestGrade = Math.max(bestGrade, 1);
+    if (addrNorm.indexOf(qv) !== -1) { bestGrade = Math.max(bestGrade, 1); addrHit = true; }
+    if (roadNorm && roadNorm.indexOf(qv) !== -1) { bestGrade = Math.max(bestGrade, 1); roadHit = true; }
+  }
+
+  return { grade: bestGrade, roadOnly: roadHit && !addrHit };
+}
 async function loadSearchIndex() {
   if (_searchIndexData) return _searchIndexData;
   if (_searchIndexLoadPromise) return _searchIndexLoadPromise;
-
   const cached = getCache(CACHE.SEARCH_INDEX);
   if (cached) {
     _searchIndexData = cached;
     console.log('[search_index] 캐시 적중: ' + Object.keys(cached).length + '개');
     return _searchIndexData;
   }
-
   console.log('[search_index] Firebase에서 다운로드 시작');
   _searchIndexLoadPromise = db.ref('search_index/stores').once('value')
     .then(function(snap) {
@@ -3058,21 +2760,17 @@ async function loadSearchIndex() {
     });
   return _searchIndexLoadPromise;
 }
-
 async function searchStores(q) {
   const resultsEl = document.getElementById('searchResults');
-
   if (!q || q.trim().length < SEARCH_MIN_QUERY_LEN) {
     resultsEl.style.display = 'none';
     return;
   }
-
   if (isNumericOnlyQuery(q)) {
     resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px; line-height:1.5;">숫자만으로는 검색할 수 없어요.<br>도로명을 함께 입력해주세요. (예: 대덕대로394)</div>';
     resultsEl.style.display = 'block';
     return;
   }
-
   let indexData;
   try {
     indexData = await loadSearchIndex();
@@ -3082,21 +2780,17 @@ async function searchStores(q) {
     resultsEl.style.display = 'block';
     return;
   }
-
   if (!indexData || Object.keys(indexData).length === 0) {
     resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px;">검색 인덱스가 비어있습니다. 관리자에게 문의해주세요.</div>';
     resultsEl.style.display = 'block';
     return;
   }
-
   const queryVariants = expandQueryWithAliases(q);
   let candidates = [];
-
   const myProjectStoresKeySet = new Set();
   if (Array.isArray(myProjectStores)) {
     myProjectStores.forEach(function(p) { if (p && p.key) myProjectStoresKeySet.add(p.key); });
   }
-
   // ★ 중복의심 그룹: 기록 없는 형제 UID는 검색결과에서도 제외 (지도와 동일 기준)
   const dupSuppressedSearch = computeDupSuppressedKeysForSearch(indexData);
 
@@ -3104,15 +2798,18 @@ async function searchStores(q) {
     if (dupSuppressedSearch[fbKey]) continue;
     const s = indexData[fbKey];
     if (!s) continue;
-    // ★ v52: 신규업장추가 유래 업장은 등록 파트너 본인에게만 검색 노출 (관리자 제외)
+
+    // v52: 신규업장추가 유래 업장은 등록 파트너 본인에게만 검색 노출 (관리자 제외)
     if (s.regBy && !isAdminUser) {
       const myCode = currentUser ? String(currentUser.code || '').trim() : '';
       if (String(s.regBy).trim() !== myCode) continue;
     }
+
     const nameNorm = normalizeText(s.n);
     const addrNorm = normalizeText(s.a);
-    const grade = getMatchGrade(nameNorm, addrNorm, queryVariants);
-    if (grade === 0) continue;
+    const roadNorm = normalizeText(s.r);          // ★ 도로명주소
+    const m = getMatchGrade(nameNorm, addrNorm, roadNorm, queryVariants);
+    if (m.grade === 0) continue;
 
     let dist = Infinity;
     if (currentUserLocation && !isNaN(s.lat) && !isNaN(s.lng)) {
@@ -3123,32 +2820,29 @@ async function searchStores(q) {
       _key: fbKey,
       name: s.n,
       address: s.a,
+      roadAddress: s.r || '',                     // ★ 신규
       lat: s.lat,
       lng: s.lng,
       grade: s.c === true ? '기계약' : '',
       _isMyProject: myProjectStoresKeySet.has(fbKey),
-      _matchGrade: grade,
+      _matchGrade: m.grade,
+      _matchedRoad: m.roadOnly,                    // ★ 신규
       _distKm: dist
     });
   }
-
   // ★ 신규: 같은 업장의 기계약/미방문 중복 제거 (지도와 동일 규칙)
   candidates = removeContractDuplicatesForSearch(candidates);
-
   candidates.sort(function(a, b) {
     if (a._matchGrade !== b._matchGrade) return b._matchGrade - a._matchGrade;
     return a._distKm - b._distKm;
   });
-
   // ★ v51.7: 외주 모드 — 기계약(c:true)만 노출
   const top = (isExternalUser
     ? candidates.filter(c => isContractGrade(c.grade))
     : candidates
   ).slice(0, SEARCH_MAX_RESULTS);
-
   renderSearchResults(top);
 }
-
 function renderSearchResults(list) {
   const resultsEl = document.getElementById("searchResults");
   if (list.length === 0) {
@@ -3161,8 +2855,10 @@ function renderSearchResults(list) {
     const statusColor = getStatusColor(status);
     const statusLabel = getStatusLabel(status);
     const projectTag = s._isMyProject ? '<span class="search-project-tag">🎯</span>' : '';
-    const addressLine = s.address
-      ? '<div class="search-address">' + escapeHtml(s.address) + '</div>'
+    // ★ 도로명으로 검색해서 걸린 건은 도로명주소를 보여줌 (지번으로 걸리면 지번 그대로)
+    const shownAddr = (s._matchedRoad && s.roadAddress) ? s.roadAddress : (s.address || s.roadAddress || '');
+    const addressLine = shownAddr
+      ? '<div class="search-address">' + escapeHtml(shownAddr) + '</div>'
       : '';
     let distLabel = '';
     if (typeof s._distKm === 'number' && s._distKm !== Infinity && s._distKm < 100) {
@@ -3196,7 +2892,6 @@ function renderSearchResults(list) {
   });
   resultsEl.style.display = "block";
 }
-
 function getStatusLabel(status) {
   return {
     visit: "단순방문", lead: "유효리드", success: "계약성사", fail: "최종불발",
@@ -3204,22 +2899,18 @@ function getStatusLabel(status) {
     simpleContact: "단순접촉"
   }[status] || "미방문";
 }
-
 function formatDate(ts) {
   if (!ts) return "";
   const d = new Date(ts);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
-
 function escapeHtml(s) {
   if (s === null || s === undefined) return "";
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
-
 // ============================================================
 // 신규업장추가 모달
 // ============================================================
-
 function openNewStoreModal() {
   if (!currentUser || !currentUser.code) {
     showNsToast('로그인 후 이용 가능합니다');
@@ -3228,75 +2919,61 @@ function openNewStoreModal() {
   resetNewStoreForm();
   document.getElementById('newStoreModal').classList.add('open');
 }
-
 function closeNewStoreModal() {
   document.getElementById('newStoreModal').classList.remove('open');
   resetNewStoreForm();
 }
-
 function resetNewStoreForm() {
   document.getElementById('nsSearchInput').value = '';
   document.getElementById('nsSearchResults').classList.remove('open');
   document.getElementById('nsSearchResults').innerHTML = '';
   _nsSelectedPlace = null;
   document.getElementById('nsSelectedPlace').classList.remove('show');
-
   // ★ v53-2: 폐기물 드롭다운 초기화
   populateNsWasteTypeOptions();
   const wasteSel = document.getElementById('nsWasteType');
   if (wasteSel) wasteSel.value = WASTE_TYPE_DEFAULT;
   applyNsWasteTypeUI(WASTE_TYPE_DEFAULT);
-
   ['nsStoreName', 'nsAddress', 'nsCurrentStoreName', 'nsContact',
    'nsAmount', 'nsFreq', 'nsPrice', 'nsSuggestedPrice',
    'nsBins', 'nsNote'].forEach(function(id) {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-
   ['nsVinyl', 'nsTruck'].forEach(function(id) {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-
   _nsSelectedAdminType = '';
   document.querySelectorAll('button[data-admintype]').forEach(function(b) { b.classList.remove('active'); });
-
   _nsSelectedSalesType = '';
   document.querySelectorAll('button[data-salestype]').forEach(function(b) { b.classList.remove('active'); });
-
   _nsSelectedOutcome = '';
   document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
   const defaultOutcomeBtn = document.querySelector('.ns-outcome-buttons button[data-outcome=""]');
   if (defaultOutcomeBtn) defaultOutcomeBtn.classList.add('active');
-
   const btn = document.getElementById('nsSubmitBtn');
   if (btn) {
     btn.disabled = false;
     btn.textContent = '등록';
   }
 }
-
 function onNsSearchInput() {
   const query = document.getElementById('nsSearchInput').value.trim();
   if (_placesSearchTimer) clearTimeout(_placesSearchTimer);
-
   if (!query || query.length < 2) {
     document.getElementById('nsSearchResults').classList.remove('open');
     return;
   }
-
   _placesSearchTimer = setTimeout(function() {
     runKakaoPlacesSearch(query);
   }, 300);
 }
-
 function runKakaoPlacesSearch(query) {
   if (typeof kakao === 'undefined' || !kakao.maps || !kakao.maps.services) {
     console.error('Kakao services library not loaded');
     return;
   }
-
   const ps = new kakao.maps.services.Places();
   const options = {};
   if (typeof map !== 'undefined' && map) {
@@ -3304,7 +2981,6 @@ function runKakaoPlacesSearch(query) {
     options.location = center;
     options.radius = 20000;
   }
-
   ps.keywordSearch(query, function(data, status) {
     const resultsEl = document.getElementById('nsSearchResults');
     if (status === kakao.maps.services.Status.OK && data && data.length > 0) {
@@ -3324,7 +3000,6 @@ function runKakaoPlacesSearch(query) {
     }
   }, options);
 }
-
 function selectKakaoPlace(idx) {
   if (!_placesSearchCache || !_placesSearchCache[idx]) return;
   const p = _placesSearchCache[idx];
@@ -3333,6 +3008,8 @@ function selectKakaoPlace(idx) {
   _nsSelectedPlace = {
     name: p.place_name,
     address: addr,
+    roadAddress: p.road_address_name || '',   // ★ 신규
+    jibunAddress: p.address_name || '',       // ★ 신규
     lat: parseFloat(p.y),
     lng: parseFloat(p.x)
   };
@@ -3347,18 +3024,15 @@ function selectKakaoPlace(idx) {
   document.getElementById('nsSearchInput').value = '';
   document.getElementById('nsSearchResults').classList.remove('open');
 }
-
 function clearSelectedPlace() {
   _nsSelectedPlace = null;
   document.getElementById('nsSelectedPlace').classList.remove('show');
 }
-
 function selectAdminType(btn) {
   document.querySelectorAll('button[data-admintype]').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   _nsSelectedAdminType = btn.dataset.admintype;
 }
-
 // ★ v53-2: 신규업장추가 모달 — 폐기물 드롭다운 옵션 채우기 (기존 WASTE_TYPES 재사용)
 function populateNsWasteTypeOptions() {
   const sel = document.getElementById('nsWasteType');
@@ -3367,7 +3041,6 @@ function populateNsWasteTypeOptions() {
     return '<option value="' + w.code + '">' + w.label + '</option>';
   }).join('');
 }
-
 // ★ v53-2: 신규업장추가 모달 — 폐기물 종류에 따라 라벨/필드 숨김 적용 (핀 클릭 폼과 동일 로직)
 function applyNsWasteTypeUI(wasteType) {
   const labels = WASTE_FIELD_LABELS[wasteType] || WASTE_FIELD_LABELS[WASTE_TYPE_DEFAULT];
@@ -3375,7 +3048,6 @@ function applyNsWasteTypeUI(wasteType) {
   setLabel('lbl_nsAmount', labels.amount);
   setLabel('lbl_nsPrice', labels.price);
   setLabel('lbl_nsSuggestedPrice', labels.suggestedPrice);
-
   const hidden = WASTE_HIDDEN_FIELDS[wasteType] || [];
   const groupMap = { bins: 'grp_nsBins', vinyl: 'grp_nsVinyl' };
   for (const key in groupMap) {
@@ -3383,23 +3055,19 @@ function applyNsWasteTypeUI(wasteType) {
     if (groupEl) groupEl.style.display = hidden.indexOf(key) !== -1 ? 'none' : '';
   }
 }
-
 function selectSalesType(btn) {
   document.querySelectorAll('button[data-salestype]').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   _nsSelectedSalesType = btn.dataset.salestype;
 }
-
 function selectOutcome(btn) {
   document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   _nsSelectedOutcome = btn.dataset.outcome;
 }
-
 async function submitNewStore() {
   const storeName = document.getElementById('nsStoreName').value.trim();
   const address = document.getElementById('nsAddress').value.trim();
-
   if (!storeName) {
     showNsToast('사업장명을 입력해주세요');
     document.getElementById('nsStoreName').focus();
@@ -3414,15 +3082,12 @@ async function submitNewStore() {
     showNsToast('로그인 정보가 없습니다');
     return;
   }
-
   const usedSearch = !!_nsSelectedPlace;
   const lat = _nsSelectedPlace ? _nsSelectedPlace.lat : '';
   const lng = _nsSelectedPlace ? _nsSelectedPlace.lng : '';
-
   // ★ v53-2: 폐기물 종류에 따라 숨긴 필드(bins/vinyl)는 제출하지 않음
   const nsWasteType = document.getElementById('nsWasteType').value || WASTE_TYPE_DEFAULT;
   const nsHiddenFields = WASTE_HIDDEN_FIELDS[nsWasteType] || [];
-
   const payload = {
     partnerName: currentUser.name || '',
     partnerCode: currentUser.code,
@@ -3434,6 +3099,8 @@ async function submitNewStore() {
     adminType: _nsSelectedAdminType,
     salesType: _nsSelectedSalesType,
     wasteType: nsWasteType,
+    roadAddress:  _nsSelectedPlace ? (_nsSelectedPlace.roadAddress  || '') : '',   // ★ 신규
+    jibunAddress: _nsSelectedPlace ? (_nsSelectedPlace.jibunAddress || '') : '',   // ★ 신규
     currentStoreName: document.getElementById('nsCurrentStoreName').value.trim(),
     contact: document.getElementById('nsContact').value.trim(),
     amount: document.getElementById('nsAmount').value.trim(),
@@ -3446,11 +3113,9 @@ async function submitNewStore() {
     note: document.getElementById('nsNote').value.trim(),
     outcome: _nsSelectedOutcome
   };
-
   const btn = document.getElementById('nsSubmitBtn');
   btn.disabled = true;
   btn.textContent = '등록 중...';
-
   try {
     const response = await fetch(NEW_STORE_ENDPOINT, {
       method: 'POST',
@@ -3460,9 +3125,7 @@ async function submitNewStore() {
       body: JSON.stringify(payload),
       redirect: 'follow'
     });
-
     const result = await response.json();
-
     if (result.ok) {
       closeNewStoreModal();
       showNsToast('신규 등록 업장은 검토 후 지도에 반영됩니다.', 4000);
@@ -3479,11 +3142,9 @@ async function submitNewStore() {
     btn.textContent = '등록';
   }
 }
-
 // ============================================================
 // v51.7: 외주 모드 — 기계약 열람 전용
 // ============================================================
-
 async function loadExternalContracts() {
   document.getElementById('statusBar').textContent = '기계약 업장 로딩 중...';
   try {
@@ -3509,12 +3170,10 @@ async function loadExternalContracts() {
     document.getElementById('statusBar').textContent = '로딩 실패 — 새로고침해주세요';
   }
 }
-
 function renderExternalView() {
   allStoresInView = externalContracts;
   renderMarkers();
 }
-
 function showNsToast(message, duration) {
   duration = duration || 2500;
   let toast = document.getElementById('nsToast');
