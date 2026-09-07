@@ -177,6 +177,13 @@
   .visit-form input, .visit-form select, .visit-form textarea { width: 100%; padding: 8px 10px; border: 1px solid #DDD; border-radius: 6px; font-size: 13px; font-family: inherit; }
   .visit-form textarea { min-height: 60px; resize: vertical; }
   .visit-form input:focus, .visit-form select:focus, .visit-form textarea:focus { outline: none; border-color: #F2AC57; }
+  /* ★ v56: 숫자 전용 필드 경고 (입력은 막지 않고 경고만) */
+  .num-warn-msg { display: none; color: #E53935; font-size: 11px; font-weight: 600; margin-left: 6px; }
+  label.num-invalid .num-warn-msg { display: inline; }
+  input.num-invalid { border-color: #E53935 !important; background: #FFF6F6; }
+  /* ★ v56: 예상계약일자 년/월/일 드롭다운 */
+  .date-select-row { display: flex; gap: 6px; }
+  .date-select-row select { flex: 1; min-width: 0; }
   .save-btn { width: 100%; padding: 12px; margin-top: 14px; border: none; border-radius: 8px; background: #F2AC57; color: white; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   /* ★ 재탭핑우선순위 토글 */
@@ -419,6 +426,11 @@
           <button type="button" data-salestype="아웃바운드" onclick="selectSalesType(this)">아웃바운드</button>
         </div>
       </div>
+      <!-- ★ v56: 접촉방식 — 영업구분 바로 아래 -->
+      <div class="ns-form-group">
+        <label>접촉방식</label>
+        <select id="nsContactMethod"></select>
+      </div>
       <div class="ns-form-group">
         <label>폐기물 선택</label>
         <select id="nsWasteType" onchange="applyNsWasteTypeUI(this.value)"></select>
@@ -441,27 +453,27 @@
       </div>
       <div class="ns-form-row">
         <div class="ns-form-group">
-          <label id="lbl_nsAmount">월 예상배출량 (L)</label>
+          <label for="nsAmount"><span id="lbl_nsAmount">월 예상배출량 (L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
           <input type="text" id="nsAmount" inputmode="numeric" placeholder="예: 500">
         </div>
         <div class="ns-form-group">
-          <label>주 수거횟수</label>
+          <label for="nsFreq">주 수거횟수<span class="num-warn-msg">숫자만 기재해주세요</span></label>
           <input type="text" id="nsFreq" inputmode="numeric" placeholder="예: 3">
         </div>
       </div>
       <div class="ns-form-row">
         <div class="ns-form-group">
-          <label id="lbl_nsPrice">현재 단가 (원/L)</label>
+          <label for="nsPrice"><span id="lbl_nsPrice">현재 단가 (원/L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
           <input type="text" id="nsPrice" inputmode="numeric" placeholder="예: 180">
         </div>
         <div class="ns-form-group">
-          <label id="lbl_nsSuggestedPrice">제안 단가 (원/L)</label>
+          <label for="nsSuggestedPrice"><span id="lbl_nsSuggestedPrice">제안 단가 (원/L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
           <input type="text" id="nsSuggestedPrice" inputmode="numeric" placeholder="예: 170">
         </div>
       </div>
       <div class="ns-form-row">
         <div class="ns-form-group" id="grp_nsBins">
-          <label>현재 통 갯수</label>
+          <label for="nsBins">현재 통 갯수<span class="num-warn-msg">숫자만 기재해주세요</span></label>
           <input type="text" id="nsBins" inputmode="numeric" placeholder="예: 4">
         </div>
         <div class="ns-form-group" id="grp_nsVinyl">
@@ -482,6 +494,13 @@
           <option value="가능">가능</option>
           <option value="불가능">불가능</option>
         </select>
+      </div>
+      <!-- ★ v56: 예상계약일자 — 상세 상담내용 바로 위 -->
+      <div class="ns-form-group">
+        <label>예상계약일자</label>
+        <div class="date-select-row">
+          <select id="nsEcdY"></select><select id="nsEcdM"></select><select id="nsEcdD"></select>
+        </div>
       </div>
       <div class="ns-form-group">
         <label>상세 상담내용</label>
@@ -2445,6 +2464,104 @@ async function openPriceGuide() {
     alert('영업기준표를 여는 중 오류가 발생했습니다.');
   }
 }
+// ============================================================
+// ★ v56: 접촉방식 / 숫자 전용 필드 경고 / 예상계약일자 공통 유틸
+//   - 핀 클릭 방문기록 폼과 신규업장 등록 모달이 함께 사용합니다.
+// ============================================================
+// ★ v56: 영업구분 기본값 — 비어있을 때만 채웁니다.
+//   기존 기록에 '인바운드'가 저장돼 있으면 절대 덮어쓰지 않습니다.
+const SALES_TYPE_DEFAULT = '아웃바운드';
+function applySalesTypeDefault_() {
+  const el = document.getElementById('v_salesType');
+  if (el && !el.value) el.value = SALES_TYPE_DEFAULT;
+}
+const CONTACT_METHODS = ['팔로업콜', '대면미팅', '단순견적발송(콜,미팅X)'];
+function buildContactMethodOptions_() {
+  return '<option value="">선택</option>' + CONTACT_METHODS.map(function(m) {
+    return '<option value="' + m + '">' + m + '</option>';
+  }).join('');
+}
+// 라벨 옆에 붙는 경고 문구(기본 숨김). label.num-invalid 일 때만 노출됨.
+const NUM_WARN_HTML_ = '<span class="num-warn-msg">숫자만 기재해주세요</span>';
+// 숫자만 허용하는 필드 — 월예상배출량 ~ 통갯수 구간
+const NUMERIC_FIELD_IDS_    = ['v_amount', 'v_price', 'v_suggestedPrice', 'v_freq', 'v_bins'];
+const NS_NUMERIC_FIELD_IDS_ = ['nsAmount', 'nsPrice', 'nsSuggestedPrice', 'nsFreq', 'nsBins'];
+// ★ 입력을 막지 않습니다. 숫자가 아닌 값이 있으면 테두리+문구로 경고만 하고,
+//   저장 시에도 입력값을 그대로 보존합니다(데이터 유실 방지).
+function validateNumericField_(el) {
+  if (!el) return;
+  const raw = String(el.value || '').trim();
+  const invalid = raw.length > 0 && !/^[0-9]+$/.test(raw);
+  el.classList.toggle('num-invalid', invalid);
+  const label = el.parentElement ? el.parentElement.querySelector('label[for="' + el.id + '"]') : null;
+  const labelEl = label || (el.previousElementSibling && el.previousElementSibling.tagName === 'LABEL' ? el.previousElementSibling : null);
+  if (labelEl) labelEl.classList.toggle('num-invalid', invalid);
+}
+function attachNumericWarnings_(ids) {
+  ids.forEach(function(id) {
+    const el = document.getElementById(id);
+    if (!el || el._numWarnBound) return;
+    el._numWarnBound = true;
+    el.addEventListener('input', function() { validateNumericField_(el); });
+    el.addEventListener('blur',  function() { validateNumericField_(el); });
+  });
+}
+function refreshNumericWarnings_(ids) {
+  ids.forEach(function(id) { validateNumericField_(document.getElementById(id)); });
+}
+// ── 예상계약일자 (년/월/일 드롭다운 → 'YYYY-MM-DD' 문자열 1개로 저장) ──
+function daysInMonth_(y, m) {
+  if (!y || !m) return 31;
+  return new Date(Number(y), Number(m), 0).getDate();
+}
+function initDateSelects_(yId, mId, dId, onChange) {
+  const ySel = document.getElementById(yId), mSel = document.getElementById(mId), dSel = document.getElementById(dId);
+  if (!ySel || !mSel || !dSel) return;
+  if (ySel._dsInit) return;   // 폐기물 종류 전환 등으로 재호출돼도 리스너가 중복되지 않도록
+  ySel._dsInit = true;
+  const thisYear = new Date().getFullYear();
+  let yHtml = '<option value="">년</option>';
+  for (let y = thisYear; y <= thisYear + 3; y++) yHtml += '<option value="' + y + '">' + y + '년</option>';
+  ySel.innerHTML = yHtml;
+  let mHtml = '<option value="">월</option>';
+  for (let m = 1; m <= 12; m++) mHtml += '<option value="' + m + '">' + m + '월</option>';
+  mSel.innerHTML = mHtml;
+  const rebuildDays = function() {
+    const keep = dSel.value;
+    const max = daysInMonth_(ySel.value, mSel.value);
+    let dHtml = '<option value="">일</option>';
+    for (let d = 1; d <= max; d++) dHtml += '<option value="' + d + '">' + d + '일</option>';
+    dSel.innerHTML = dHtml;
+    if (keep && Number(keep) <= max) dSel.value = keep;   // 말일 초과 시에만 초기화
+  };
+  rebuildDays();
+  ySel.addEventListener('change', function() { rebuildDays(); if (onChange) onChange(); });
+  mSel.addEventListener('change', function() { rebuildDays(); if (onChange) onChange(); });
+  dSel.addEventListener('change', function() { if (onChange) onChange(); });
+}
+function pad2_(n) { return String(n).length < 2 ? '0' + n : String(n); }
+// 년·월·일이 모두 선택된 경우에만 값을 만듭니다(부분 입력은 빈 값 처리).
+function getDateSelectValue_(yId, mId, dId) {
+  const y = (document.getElementById(yId) || {}).value || '';
+  const m = (document.getElementById(mId) || {}).value || '';
+  const d = (document.getElementById(dId) || {}).value || '';
+  if (!y || !m || !d) return '';
+  return y + '-' + pad2_(m) + '-' + pad2_(d);
+}
+function setDateSelectValue_(yId, mId, dId, val) {
+  const ySel = document.getElementById(yId), mSel = document.getElementById(mId), dSel = document.getElementById(dId);
+  if (!ySel || !mSel || !dSel) return;
+  const parts = String(val || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!parts) { ySel.value = ''; mSel.value = ''; dSel.value = ''; return; }
+  // 저장된 연도가 드롭다운 범위 밖이면(과거 기록 등) 옵션을 즉석에서 보강
+  if (!Array.prototype.some.call(ySel.options, function(o) { return o.value === parts[1]; })) {
+    ySel.insertAdjacentHTML('beforeend', '<option value="' + parts[1] + '">' + parts[1] + '년</option>');
+  }
+  ySel.value = parts[1];
+  mSel.value = String(Number(parts[2]));
+  ySel.dispatchEvent(new Event('change'));   // 일 옵션 재생성
+  dSel.value = String(Number(parts[3]));
+}
 // ★ v53: 폐기물 종류 드롭다운 + 동적 라벨 id 추가
 function buildVisitForm() {
   const wasteOptions = WASTE_TYPES.map(function(w) {
@@ -2461,6 +2578,9 @@ function buildVisitForm() {
     '<input type="hidden" id="v_repriority" value="">' +
     '<label>영업구분</label>' +
     '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
+    // ★ v56: 접촉방식 — 영업구분 바로 아래, 동일 양식(select)
+    '<label>접촉방식</label>' +
+    '<select id="v_contactMethod">' + buildContactMethodOptions_() + '</select>' +
     '<label>폐기물 선택</label>' +
     '<select id="v_wasteType">' + wasteOptions + '</select>' +
     '<div class="visit-dates" id="visitDates"></div>' +
@@ -2468,16 +2588,27 @@ function buildVisitForm() {
     '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (없을경우 사유기재)">' +
     '<label>담당자 연락처</label>' +
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
-    '<label id="lbl_amount">월 예상배출량 (L)</label><input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500">' +
-    '<label id="lbl_price">현재 단가 (원/L)</label><input id="v_price" type="text" inputmode="numeric" placeholder="예: 180">' +
-    '<label id="lbl_suggestedPrice">제안 단가 (원/L)</label><input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170">' +
-    '<label>현재 주 수거횟수</label><input id="v_freq" type="text" inputmode="numeric" placeholder="예: 3">' +
-    '<div id="grp_bins"><label><span style="color:#E53935;">*</span> 현재 통 갯수</label>' +
+    // ★ v56: 라벨 텍스트를 내부 span(lbl_*)으로 감쌈 — applyWasteTypeUI의 textContent 치환이
+    //   경고 문구 span을 지우지 않도록 하기 위함. setLabel() 로직은 그대로 둬도 동작함.
+    '<label for="v_amount"><span id="lbl_amount">월 예상배출량 (L)</span>' + NUM_WARN_HTML_ + '</label>' +
+    '<input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500">' +
+    '<label for="v_price"><span id="lbl_price">현재 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
+    '<input id="v_price" type="text" inputmode="numeric" placeholder="예: 180">' +
+    '<label for="v_suggestedPrice"><span id="lbl_suggestedPrice">제안 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
+    '<input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170">' +
+    '<label for="v_freq">현재 주 수거횟수' + NUM_WARN_HTML_ + '</label>' +
+    '<input id="v_freq" type="text" inputmode="numeric" placeholder="예: 3">' +
+    '<div id="grp_bins"><label for="v_bins"><span style="color:#E53935;">*</span> 현재 통 갯수' + NUM_WARN_HTML_ + '</label>' +
     '<input id="v_bins" type="text" inputmode="numeric" placeholder="예: 4"></div>' +
     '<div id="grp_vinyl"><label><span style="color:#E53935;">*</span> 비닐 사용여부</label>' +
     '<select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="지자체">지자체</option><option value="처리기">처리기</option></select></div>' +
     '<label><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>' +
     '<select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select>' +
+    // ★ v56: 예상계약일자 — 상세 상담내용 바로 위, 년/월/일 드롭다운
+    '<label>예상계약일자</label>' +
+    '<div class="date-select-row">' +
+      '<select id="v_ecdY"></select><select id="v_ecdM"></select><select id="v_ecdD"></select>' +
+    '</div>' +
     '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
     '<label>최종영업결과 및 폐업 여부 선택</label>' +
     '<select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option><option value="폐업">폐업</option></select>' +
@@ -2506,12 +2637,17 @@ function loadMyVisit(store, wasteType) {
   }
   setVal('v_wasteType', wasteType);
   applyWasteTypeUI(wasteType);
+  initDateSelects_('v_ecdY', 'v_ecdM', 'v_ecdD');   // ★ v56: 옵션 채우기(최초 1회)
   const rec = byType[wasteType];
   if (!rec) {
-    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
+    // ★ v56: contactMethod 추가
+    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod'].forEach(function(k) {
       setVal('v_' + k, '');
     });
     setVal('v_repriority', '');
+    setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', '');   // ★ v56
+    applySalesTypeDefault_();                                 // ★ v56: 아웃바운드 기본선택
+    refreshNumericWarnings_(NUMERIC_FIELD_IDS_);              // ★ v56: 빈 값이므로 경고 해제
     const rpEl = document.getElementById('repriorityToggle');
     if (rpEl) rpEl.querySelectorAll('button').forEach(function(b) { b.classList.remove('sel'); });
     const dateEl = document.getElementById("visitDates");
@@ -2519,9 +2655,13 @@ function loadMyVisit(store, wasteType) {
     return;
   }
   const cur = rec.current || {};
-  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType'].forEach(function(k) {
+  // ★ v56: contactMethod 추가
+  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
   });
+  setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', cur.expectedContractDate);   // ★ v56
+  applySalesTypeDefault_();                    // ★ v56: 기존 기록에 영업구분이 비어있을 때만 아웃바운드
+  refreshNumericWarnings_(NUMERIC_FIELD_IDS_); // ★ v56: 기존에 저장된 비숫자 값도 경고 표시
   // ★ 재탭핑우선순위 복원 (숨은 input + 버튼 하이라이트)
   setVal('v_repriority', cur.repriority);
   const rpToggleEl = document.getElementById('repriorityToggle');
@@ -2550,10 +2690,13 @@ function bindVisitForm(store) {
       btn.disabled = false;
     });
   }
+  // ★ v56: 접촉방식 + 예상계약일자 3종 드롭다운 추가
   const formFieldIds = [
-    'v_salesType','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
-    'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome'
+    'v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
+    'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome',
+    'v_ecdY','v_ecdM','v_ecdD'
   ];
+  attachNumericWarnings_(NUMERIC_FIELD_IDS_);   // ★ v56: 숫자 외 입력 시 경고(입력은 막지 않음)
   const resetSaveBtn = function() {
     if (btn.textContent === '✓ 저장됨') {
       btn.textContent = '저장';
@@ -2611,6 +2754,13 @@ async function saveVisit(store) {
   currentData.wasteType = wasteType; // ★ v53
   const salesTypeVal = getVal('v_salesType');
   if (salesTypeVal) currentData.salesType = salesTypeVal;
+  // ★ v56: 접촉방식 — salesType과 동일하게 값이 있을 때만 저장.
+  //   classifyVisitCurrent()의 판정 필드에는 넣지 않으므로 핀 색상/칩 카운트에 영향 없음.
+  const contactMethodVal = getVal('v_contactMethod');
+  if (contactMethodVal) currentData.contactMethod = contactMethodVal;
+  // ★ v56: 예상계약일자 — 년·월·일이 모두 선택된 경우에만 'YYYY-MM-DD'로 저장
+  const ecdVal = getDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD');
+  if (ecdVal) currentData.expectedContractDate = ecdVal;
   const repriorityVal = getVal('v_repriority');
   if (repriorityVal) currentData.repriority = repriorityVal;
   currentData.updatedAt = Date.now();
@@ -2944,6 +3094,17 @@ function resetNewStoreForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  // ★ v56: 접촉방식 드롭다운 채우기 + 초기화
+  const cmSel = document.getElementById('nsContactMethod');
+  if (cmSel) {
+    if (!cmSel.options.length) cmSel.innerHTML = buildContactMethodOptions_();
+    cmSel.value = '';
+  }
+  // ★ v56: 예상계약일자 초기화 + 숫자 경고 바인딩/해제
+  initDateSelects_('nsEcdY', 'nsEcdM', 'nsEcdD');
+  setDateSelectValue_('nsEcdY', 'nsEcdM', 'nsEcdD', '');
+  attachNumericWarnings_(NS_NUMERIC_FIELD_IDS_);
+  refreshNumericWarnings_(NS_NUMERIC_FIELD_IDS_);
   _nsSelectedAdminType = '';
   document.querySelectorAll('button[data-admintype]').forEach(function(b) { b.classList.remove('active'); });
   _nsSelectedSalesType = '';
@@ -3111,7 +3272,11 @@ async function submitNewStore() {
     vinyl: nsHiddenFields.indexOf('vinyl') !== -1 ? '' : document.getElementById('nsVinyl').value,
     truck: document.getElementById('nsTruck').value,
     note: document.getElementById('nsNote').value.trim(),
-    outcome: _nsSelectedOutcome
+    outcome: _nsSelectedOutcome,
+    // ★ v56: 접촉방식 / 예상계약일자
+    //   addNewStore.gs가 아직 이 두 키를 모르면 그냥 무시됩니다(기존 동작 영향 없음).
+    contactMethod: document.getElementById('nsContactMethod').value,
+    expectedContractDate: getDateSelectValue_('nsEcdY', 'nsEcdM', 'nsEcdD')
   };
   const btn = document.getElementById('nsSubmitBtn');
   btn.disabled = true;
