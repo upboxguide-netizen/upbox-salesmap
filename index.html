@@ -177,9 +177,10 @@
   .visit-form input, .visit-form select, .visit-form textarea { width: 100%; padding: 8px 10px; border: 1px solid #DDD; border-radius: 6px; font-size: 13px; font-family: inherit; }
   .visit-form textarea { min-height: 60px; resize: vertical; }
   .visit-form input:focus, .visit-form select:focus, .visit-form textarea:focus { outline: none; border-color: #F2AC57; }
-  /* ★ v56: 숫자 전용 필드 경고 (입력은 막지 않고 경고만) */
-  .num-warn-msg { display: none; color: #E53935; font-size: 11px; font-weight: 600; margin-left: 6px; }
-  label.num-invalid .num-warn-msg { display: inline; }
+  /* ★ v56/v57: 입력값 경고 (입력은 막지 않고 경고만) */
+  .num-warn-msg { display: none; color: #E53935; font-size: 11px; font-weight: 600; line-height: 1.45; margin-top: 3px; }
+  label.num-invalid .num-warn-msg { display: block; }
+  .num-warn-msg:empty { display: none !important; }
   input.num-invalid { border-color: #E53935 !important; background: #FFF6F6; }
   /* ★ v56: 예상계약일자 년/월/일 드롭다운 */
   .date-select-row { display: flex; gap: 6px; }
@@ -455,7 +456,7 @@
         <input type="text" id="nsCurrentStoreName" placeholder="이미 거래 중인 업체가 있다면">
       </div>
       <div class="ns-form-group">
-        <label>담당자 연락처</label>
+        <label for="nsContact">담당자 연락처<span class="num-warn-msg"></span></label>
         <input type="tel" id="nsContact" inputmode="numeric" placeholder="010-0000-0000" maxlength="13">
       </div>
       <div class="ns-form-row">
@@ -520,6 +521,15 @@
           <button type="button" data-outcome="성사" class="success" onclick="selectOutcome(this)">성사</button>
           <button type="button" data-outcome="실패" class="fail" onclick="selectOutcome(this)">실패</button>
         </div>
+      </div>
+      <!-- ★ v60: 불발사유 (AD열) / 기타불발사유 (AE열) — '실패' 선택 시에만 노출 -->
+      <div class="ns-form-group" id="ns_grp_failReason" style="display:none;">
+        <label>불발사유</label>
+        <select id="ns_failReason"></select>
+      </div>
+      <div class="ns-form-group" id="ns_grp_failReasonEtc" style="display:none;">
+        <label>기타 불발사유</label>
+        <input type="text" id="ns_failReasonEtc" placeholder="사유를 직접 입력해주세요">
       </div>
       <div class="ns-submit-row">
         <button class="ns-btn-cancel" onclick="closeNewStoreModal()" type="button">취소</button>
@@ -1269,8 +1279,9 @@ function computeMyVisitCounts() {
     const outcome = String(cur.outcome || "").trim();
     if (outcome === "성사") { counts.success++; continue; }
     if (outcome === "실패") { counts.fail++; continue; }
-    const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
-    const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
+    const eff = effectiveVisitValues_(cur);   // ★ v57: 임의값 제외
+    const visitFields = [eff.currentStoreName, eff.bins, eff.vinyl, eff.truck];
+    const leadAdditionalFields = [eff.contact, eff.amount, eff.suggestedPrice, eff.note];
     const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
     const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
     if (allVisitFilled && allLeadAdditionalFilled) { counts.lead++; continue; }
@@ -1535,8 +1546,9 @@ async function moveToFilteredStoresForPartner(filter) {
     if (outcome === '성사') status = 'success';
     else if (outcome === '실패') status = 'fail';
     else {
-      const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
-      const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
+      const eff = effectiveVisitValues_(cur);   // ★ v57: 임의값 제외
+      const visitFields = [eff.currentStoreName, eff.bins, eff.vinyl, eff.truck];
+      const leadAdditionalFields = [eff.contact, eff.amount, eff.suggestedPrice, eff.note];
       const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
       const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
       if (allVisitFilled && allLeadAdditionalFilled) status = 'lead';
@@ -2233,13 +2245,32 @@ function getGradeIcon(grade) {
   return "-";
 }
 // ★ 방문기록(current) 하나를 상태로 분류하는 단일 함수 (핀 색상·타파트너 판정 공용)
+/* ★ v57: 임의값을 '미기재'로 환산한 판정용 값 묶음.
+ *   유효리드 조건 자체는 v56과 동일합니다. 값의 유효성만 한 겹 더 봅니다.
+ *   → 판정 로직 3곳(classifyVisitCurrent / computeMyVisitCounts /
+ *     moveToFilteredStoresForPartner)이 전부 이 함수를 씁니다. */
+function effectiveVisitValues_(cur) {
+  cur = cur || {};
+  const keep = function(v, ok) { return ok ? v : ""; };
+  return {
+    currentStoreName: cur.currentStoreName,
+    vinyl:  cur.vinyl,
+    truck:  cur.truck,
+    note:   cur.note,
+    bins:           keep(cur.bins,           isValidBins_(cur.bins, cur.vinyl)),
+    contact:        keep(cur.contact,        isValidContact_(cur.contact)),
+    amount:         keep(cur.amount,         isValidAmount_(cur.amount)),
+    suggestedPrice: keep(cur.suggestedPrice, isValidPrice_(cur.suggestedPrice))
+  };
+}
 function classifyVisitCurrent(cur) {
   cur = cur || {};
   const outcome = String(cur.outcome || "").trim();
   if (outcome === "성사") return "success";
   if (outcome === "실패") return "fail";
-  const visitFields = [cur.currentStoreName, cur.bins, cur.vinyl, cur.truck];
-  const leadAdditionalFields = [cur.contact, cur.amount, cur.suggestedPrice, cur.note];
+  const eff = effectiveVisitValues_(cur);   // ★ v57
+  const visitFields = [eff.currentStoreName, eff.bins, eff.vinyl, eff.truck];
+  const leadAdditionalFields = [eff.contact, eff.amount, eff.suggestedPrice, eff.note];
   const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
   const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
   if (allVisitFilled && allLeadAdditionalFilled) return "lead";
@@ -2247,9 +2278,13 @@ function classifyVisitCurrent(cur) {
   if (outcome === "폐업") return "closedByMe";
   // ★ 단순접촉: 위 조건 미달이지만 접촉내용 필드가 하나라도 채워진 경우
   //   (재탭핑우선순위 포함 / 영업구분은 제외)
+  // ★ v57: 검증 대상 4개는 임의값을 걸러낸 값으로, 나머지는 기존 그대로.
+  //   (현재단가·주수거횟수는 판정에 반영하지 않기로 한 항목이라 원값 유지)
+  // ★ v57: 검증 대상 4개는 임의값을 걸러낸 값으로, 나머지는 기존 그대로.
+  //   (현재단가·주수거횟수는 판정에 반영하지 않기로 한 항목이라 원값 유지)
   const contactFields = [
-    cur.currentStoreName, cur.contact, cur.amount, cur.price,
-    cur.suggestedPrice, cur.freq, cur.bins, cur.vinyl, cur.truck, cur.note,
+    eff.currentStoreName, eff.contact, eff.amount, cur.price,
+    eff.suggestedPrice, cur.freq, eff.bins, eff.vinyl, eff.truck, eff.note,
     cur.repriority
   ];
   if (contactFields.some(v => String(v || "").trim().length > 0)) return "simpleContact";
@@ -2511,6 +2546,49 @@ function setRepriorityValue_(val) {
   }
   el.value = v;
 }
+/* ★ v60: 불발사유 — 방문기록 시트 AD열 / 기타불발사유 AE열
+ *   Firebase current.failReason / current.failReasonEtc
+ *
+ *   ⚠️ 통합관리시트 BW열에 이미 11종 분류가 운영 중입니다(최종불발 820건 적재됨).
+ *      여기 7종은 그것과 항목이 다릅니다. 특히 '컨택 지연'(기존 131건)과
+ *      '배출량'(37건)에 대응하는 선택지가 없어 '기타'로 몰릴 수 있습니다.
+ *      두 시트를 합칠 계획이 생기면 이 배열부터 맞추세요.
+ *
+ *   ⚠️ 판정에는 쓰지 않습니다. salesType·contactMethod와 동일하게
+ *      classifyVisitCurrent()의 판정 필드에서 제외됩니다. */
+const FAIL_REASONS = [
+  '단가열위',
+  '기존업체 해지방어 실패',
+  '수거횟수열위',
+  '서비스불만(세척 등)',
+  '처리기도입',
+  '지자체 사용중',
+  '기타'
+];
+const FAIL_REASON_ETC = '기타';   // 이 값일 때만 기타 입력란이 열립니다
+// 불발사유 입력란을 열어줄 최종영업결과 값. '실패'만 두면 성사 건에는 안 보입니다.
+const FAIL_REASON_OUTCOMES = ['실패'];
+
+function buildFailReasonOptions_() {
+  return '<option value="">선택</option>' + FAIL_REASONS.map(function(r) {
+    return '<option value="' + r + '">' + r + '</option>';
+  }).join('');
+}
+/* 최종영업결과·불발사유 값에 따라 두 칸의 노출을 갱신합니다.
+   숨길 때는 값도 같이 비웁니다 — 안 그러면 성사로 바꿔도 불발사유가 남아 저장됩니다. */
+function applyFailReasonUI_(prefix) {
+  const g   = document.getElementById(prefix + 'grp_failReason');
+  const gE  = document.getElementById(prefix + 'grp_failReasonEtc');
+  const sel = document.getElementById(prefix + 'failReason');
+  const etc = document.getElementById(prefix + 'failReasonEtc');
+  const outcome = prefix === 'ns_' ? _nsSelectedOutcome : getVal('v_outcome');
+  const show = FAIL_REASON_OUTCOMES.indexOf(String(outcome || '').trim()) !== -1;
+  if (g) g.style.display = show ? '' : 'none';
+  if (!show) { if (sel) sel.value = ''; if (etc) etc.value = ''; }
+  const showEtc = show && sel && sel.value === FAIL_REASON_ETC;
+  if (gE) gE.style.display = showEtc ? '' : 'none';
+  if (!showEtc && etc) etc.value = '';
+}
 const CONTACT_METHODS = ['팔로업콜', '대면미팅', '단순견적발송(콜,미팅X)'];
 
 function buildContactMethodOptions_() {
@@ -2518,21 +2596,119 @@ function buildContactMethodOptions_() {
     return '<option value="' + m + '">' + m + '</option>';
   }).join('');
 }
-// 라벨 옆에 붙는 경고 문구(기본 숨김). label.num-invalid 일 때만 노출됨.
-const NUM_WARN_HTML_ = '<span class="num-warn-msg">숫자만 기재해주세요</span>';
-// 숫자만 허용하는 필드 — 월예상배출량 ~ 통갯수 구간
-const NUMERIC_FIELD_IDS_    = ['v_amount', 'v_price', 'v_suggestedPrice', 'v_freq', 'v_bins'];
-const NS_NUMERIC_FIELD_IDS_ = ['nsAmount', 'nsPrice', 'nsSuggestedPrice', 'nsFreq', 'nsBins'];
-// ★ 입력을 막지 않습니다. 숫자가 아닌 값이 있으면 테두리+문구로 경고만 하고,
-//   저장 시에도 입력값을 그대로 보존합니다(데이터 유실 방지).
+// 라벨 옆에 붙는 경고 문구(기본 숨김). 문구는 검증 결과에 따라 JS가 채웁니다.
+const NUM_WARN_HTML_ = '<span class="num-warn-msg"></span>';
+
+/* ============================================================
+ * ★ v57: 임의값(거짓숫자) 검증
+ *
+ *  설계 원칙 — 유효리드 "조건"은 v56과 동일하게 유지합니다.
+ *    바뀌는 건 "채워졌다"의 정의뿐입니다.
+ *    값이 있어도 임의값이면 → 미기재로 취급 → 등급이 자연스럽게 내려감.
+ *    (유효리드 → 단순방문 → 단순접촉)
+ *
+ *  ⚠️ 유효리드 판정에 실제로 쓰이는 건 아래 4개뿐입니다.
+ *      담당자연락처 · 월예상배출량 · 제안단가 · 통갯수(+비닐)
+ *    현재단가·주수거횟수는 원래 판정 항목이 아니라서 경고만 합니다.
+ *    (없는 불이익을 안내하지 않기 위해 문구도 다르게 씁니다)
+ * ============================================================ */
+const WARN_MSG_LEAD_  = '임의값이 아닌 정확한 정보를 기재해주세요. 임의값 기재시 유효리드에서 제외됩니다.';
+const WARN_MSG_PLAIN_ = '임의값이 아닌 정확한 정보를 기재해주세요.';
+const WARN_MSG_NUM_   = '숫자만 기재해주세요.';
+
+// 한국 전화번호 국번 (휴대폰/지역/안심번호/인터넷전화/대표번호)
+const PHONE_PREFIX_RE_ = /^(01[016789]|02|0(3[1-3]|4[1-4]|5[1-5]|6[1-4])|050\d|070|080)/;
+
+// ★ 시트·Firebase 저장 과정에서 앞자리 0이 유실된 번호를 되살립니다.
+//   실측 결과 유효리드 78건의 '이상한 연락처' 중 58건이 이 경우였습니다.
+//   (1048542661 → 01048542661, 417453892 → 0417453892)
+function normalizePhone_(v) {
+  const d = String(v == null ? '' : v).replace(/[^0-9]/g, '');
+  if (!d) return '';
+  return d.charAt(0) === '0' ? d : '0' + d;
+}
+function isValidContact_(v) {
+  const d = normalizePhone_(v);
+  // 050x 안심번호는 0507-1234-5678 처럼 12자리입니다 (실제 데이터에 존재)
+  const maxLen = /^050\d/.test(d) ? 12 : 11;
+  if (!d || d.length < 9 || d.length > maxLen) return false;
+  if (!PHONE_PREFIX_RE_.test(d)) return false;
+  const body = d.indexOf('01') === 0 ? d.slice(3) : d.slice(2);
+  if (body.length === 0) return false;
+  // 0000000 / 1111111 처럼 한 글자 반복, 12341234 같은 연속 패턴 배제
+  const uniq = {};
+  for (let i = 0; i < body.length; i++) uniq[body.charAt(i)] = true;
+  if (Object.keys(uniq).length <= 1) return false;
+  if (['12341234', '12345678', '43214321', '11112222'].indexOf(body) !== -1) return false;
+  return true;
+}
+function toNum_(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s || !/^[0-9]+(\.[0-9]+)?$/.test(s)) return null;
+  return Number(s);
+}
+function isValidAmount_(v) { const n = toNum_(v); return n !== null && n > 0; }      // 월예상배출량 0 이하 배제
+function isValidPrice_(v)  { const n = toNum_(v); return n !== null && n >= 100; }   // 단가 최소 100원
+function isValidFreq_(v)   { const n = toNum_(v); return n !== null && n >= 1 && n <= 7; }
+// 통갯수는 0일 수 있지만, 그때는 비닐이 지자체/처리기여야 말이 됩니다.
+function isValidBins_(v, vinyl) {
+  const n = toNum_(v);
+  if (n === null) return false;
+  if (n > 0) return true;
+  const vy = String(vinyl == null ? '' : vinyl).trim();
+  return vy === '지자체' || vy === '처리기';
+}
+
+/* 필드별 검증 정의.
+ *   affectsLead: true  → 유효리드 판정에 반영 + 강한 문구
+ *   affectsLead: false → 경고만 (판정 미반영) + 약한 문구        */
+const FIELD_RULES_ = {
+  contact:        { numeric: false, affectsLead: true,  test: function(v)     { return isValidContact_(v); } },
+  amount:         { numeric: true,  affectsLead: true,  test: function(v)     { return isValidAmount_(v); } },
+  price:          { numeric: true,  affectsLead: false, test: function(v)     { return isValidPrice_(v); } },
+  suggestedPrice: { numeric: true,  affectsLead: true,  test: function(v)     { return isValidPrice_(v); } },
+  freq:           { numeric: true,  affectsLead: false, test: function(v)     { return isValidFreq_(v); } },
+  bins:           { numeric: true,  affectsLead: true,  test: function(v, vy) { return isValidBins_(v, vy); } }
+};
+
+// 폼 input id ↔ 규칙 키 매핑 (핀 클릭 폼 / 신규업장 모달)
+const WARN_FIELD_MAP_    = { v_contact:'contact', v_amount:'amount', v_price:'price',
+                             v_suggestedPrice:'suggestedPrice', v_freq:'freq', v_bins:'bins' };
+const NS_WARN_FIELD_MAP_ = { nsContact:'contact', nsAmount:'amount', nsPrice:'price',
+                             nsSuggestedPrice:'suggestedPrice', nsFreq:'freq', nsBins:'bins' };
+const NUMERIC_FIELD_IDS_    = Object.keys(WARN_FIELD_MAP_);
+const NS_NUMERIC_FIELD_IDS_ = Object.keys(NS_WARN_FIELD_MAP_);
+// 통갯수 검증은 비닐 값을 같이 봐야 해서 짝을 기억해둡니다.
+const VINYL_PARTNER_ID_ = { v_bins: 'v_vinyl', nsBins: 'nsVinyl' };
+
+// ★ 입력을 막지 않습니다. 경고만 표시하고 저장 시 입력값을 그대로 보존합니다.
 function validateNumericField_(el) {
   if (!el) return;
+  const key = WARN_FIELD_MAP_[el.id] || NS_WARN_FIELD_MAP_[el.id];
+  const rule = key ? FIELD_RULES_[key] : null;
   const raw = String(el.value || '').trim();
-  const invalid = raw.length > 0 && !/^[0-9]+$/.test(raw);
+
+  let msg = '';
+  if (rule && raw.length > 0) {
+    // ★ 정수만 허용 (v56에서 확정한 정책). 배출량·단가·횟수·통갯수 모두 정수 필드입니다.
+    if (rule.numeric && !/^[0-9]+$/.test(raw)) {
+      msg = WARN_MSG_NUM_;                                  // 숫자 자리에 글자 또는 소수점
+    } else {
+      const vinylEl = VINYL_PARTNER_ID_[el.id] ? document.getElementById(VINYL_PARTNER_ID_[el.id]) : null;
+      const ok = rule.test(raw, vinylEl ? vinylEl.value : '');
+      if (!ok) msg = rule.affectsLead ? WARN_MSG_LEAD_ : WARN_MSG_PLAIN_;
+    }
+  }
+
+  const invalid = msg.length > 0;
   el.classList.toggle('num-invalid', invalid);
   const label = el.parentElement ? el.parentElement.querySelector('label[for="' + el.id + '"]') : null;
   const labelEl = label || (el.previousElementSibling && el.previousElementSibling.tagName === 'LABEL' ? el.previousElementSibling : null);
-  if (labelEl) labelEl.classList.toggle('num-invalid', invalid);
+  if (labelEl) {
+    labelEl.classList.toggle('num-invalid', invalid);
+    const span = labelEl.querySelector('.num-warn-msg');
+    if (span) span.textContent = msg;
+  }
 }
 function attachNumericWarnings_(ids) {
   ids.forEach(function(id) {
@@ -2541,6 +2717,15 @@ function attachNumericWarnings_(ids) {
     el._numWarnBound = true;
     el.addEventListener('input', function() { validateNumericField_(el); });
     el.addEventListener('blur',  function() { validateNumericField_(el); });
+  });
+  // 비닐을 바꾸면 통갯수 경고가 달라질 수 있으므로 같이 다시 검사합니다.
+  ids.forEach(function(id) {
+    const partnerId = VINYL_PARTNER_ID_[id];
+    if (!partnerId) return;
+    const vy = document.getElementById(partnerId);
+    if (!vy || vy._binsRecheckBound) return;
+    vy._binsRecheckBound = true;
+    vy.addEventListener('change', function() { validateNumericField_(document.getElementById(id)); });
   });
 }
 function refreshNumericWarnings_(ids) {
@@ -2619,7 +2804,7 @@ function buildVisitForm() {
     '<div class="visit-dates" id="visitDates"></div>' +
     '<label><span style="color:#E53935;">*</span> 현재 수거업체명</label>' +
     '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (없을경우 사유기재)">' +
-    '<label>담당자 연락처</label>' +
+    '<label for="v_contact">담당자 연락처' + NUM_WARN_HTML_ + '</label>' +
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
     // ★ v56: 라벨 텍스트를 내부 span(lbl_*)으로 감쌈 — applyWasteTypeUI의 textContent 치환이
     //   경고 문구 span을 지우지 않도록 하기 위함. setLabel() 로직은 그대로 둬도 동작함.
@@ -2645,6 +2830,15 @@ function buildVisitForm() {
     '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
     '<label>최종영업결과 및 폐업 여부 선택</label>' +
     '<select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option><option value="폐업">폐업</option></select>' +
+    // ★ v60: 불발사유 (AD열) / 기타불발사유 (AE열) — 최종영업결과가 '실패'일 때만 노출
+    '<div id="v_grp_failReason" style="display:none;">' +
+      '<label>불발사유</label>' +
+      '<select id="v_failReason">' + buildFailReasonOptions_() + '</select>' +
+    '</div>' +
+    '<div id="v_grp_failReasonEtc" style="display:none;">' +
+      '<label>기타 불발사유</label>' +
+      '<input id="v_failReasonEtc" type="text" placeholder="사유를 직접 입력해주세요">' +
+    '</div>' +
     '<button class="save-btn" id="saveVisitBtn">저장</button></div>';
 }
 // ★ v53: 선택된 폐기물 종류에 맞춰 라벨 텍스트/필드 숨김 적용
@@ -2674,9 +2868,10 @@ function loadMyVisit(store, wasteType) {
   const rec = byType[wasteType];
   if (!rec) {
     // ★ v56: contactMethod 추가
-    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod'].forEach(function(k) {
+    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc'].forEach(function(k) {
       setVal('v_' + k, '');
     });
+    applyFailReasonUI_('v_');   // ★ v60
     setRepriorityValue_('');                                  // ★ v58: 성사가능성 초기화
     setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', '');   // ★ v56
     applySalesTypeDefault_();                                 // ★ v56: 아웃바운드 기본선택
@@ -2688,9 +2883,10 @@ function loadMyVisit(store, wasteType) {
   }
   const cur = rec.current || {};
   // ★ v56: contactMethod 추가
-  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod'].forEach(function(k) {
+  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
   });
+  applyFailReasonUI_('v_');   // ★ v60: 저장된 값에 맞춰 노출 상태 복원
   setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', cur.expectedContractDate);   // ★ v56
   applySalesTypeDefault_();                    // ★ v56: 기존 기록에 영업구분이 비어있을 때만 아웃바운드
   refreshNumericWarnings_(NUMERIC_FIELD_IDS_); // ★ v56: 기존에 저장된 비숫자 값도 경고 표시
@@ -2721,8 +2917,17 @@ function bindVisitForm(store) {
   const formFieldIds = [
     'v_repriority','v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
     'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome',
-    'v_ecdY','v_ecdM','v_ecdD'
+    'v_ecdY','v_ecdM','v_ecdD',
+    'v_failReason','v_failReasonEtc'
   ];
+  // ★ v60: 최종영업결과·불발사유가 바뀌면 노출 상태를 다시 계산
+  ['v_outcome','v_failReason'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el && !el._failReasonBound) {
+      el._failReasonBound = true;
+      el.addEventListener('change', function() { applyFailReasonUI_('v_'); });
+    }
+  });
   attachNumericWarnings_(NUMERIC_FIELD_IDS_);   // ★ v56: 숫자 외 입력 시 경고(입력은 막지 않음)
   const resetSaveBtn = function() {
     if (btn.textContent === '✓ 저장됨') {
@@ -2776,6 +2981,11 @@ async function saveVisit(store) {
   if (ecdVal) currentData.expectedContractDate = ecdVal;
   const repriorityVal = getVal('v_repriority');
   if (repriorityVal) currentData.repriority = repriorityVal;
+  // ★ v60: 불발사유 / 기타불발사유. 노출 조건을 벗어나면 applyFailReasonUI_가 이미 비워둡니다.
+  const failReasonVal = getVal('v_failReason');
+  if (failReasonVal) currentData.failReason = failReasonVal;
+  const failReasonEtcVal = getVal('v_failReasonEtc');
+  if (failReasonVal === FAIL_REASON_ETC && failReasonEtcVal) currentData.failReasonEtc = failReasonEtcVal;
   currentData.updatedAt = Date.now();
   // ★ v53: 음식물류폐기물(기본값)은 레거시 recKey 그대로(REC_파트너_업장), 나머지는 접미사 추가
   const recKey = buildWasteRecKey_(currentUser.key, store._key, wasteType);
@@ -3114,6 +3324,18 @@ function resetNewStoreForm() {
     cmSel.value = '';
   }
   // ★ v56: 예상계약일자 초기화 + 숫자 경고 바인딩/해제
+  // ★ v60: 불발사유 드롭다운 채우기 + 초기화
+  const frSel = document.getElementById('ns_failReason');
+  if (frSel) {
+    if (!frSel.options.length) frSel.innerHTML = buildFailReasonOptions_();
+    frSel.value = '';
+    if (!frSel._failReasonBound) {
+      frSel._failReasonBound = true;
+      frSel.addEventListener('change', function() { applyFailReasonUI_('ns_'); });
+    }
+  }
+  const frEtc = document.getElementById('ns_failReasonEtc');
+  if (frEtc) frEtc.value = '';
   initDateSelects_('nsEcdY', 'nsEcdM', 'nsEcdD');
   setDateSelectValue_('nsEcdY', 'nsEcdM', 'nsEcdD', '');
   attachNumericWarnings_(NS_NUMERIC_FIELD_IDS_);
@@ -3126,6 +3348,7 @@ function resetNewStoreForm() {
   document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
   const defaultOutcomeBtn = document.querySelector('.ns-outcome-buttons button[data-outcome=""]');
   if (defaultOutcomeBtn) defaultOutcomeBtn.classList.add('active');
+  applyFailReasonUI_('ns_');   // ★ v60: 기록만 상태이므로 불발사유는 숨김
   const btn = document.getElementById('nsSubmitBtn');
   if (btn) {
     btn.disabled = false;
@@ -3238,6 +3461,7 @@ function selectOutcome(btn) {
   document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
   _nsSelectedOutcome = btn.dataset.outcome;
+  applyFailReasonUI_('ns_');   // ★ v60
 }
 async function submitNewStore() {
   const storeName = document.getElementById('nsStoreName').value.trim();
@@ -3289,7 +3513,11 @@ async function submitNewStore() {
     // ★ v56: 접촉방식 / 예상계약일자
     //   addNewStore.gs가 아직 이 두 키를 모르면 그냥 무시됩니다(기존 동작 영향 없음).
     contactMethod: document.getElementById('nsContactMethod').value,
-    expectedContractDate: getDateSelectValue_('nsEcdY', 'nsEcdM', 'nsEcdD')
+    expectedContractDate: getDateSelectValue_('nsEcdY', 'nsEcdM', 'nsEcdD'),
+    // ★ v60: 불발사유 / 기타불발사유
+    failReason: document.getElementById('ns_failReason').value,
+    failReasonEtc: document.getElementById('ns_failReason').value === FAIL_REASON_ETC
+                     ? document.getElementById('ns_failReasonEtc').value.trim() : ''
   };
   const btn = document.getElementById('nsSubmitBtn');
   btn.disabled = true;
