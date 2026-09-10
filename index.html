@@ -329,12 +329,19 @@
         </div>
       </div>
       <div class="cf-facet">
-        <div class="cf-facet-title"><span>재탭핑우선순위</span><span class="cf-facet-desc">여러 개 선택 가능</span></div>
+        <div class="cf-facet-title"><span>성사가능성</span><span class="cf-facet-desc">여러 개 선택 가능</span></div>
         <div class="cf-pill-group" data-facet="repriority">
-          <button type="button" class="cf-pill" data-val="상">상</button>
-          <button type="button" class="cf-pill" data-val="중">중</button>
-          <button type="button" class="cf-pill" data-val="하">하</button>
+          <button type="button" class="cf-pill" data-val="0% (가능성 없음)">0%</button>
+          <button type="button" class="cf-pill" data-val="20% (관심 낮음)">20%</button>
+          <button type="button" class="cf-pill" data-val="40% (관심 있으나 불확실)">40%</button>
+          <button type="button" class="cf-pill" data-val="60% (계약 의향 있음)">60%</button>
+          <button type="button" class="cf-pill" data-val="80% (계약 유력)">80%</button>
+          <button type="button" class="cf-pill" data-val="100% (계약 확정)">100%</button>
+          <button type="button" class="cf-pill" data-val="상">상(이전)</button>
+          <button type="button" class="cf-pill" data-val="중">중(이전)</button>
+          <button type="button" class="cf-pill" data-val="하">하(이전)</button>
         </div>
+
       </div>
       <div class="cf-facet">
         <div class="cf-facet-title"><span>폐기물 종류</span><span class="cf-facet-desc">내가 기록한 유형 기준 · 여러 개 선택 가능</span></div>
@@ -2475,7 +2482,37 @@ function applySalesTypeDefault_() {
   const el = document.getElementById('v_salesType');
   if (el && !el.value) el.value = SALES_TYPE_DEFAULT;
 }
+/* ★ v58: 성사가능성 (구 재탭핑우선순위) — 상/중/하 → 6단계 드롭다운
+ *   저장 위치는 그대로입니다: Firebase current.repriority / 방문기록 시트 X열
+ *   ⚠️ 기존 상/중/하 기록이 632건 남아 있습니다. 새 목록에 없는 값을 select에 넣으면
+ *      값이 ''로 튕겨서, 그 상태로 저장하면 기존 값이 지워집니다.
+ *      그래서 목록에 없는 값이 오면 '(이전 값)' 옵션을 즉석에서 붙여 보존합니다. */
+const REPRIORITY_OPTIONS = [
+  '0% (가능성 없음)',
+  '20% (관심 낮음)',
+  '40% (관심 있으나 불확실)',
+  '60% (계약 의향 있음)',
+  '80% (계약 유력)',
+  '100% (계약 확정)'
+];
+function buildRepriorityOptions_() {
+  return '<option value="">선택</option>' + REPRIORITY_OPTIONS.map(function(o) {
+    return '<option value="' + o + '">' + o + '</option>';
+  }).join('');
+}
+function setRepriorityValue_(val) {
+  const el = document.getElementById('v_repriority');
+  if (!el) return;
+  const v = String(val == null ? '' : val).trim();
+  if (!v) { el.value = ''; return; }
+  if (REPRIORITY_OPTIONS.indexOf(v) === -1) {
+    const exists = Array.prototype.some.call(el.options, function(o) { return o.value === v; });
+    if (!exists) el.insertAdjacentHTML('beforeend', '<option value="' + v + '">' + v + ' (이전 값)</option>');
+  }
+  el.value = v;
+}
 const CONTACT_METHODS = ['팔로업콜', '대면미팅', '단순견적발송(콜,미팅X)'];
+
 function buildContactMethodOptions_() {
   return '<option value="">선택</option>' + CONTACT_METHODS.map(function(m) {
     return '<option value="' + m + '">' + m + '</option>';
@@ -2569,13 +2606,9 @@ function buildVisitForm() {
   }).join('');
   return '<div class="visit-form">' +
     '<h3>방문기록</h3>' +
-    '<label>재탭핑우선순위</label>' +
-    '<div class="repriority-toggle" id="repriorityToggle">' +
-      '<button type="button" data-repriority="상">상</button>' +
-      '<button type="button" data-repriority="중">중</button>' +
-      '<button type="button" data-repriority="하">하</button>' +
-    '</div>' +
-    '<input type="hidden" id="v_repriority" value="">' +
+    '<label>성사가능성</label>' +
+    '<select id="v_repriority">' + buildRepriorityOptions_() + '</select>' +
+
     '<label>영업구분</label>' +
     '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
     // ★ v56: 접촉방식 — 영업구분 바로 아래, 동일 양식(select)
@@ -2644,12 +2677,11 @@ function loadMyVisit(store, wasteType) {
     ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod'].forEach(function(k) {
       setVal('v_' + k, '');
     });
-    setVal('v_repriority', '');
+    setRepriorityValue_('');                                  // ★ v58: 성사가능성 초기화
     setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', '');   // ★ v56
     applySalesTypeDefault_();                                 // ★ v56: 아웃바운드 기본선택
     refreshNumericWarnings_(NUMERIC_FIELD_IDS_);              // ★ v56: 빈 값이므로 경고 해제
-    const rpEl = document.getElementById('repriorityToggle');
-    if (rpEl) rpEl.querySelectorAll('button').forEach(function(b) { b.classList.remove('sel'); });
+
     const dateEl = document.getElementById("visitDates");
     if (dateEl) dateEl.textContent = "";
     return;
@@ -2662,14 +2694,9 @@ function loadMyVisit(store, wasteType) {
   setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', cur.expectedContractDate);   // ★ v56
   applySalesTypeDefault_();                    // ★ v56: 기존 기록에 영업구분이 비어있을 때만 아웃바운드
   refreshNumericWarnings_(NUMERIC_FIELD_IDS_); // ★ v56: 기존에 저장된 비숫자 값도 경고 표시
-  // ★ 재탭핑우선순위 복원 (숨은 input + 버튼 하이라이트)
-  setVal('v_repriority', cur.repriority);
-  const rpToggleEl = document.getElementById('repriorityToggle');
-  if (rpToggleEl) {
-    rpToggleEl.querySelectorAll('button').forEach(function(b) {
-      b.classList.toggle('sel', b.dataset.repriority === (cur.repriority || ''));
-    });
-  }
+  // ★ v58: 성사가능성 복원 (목록에 없는 구 값은 '(이전 값)' 옵션으로 보존)
+  setRepriorityValue_(cur.repriority);
+
   const first = rec.firstVisitAt ? formatDate(rec.firstVisitAt) : '';
   const last = rec.lastUpdatedAt ? formatDate(rec.lastUpdatedAt) : '';
   const dateText = first && last && first !== last ? '최초 방문: ' + first + ' · 마지막 수정: ' + last : (first ? '최초 방문: ' + first : '');
@@ -2692,7 +2719,7 @@ function bindVisitForm(store) {
   }
   // ★ v56: 접촉방식 + 예상계약일자 3종 드롭다운 추가
   const formFieldIds = [
-    'v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
+    'v_repriority','v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
     'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome',
     'v_ecdY','v_ecdM','v_ecdD'
   ];
@@ -2708,21 +2735,7 @@ function bindVisitForm(store) {
     el.addEventListener('input', resetSaveBtn);
     el.addEventListener('change', resetSaveBtn);
   });
-  // ★ 재탭핑우선순위 토글: 클릭 선택 / 같은 값 다시 클릭 시 해제
-  const rpToggle = document.getElementById('repriorityToggle');
-  if (rpToggle) {
-    rpToggle.querySelectorAll('button').forEach(function(b) {
-      b.addEventListener('click', function() {
-        const val = b.dataset.repriority;
-        const hidden = document.getElementById('v_repriority');
-        const already = hidden.value === val;
-        rpToggle.querySelectorAll('button').forEach(function(x) { x.classList.remove('sel'); });
-        hidden.value = already ? '' : val;
-        if (!already) b.classList.add('sel');
-        resetSaveBtn();
-      });
-    });
-  }
+  // ★ v58: 성사가능성이 드롭다운으로 바뀌어 토글 핸들러는 불필요 (formFieldIds가 처리)
   const contactInput = document.getElementById("v_contact");
   if (contactInput) {
     contactInput.addEventListener("input", function(e) {
