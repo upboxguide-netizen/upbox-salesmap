@@ -185,6 +185,16 @@
   /* ★ v56: 예상계약일자 년/월/일 드롭다운 */
   .date-select-row { display: flex; gap: 6px; }
   .date-select-row select { flex: 1; min-width: 0; }
+  /* ★ v61: 저장 실패 시 임시보관된 입력 안내 */
+  .draft-notice { display: none; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+    background: #FFF4E5; border: 1px solid #F2AC57; border-radius: 8px;
+    padding: 9px 11px; margin-bottom: 10px; font-size: 12px; color: #8A5A00; line-height: 1.5; }
+  .draft-notice.show { display: flex; }
+  .draft-notice .draft-actions { display: flex; gap: 6px; margin-left: auto; }
+  .draft-notice button { border: none; border-radius: 6px; padding: 6px 10px;
+    font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  #v_draftRestore { background: #F2AC57; color: #fff; }
+  #v_draftDiscard { background: #EEE; color: #666; }
   .save-btn { width: 100%; padding: 12px; margin-top: 14px; border: none; border-radius: 8px; background: #F2AC57; color: white; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   /* ★ 재탭핑우선순위 토글 */
@@ -870,6 +880,7 @@ async function checkMyProjectAssignmentLegacy() {
   } catch(e) { console.warn("프로젝트 배정 확인 실패:", e); }
 }
 async function startApp() {
+  purgeExpiredDrafts_();   // ★ v61: 7일 지난 초안 정리
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("userInfo").textContent = currentUser.name;
   isAdminUser = isAdmin(currentUser.code);
@@ -2507,6 +2518,72 @@ async function openPriceGuide() {
   }
 }
 // ============================================================
+// ★ v61: 저장 안정화 — 타임아웃 · 오프라인 감지 · 입력 초안 보관
+//
+//  배경: "저장 버튼을 눌렀는데 저장이 안 된다" 현장 신고의 원인이 4가지였습니다.
+//   1) saveVisit의 try 블록이 늦게 시작해, currentUser 손상 등으로 예외가 나면
+//      catch가 못 잡고 버튼이 '저장 중...'에서 영구히 잠김 (토스트조차 없음)
+//   2) Firebase once()는 연결이 끊기면 거부되지 않고 무한 대기 → 지하·건물 안에서 재현
+//   3) 왕복 2회라 느린데, 그 사이 패널을 닫으면 저장은 됐는데 확인을 못 봄
+//   4) 실패 시 입력값이 통째로 날아가 재입력을 포기하게 됨
+// ============================================================
+const SAVE_TIMEOUT_MS_ = 15000;              // Firebase 응답 대기 상한
+const DRAFT_PREFIX_ = 'upbox_draft_';
+const DRAFT_TTL_MS_ = 7 * 24 * 60 * 60 * 1000;   // 초안 보관 7일
+
+// Firebase Promise에 시간 상한을 씌웁니다. once()가 영원히 안 오는 걸 막는 유일한 방법입니다.
+function withTimeout_(promise, ms, label) {
+  let timer;
+  const timeout = new Promise(function(_, reject) {
+    timer = setTimeout(function() {
+      reject(new Error((label || '요청') + ' 응답이 ' + Math.round(ms / 1000) + '초 안에 오지 않았습니다'));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(function() { clearTimeout(timer); });
+}
+
+function draftKey_(storeKey, wasteType) {
+  return DRAFT_PREFIX_ + (currentUser ? currentUser.key : 'anon') + '_' + storeKey + '_' + wasteType;
+}
+// 초안은 파트너 단말의 localStorage에만 저장됩니다. Firebase 통신·비용과 무관합니다.
+function saveDraft_(storeKey, wasteType, data) {
+  try {
+    localStorage.setItem(draftKey_(storeKey, wasteType), JSON.stringify({ t: Date.now(), d: data }));
+    return true;
+  } catch(e) { return false; }   // 저장공간 부족 등 — 초안 실패가 본 흐름을 막으면 안 됨
+}
+function loadDraft_(storeKey, wasteType) {
+  try {
+    const raw = localStorage.getItem(draftKey_(storeKey, wasteType));
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || !obj.t || !obj.d) return null;
+    if (Date.now() - obj.t > DRAFT_TTL_MS_) { clearDraft_(storeKey, wasteType); return null; }
+    return obj;
+  } catch(e) { return null; }
+}
+function clearDraft_(storeKey, wasteType) {
+  try { localStorage.removeItem(draftKey_(storeKey, wasteType)); } catch(e) {}
+}
+// 7일 지난 초안 청소 — 앱 시작 시 1회. 안 하면 단말에 계속 쌓입니다.
+function purgeExpiredDrafts_() {
+  try {
+    const now = Date.now();
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.indexOf(DRAFT_PREFIX_) !== 0) continue;
+      try {
+        const obj = JSON.parse(localStorage.getItem(k));
+        if (!obj || !obj.t || now - obj.t > DRAFT_TTL_MS_) doomed.push(k);
+      } catch(e) { doomed.push(k); }
+    }
+    doomed.forEach(function(k) { localStorage.removeItem(k); });
+    if (doomed.length) console.log('[초안] 만료 ' + doomed.length + '건 정리');
+  } catch(e) {}
+}
+
+// ============================================================
 // ★ v56: 접촉방식 / 숫자 전용 필드 경고 / 예상계약일자 공통 유틸
 //   - 핀 클릭 방문기록 폼과 신규업장 등록 모달이 함께 사용합니다.
 // ============================================================
@@ -2791,6 +2868,14 @@ function buildVisitForm() {
   }).join('');
   return '<div class="visit-form">' +
     '<h3>방문기록</h3>' +
+    // ★ v61: 저장 실패로 임시보관된 입력이 있으면 여기에 안내가 뜹니다
+    '<div class="draft-notice" id="v_draftNotice">' +
+      '<span id="v_draftText"></span>' +
+      '<span class="draft-actions">' +
+        '<button type="button" id="v_draftRestore">이어서 작성</button>' +
+        '<button type="button" id="v_draftDiscard">삭제</button>' +
+      '</span>' +
+    '</div>' +
     '<label>성사가능성</label>' +
     '<select id="v_repriority">' + buildRepriorityOptions_() + '</select>' +
 
@@ -2876,28 +2961,59 @@ function loadMyVisit(store, wasteType) {
     setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', '');   // ★ v56
     applySalesTypeDefault_();                                 // ★ v56: 아웃바운드 기본선택
     refreshNumericWarnings_(NUMERIC_FIELD_IDS_);              // ★ v56: 빈 값이므로 경고 해제
-
+    applyDraftNotice_(store, wasteType);                      // ★ v61
     const dateEl = document.getElementById("visitDates");
     if (dateEl) dateEl.textContent = "";
     return;
   }
   const cur = rec.current || {};
-  // ★ v56: contactMethod 추가
-  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc'].forEach(function(k) {
-    setVal('v_' + k, cur[k]);
-  });
-  applyFailReasonUI_('v_');   // ★ v60: 저장된 값에 맞춰 노출 상태 복원
-  setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', cur.expectedContractDate);   // ★ v56
-  applySalesTypeDefault_();                    // ★ v56: 기존 기록에 영업구분이 비어있을 때만 아웃바운드
-  refreshNumericWarnings_(NUMERIC_FIELD_IDS_); // ★ v56: 기존에 저장된 비숫자 값도 경고 표시
-  // ★ v58: 성사가능성 복원 (목록에 없는 구 값은 '(이전 값)' 옵션으로 보존)
-  setRepriorityValue_(cur.repriority);
+  fillVisitFormFromCurrent_(cur);              // ★ v61: 초안 복원과 공용
+  applyDraftNotice_(store, wasteType);         // ★ v61
 
   const first = rec.firstVisitAt ? formatDate(rec.firstVisitAt) : '';
   const last = rec.lastUpdatedAt ? formatDate(rec.lastUpdatedAt) : '';
   const dateText = first && last && first !== last ? '최초 방문: ' + first + ' · 마지막 수정: ' + last : (first ? '최초 방문: ' + first : '');
   const dateEl = document.getElementById("visitDates");
   if (dateEl) dateEl.textContent = dateText;
+}
+/* ★ v61: current 객체 하나로 폼 전체를 채웁니다.
+   저장된 기록 복원과 초안(실패한 입력) 복원이 같은 경로를 쓰도록 분리했습니다. */
+function fillVisitFormFromCurrent_(cur) {
+  cur = cur || {};
+  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck',
+   'note','outcome','salesType','contactMethod','failReason','failReasonEtc'].forEach(function(k) {
+    setVal('v_' + k, cur[k]);
+  });
+  applyFailReasonUI_('v_');                                         // ★ v60
+  setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', cur.expectedContractDate);
+  setRepriorityValue_(cur.repriority);                              // ★ v58
+  applySalesTypeDefault_();                                          // ★ v56
+  refreshNumericWarnings_(NUMERIC_FIELD_IDS_);                      // ★ v57
+}
+/* ★ v61: 저장 실패로 남은 초안이 있으면 배너로 알리고, 복원/삭제를 고르게 합니다.
+   자동으로 덮어쓰지 않습니다 — 파트너가 의도적으로 고른 경우에만 복원합니다. */
+function applyDraftNotice_(store, wasteType) {
+  const box = document.getElementById('v_draftNotice');
+  if (!box) return;
+  const draft = loadDraft_(store._key, wasteType);
+  if (!draft) { box.classList.remove('show'); return; }
+  const d = new Date(draft.t);
+  const when = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+               String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const textEl = document.getElementById('v_draftText');
+  if (textEl) textEl.textContent = '저장하지 못한 입력이 있습니다 (' + when + ')';
+  box.classList.add('show');
+  const restoreBtn = document.getElementById('v_draftRestore');
+  const discardBtn = document.getElementById('v_draftDiscard');
+  if (restoreBtn) restoreBtn.onclick = function() {
+    fillVisitFormFromCurrent_(draft.d);
+    box.classList.remove('show');
+    showNsToast('임시보관된 입력을 불러왔습니다. 확인 후 저장해주세요.', 3000);
+  };
+  if (discardBtn) discardBtn.onclick = function() {
+    clearDraft_(store._key, wasteType);
+    box.classList.remove('show');
+  };
 }
 function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v || ""; }
 function bindVisitForm(store) {
@@ -2960,38 +3076,66 @@ function bindVisitForm(store) {
 }
 async function saveVisit(store) {
   const btn = document.getElementById("saveVisitBtn");
+  if (!btn) return;
   btn.disabled = true;
   btn.textContent = "저장 중...";
-  // ★ v53: 폐기물 종류에 따라 recKey 분기 + 숨긴 필드는 저장 안 함
-  const wasteType = getVal('v_wasteType') || WASTE_TYPE_DEFAULT;
-  const hiddenFields = WASTE_HIDDEN_FIELDS[wasteType] || [];
-  const currentData = {};
-  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome'].forEach(function(k) {
-    currentData[k] = hiddenFields.indexOf(k) !== -1 ? '' : getVal('v_' + k);
-  });
-  currentData.wasteType = wasteType; // ★ v53
-  const salesTypeVal = getVal('v_salesType');
-  if (salesTypeVal) currentData.salesType = salesTypeVal;
-  // ★ v56: 접촉방식 — salesType과 동일하게 값이 있을 때만 저장.
-  //   classifyVisitCurrent()의 판정 필드에는 넣지 않으므로 핀 색상/칩 카운트에 영향 없음.
-  const contactMethodVal = getVal('v_contactMethod');
-  if (contactMethodVal) currentData.contactMethod = contactMethodVal;
-  // ★ v56: 예상계약일자 — 년·월·일이 모두 선택된 경우에만 'YYYY-MM-DD'로 저장
-  const ecdVal = getDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD');
-  if (ecdVal) currentData.expectedContractDate = ecdVal;
-  const repriorityVal = getVal('v_repriority');
-  if (repriorityVal) currentData.repriority = repriorityVal;
-  // ★ v60: 불발사유 / 기타불발사유. 노출 조건을 벗어나면 applyFailReasonUI_가 이미 비워둡니다.
-  const failReasonVal = getVal('v_failReason');
-  if (failReasonVal) currentData.failReason = failReasonVal;
-  const failReasonEtcVal = getVal('v_failReasonEtc');
-  if (failReasonVal === FAIL_REASON_ETC && failReasonEtcVal) currentData.failReasonEtc = failReasonEtcVal;
-  currentData.updatedAt = Date.now();
-  // ★ v53: 음식물류폐기물(기본값)은 레거시 recKey 그대로(REC_파트너_업장), 나머지는 접미사 추가
-  const recKey = buildWasteRecKey_(currentUser.key, store._key, wasteType);
-  const recRef = db.ref("visits/" + currentUser.key + "/" + recKey);
+
+  // ★ v61: 초안 보관에 쓰려고 try 밖에 선언해둡니다.
+  let wasteType = WASTE_TYPE_DEFAULT;
+  let currentData = null;
+
   try {
-    const existingSnap = await recRef.once("value");
+    /* ★ v61 ①: 로그인 상태를 가장 먼저 검증합니다.
+       예전엔 currentUser.key 접근이 try 밖에 있어서, 세션이 깨진 경우
+       TypeError가 catch를 그냥 통과했고 버튼이 '저장 중...'에서 영구히 잠겼습니다.
+       토스트도 안 떠서 파트너 눈엔 "눌렀는데 아무 일도 안 일어남"으로 보였습니다. */
+    if (!currentUser || !currentUser.key) {
+      showNsToast('⚠️ 로그인 정보가 없습니다. 새로고침 후 다시 로그인해주세요.', 5000);
+      return;
+    }
+
+    // ★ v53: 폐기물 종류에 따라 recKey 분기 + 숨긴 필드는 저장 안 함
+    wasteType = getVal('v_wasteType') || WASTE_TYPE_DEFAULT;
+    const hiddenFields = WASTE_HIDDEN_FIELDS[wasteType] || [];
+    currentData = {};
+    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome'].forEach(function(k) {
+      currentData[k] = hiddenFields.indexOf(k) !== -1 ? '' : getVal('v_' + k);
+    });
+    currentData.wasteType = wasteType; // ★ v53
+    const salesTypeVal = getVal('v_salesType');
+    if (salesTypeVal) currentData.salesType = salesTypeVal;
+    // ★ v56: 접촉방식 — 값이 있을 때만 저장. 상태 판정에는 쓰이지 않습니다.
+    const contactMethodVal = getVal('v_contactMethod');
+    if (contactMethodVal) currentData.contactMethod = contactMethodVal;
+    // ★ v56: 예상계약일자 — 년·월·일이 모두 선택된 경우에만 'YYYY-MM-DD'로 저장
+    const ecdVal = getDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD');
+    if (ecdVal) currentData.expectedContractDate = ecdVal;
+    const repriorityVal = getVal('v_repriority');
+    if (repriorityVal) currentData.repriority = repriorityVal;
+    // ★ v60: 불발사유 / 기타불발사유
+    const failReasonVal = getVal('v_failReason');
+    if (failReasonVal) currentData.failReason = failReasonVal;
+    const failReasonEtcVal = getVal('v_failReasonEtc');
+    if (failReasonVal === FAIL_REASON_ETC && failReasonEtcVal) currentData.failReasonEtc = failReasonEtcVal;
+    currentData.updatedAt = Date.now();
+
+    /* ★ v61 ②: 오프라인이면 시도 자체를 하지 않습니다.
+       Firebase SDK는 오프라인 쓰기를 큐에 넣고 조용히 기다리기만 해서
+       파트너는 성공/실패를 영영 알 수 없습니다. 차라리 초안으로 남기고 알립니다. */
+    if (navigator.onLine === false) {
+      const kept = saveDraft_(store._key, wasteType, currentData);
+      showNsToast(kept
+        ? '📴 인터넷이 끊겨 저장하지 못했습니다. 입력 내용은 7일간 보관되니, 연결 후 이 업장을 다시 열어 "이어서 작성"을 눌러주세요.'
+        : '📴 인터넷이 끊겨 저장하지 못했습니다. 연결 후 다시 시도해주세요.', 6000);
+      return;
+    }
+
+    const recKey = buildWasteRecKey_(currentUser.key, store._key, wasteType);
+    const recRef = db.ref("visits/" + currentUser.key + "/" + recKey);
+
+    /* ★ v61 ③: 두 왕복 모두에 15초 상한을 겁니다.
+       once()는 약전파에서 거부되지 않고 무한 대기하므로, 이게 없으면 catch로 못 옵니다. */
+    const existingSnap = await withTimeout_(recRef.once("value"), SAVE_TIMEOUT_MS_, '기존 기록 조회');
     const existing = existingSnap.val();
     const now = Date.now();
     let payload;
@@ -3012,25 +3156,47 @@ async function saveVisit(store) {
         current: currentData, history: []
       };
     }
-    await recRef.set(payload);
+    await withTimeout_(recRef.set(payload), SAVE_TIMEOUT_MS_, '저장');
+
+    // 성공 — 남아있던 초안은 더 이상 필요 없습니다.
+    clearDraft_(store._key, wasteType);
+    const noticeEl = document.getElementById('v_draftNotice');
+    if (noticeEl) noticeEl.classList.remove('show');
+
     // ★ v53: 폐기물 유형별 캐시 갱신 후, 대표 기록(핀 색상/칩카운트용) 재계산
     if (!myVisitedStoreDataByType[store._key]) myVisitedStoreDataByType[store._key] = {};
     myVisitedStoreDataByType[store._key][wasteType] = payload;
     myVisitedStoreData[store._key] = pickRepresentativeVisitRecord_(myVisitedStoreDataByType[store._key]);
     if (isAdminUser) renderAdminView(); else renderMarkers();
     updateChipCounts();
-    const newStatus = getVisitStatus(store);
-    const statusLabel = getStatusLabel(newStatus);
+
+    /* ★ v61 ④: 알림은 패널 상태와 무관하게 뜹니다.
+       저장 도중 패널을 닫아도 토스트는 body에 붙으므로 결과를 놓치지 않습니다.
+       (예전엔 확인을 못 보고 "실패했나 보다" 하며 다시 입력하는 일이 있었습니다) */
+    const statusLabel = getStatusLabel(getVisitStatus(store));
     showNsToast('✓ 저장됨 — ' + statusLabel, 2500);
+
     btn.textContent = "✓ 저장됨";
-    btn.disabled = false;
     const first = formatDate(payload.firstVisitAt);
     const last = formatDate(payload.lastUpdatedAt);
     const dateEl = document.getElementById("visitDates");
     if (dateEl) dateEl.textContent = first !== last ? '최초 방문: ' + first + ' · 마지막 수정: ' + last : '최초 방문: ' + first;
+
   } catch(e) {
-    showNsToast('⚠️ 저장 실패: ' + e.message, 4000);
-    btn.textContent = "저장";
+    /* ★ v61 ⑤: 실패하면 입력을 버리지 않고 7일간 보관합니다.
+       자동 재시도는 하지 않습니다 — 실패마다 재전송하면 통신량만 늘어납니다.
+       복원은 파트너가 "이어서 작성"을 눌렀을 때만 이뤄집니다. */
+    let kept = false;
+    if (currentData) kept = saveDraft_(store._key, wasteType, currentData);
+    console.error('[저장 실패]', e);
+    showNsToast(kept
+      ? '⚠️ 저장 실패: ' + e.message + ' — 입력 내용은 7일간 보관됩니다. 이 업장을 다시 열면 불러올 수 있어요.'
+      : '⚠️ 저장 실패: ' + e.message, 6000);
+
+  } finally {
+    /* ★ v61 ⑥: 어떤 경로로 끝나든 버튼을 반드시 되살립니다.
+       '✓ 저장됨'으로 이미 바뀐 성공 케이스만 그대로 둡니다. */
+    if (btn.textContent === "저장 중...") btn.textContent = "저장";
     btn.disabled = false;
   }
 }
