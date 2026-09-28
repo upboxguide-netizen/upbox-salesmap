@@ -954,18 +954,26 @@ async function startApp() {
   if (cachedAggregate) visitsAggregate = cachedAggregate;
   await loadMyVisits();
   updateChipCounts();
-  if (isAdminUser && cachedAggregate) {
-    await loadAdminMasterStores();
-    updateAdminStatsBar();
-    bindAdminStatsFilters();
-    buildAdminPartnerDropdown();
-  }
   initialLocation = await Promise.race([
     locationPromise,
     new Promise(resolve => setTimeout(() => resolve(null), 3000))
   ]);
   if (initialLocation) currentUserLocation = initialLocation;
+
+  // ★ v64: 지도를 먼저 띄운다.
+  //   기존엔 관리자일 때 loadAdminMasterStores()를 await 한 뒤에야 initMap()이 돌았다.
+  //   이 함수는 visits_aggregate의 업장 수(2026-09-28 기준 2,825개)만큼 stores_light를
+  //   낱개로 읽으므로, 느려지면 지도가 아예 안 그려지고 흰 화면이 된다.
+  //   이제 지도부터 그리고 관리자 핀은 뒤에서 채운다(await 하지 않음).
   initMap();
+  if (isAdminUser && cachedAggregate) {
+    loadAdminMasterStores().then(function() {
+      updateAdminStatsBar();
+      bindAdminStatsFilters();
+      buildAdminPartnerDropdown();
+      renderAdminView();
+    }).catch(function(e) { console.error('[관리자 마스터] 실패:', e); });
+  }
   setTimeout(async function() {
     const tasks = [];
     if (!cachedOtherVisits) {
