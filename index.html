@@ -737,14 +737,21 @@ let markers = [];
 let markerByKey = {};
 let allStoresInView = [];
 let currentFilter = "all";
-// ★ 파트너 조합필터 상태 (currentFilter === 'all' + 파트너 화면일 때만 적용됨. 관리자/외주는 무관)
-let partnerComboFilter = { category: CATEGORY_DEFAULT_.slice(), leadStatus: [], repriority: [], wasteType: [], otherActive: true, basicOnly: false };
 /* ★ v62: 구분1(카테고리) — 상단 칩(전체/프로젝트영업/기계약)을 조합필터로 통합.
  *   showContractOverlay(기계약 개별 토글)는 폐기하고 category 배열로 흡수했습니다.
  *   기본 선택({target,lead})은 예전 '전체' 기본 화면과 동일 — 기계약·프로젝트영업은
- *   여전히 직접 켜야만 보입니다(조용한 회귀 방지). */
+ *   여전히 직접 켜야만 보입니다(조용한 회귀 방지).
+ *
+ * ★ v65(2026-09-28) 치명 버그 수정: 이 두 const가 아래 partnerComboFilter
+ *   초기화보다 뒤에 있었습니다. const는 호이스팅되지만 TDZ(일시적 사각지대)라
+ *   선언 전 접근 시 ReferenceError가 나고, 그 순간 <script> 블록 전체가 죽습니다.
+ *   → logoutBtn 바인딩·autoLogin·initMap이 전부 실행되지 않아
+ *     "지도 흰 화면 + 로그아웃 버튼 무반응" 증상이 났습니다.
+ *   ⚠️ 이 선언을 partnerComboFilter 아래로 다시 옮기지 마세요. */
 const CATEGORY_DEFAULT_ = ['target', 'lead'];
 const CATEGORY_LABELS_ = { target: '타겟업장', lead: '리드건', contract: '⭐ 기계약', project: '🎯 프로젝트영업' };
+// ★ 파트너 조합필터 상태 (currentFilter === 'all' + 파트너 화면일 때만 적용됨. 관리자/외주는 무관)
+let partnerComboFilter = { category: CATEGORY_DEFAULT_.slice(), leadStatus: [], repriority: [], wasteType: [], otherActive: true, basicOnly: false };
 function sameSet_(a, b) {
   if (a.length !== b.length) return false;
   const s = new Set(a);
@@ -954,26 +961,18 @@ async function startApp() {
   if (cachedAggregate) visitsAggregate = cachedAggregate;
   await loadMyVisits();
   updateChipCounts();
+  if (isAdminUser && cachedAggregate) {
+    await loadAdminMasterStores();
+    updateAdminStatsBar();
+    bindAdminStatsFilters();
+    buildAdminPartnerDropdown();
+  }
   initialLocation = await Promise.race([
     locationPromise,
     new Promise(resolve => setTimeout(() => resolve(null), 3000))
   ]);
   if (initialLocation) currentUserLocation = initialLocation;
-
-  // ★ v64: 지도를 먼저 띄운다.
-  //   기존엔 관리자일 때 loadAdminMasterStores()를 await 한 뒤에야 initMap()이 돌았다.
-  //   이 함수는 visits_aggregate의 업장 수(2026-09-28 기준 2,825개)만큼 stores_light를
-  //   낱개로 읽으므로, 느려지면 지도가 아예 안 그려지고 흰 화면이 된다.
-  //   이제 지도부터 그리고 관리자 핀은 뒤에서 채운다(await 하지 않음).
   initMap();
-  if (isAdminUser && cachedAggregate) {
-    loadAdminMasterStores().then(function() {
-      updateAdminStatsBar();
-      bindAdminStatsFilters();
-      buildAdminPartnerDropdown();
-      renderAdminView();
-    }).catch(function(e) { console.error('[관리자 마스터] 실패:', e); });
-  }
   setTimeout(async function() {
     const tasks = [];
     if (!cachedOtherVisits) {
