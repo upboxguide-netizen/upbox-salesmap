@@ -45,7 +45,11 @@
   #filterBar { background: white; border-bottom: 1px solid #EEE; }
   #quickChipRow { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; }
   .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
-  .filter-chip.active { color: white; border: none; }
+  .filter-chip.active { color: white; background: #363859; border-color: #363859; }
+  /* ★ v68: 구분 칩을 패널에서 바로 꺼냈다. 라벨은 칩 앞에 작게. */
+  .quick-group-label { font-size: 11px; color: #999; align-self: center; flex-shrink: 0; padding-right: 2px; }
+  .filter-icon-btn svg { width: 17px; height: 17px; display: block; }
+  .filter-icon-btn.active svg { stroke: white; }
   .filter-chip-project { display: none; align-items: center; gap: 3px; }
   .filter-chip-project.visible { display: inline-flex; }
   .filter-chip-project.active { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%) !important; }
@@ -316,7 +320,21 @@
   </div>
   <div id="filterBar">
     <div id="quickChipRow">
-      <button id="comboFilterTrigger" class="filter-icon-btn" title="조회필터">⚙️<span id="comboFilterBadge"></span></button>
+      <button id="comboFilterTrigger" class="filter-icon-btn" title="조회필터" aria-label="조회필터 열기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#363859" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
+          <path d="M3 6h3M10 6h11M3 12h11M18 12h3M3 18h3M10 18h11"/>
+          <rect x="6" y="3.6" width="4" height="4.8" rx="1.3" fill="none"/>
+          <rect x="14" y="9.6" width="4" height="4.8" rx="1.3" fill="none"/>
+          <rect x="6" y="15.6" width="4" height="4.8" rx="1.3" fill="none"/>
+        </svg><span id="comboFilterBadge"></span>
+      </button>
+      <!-- ★ v68: 구분(타겟/리드/기계약/프로젝트)은 가장 자주 바꾸는 축이라 바로 꺼냈다.
+           ⚠️ 패널에는 두지 않는다 — 같은 값을 두 군데서 고치면 반드시 어긋난다. -->
+      <span class="quick-group-label">상세구분</span>
+      <button type="button" class="filter-chip quick-cat" data-val="target">타겟업장</button>
+      <button type="button" class="filter-chip quick-cat" data-val="lead">리드건</button>
+      <button type="button" class="filter-chip quick-cat" data-val="contract">⭐ 기계약</button>
+      <button type="button" class="filter-chip quick-cat filter-chip-project" data-val="project" id="cfCategoryProjectPill">🎯 프로젝트영업</button>
     </div>
     <div id="appliedChipsRow"></div>
   </div>
@@ -328,18 +346,9 @@
       <button type="button" id="comboFilterCloseBtn">✕</button>
     </div>
     <div id="comboFilterPanelBody">
-      <!-- ★ v62: 구분1 — 이전 상단 칩(전체/프로젝트영업/기계약)을 합집합 선택으로 통합 -->
+      <!-- ★ v68: 구분 facet 은 상단 바로 옮겼다(quickChipRow). 여기 두지 말 것. -->
       <div class="cf-facet">
-        <div class="cf-facet-title"><span>구분</span><span class="cf-facet-desc">여러 개 선택 시 합쳐서 표시 · 기본값: 타겟업장+리드건</span></div>
-        <div class="cf-pill-group" data-facet="category">
-          <button type="button" class="cf-pill sel" data-val="target">타겟업장</button>
-          <button type="button" class="cf-pill sel" data-val="lead">리드건</button>
-          <button type="button" class="cf-pill" data-val="contract">⭐ 기계약</button>
-          <button type="button" class="cf-pill cf-pill-project" data-val="project" id="cfCategoryProjectPill">🎯 프로젝트영업</button>
-        </div>
-      </div>
-      <div class="cf-facet">
-        <div class="cf-facet-title"><span>리드상태</span><span class="cf-facet-desc">여러 개 선택 가능</span></div>
+        <div class="cf-facet-title"><span>리드상태</span></div>
         <div class="cf-pill-group" data-facet="leadStatus">
           <button type="button" class="cf-pill" data-val="none">미방문</button>
           <button type="button" class="cf-pill" data-val="simpleContact">단순접촉</button>
@@ -350,7 +359,7 @@
         </div>
       </div>
       <div class="cf-facet">
-        <div class="cf-facet-title"><span>성사가능성</span><span class="cf-facet-desc">여러 개 선택 가능</span></div>
+        <div class="cf-facet-title"><span>성사가능성</span></div>
         <div class="cf-pill-group" data-facet="repriority">
           <button type="button" class="cf-pill" data-val="0% (가능성 없음)">0%</button>
           <button type="button" class="cf-pill" data-val="20% (관심 낮음)">20%</button>
@@ -365,17 +374,17 @@
 
       </div>
       <div class="cf-facet">
-        <div class="cf-facet-title"><span>폐기물 종류</span><span class="cf-facet-desc">내가 기록한 유형 기준 · 여러 개 선택 가능</span></div>
+        <div class="cf-facet-title"><span>폐기물 종류</span><span class="cf-facet-desc">내가 기록한 유형 기준</span></div>
         <div class="cf-pill-group" data-facet="wasteType" id="cfWasteTypeGroup"></div>
       </div>
       <!-- ★ v68: 업종 — 지도용DB F열 283종을 11개로 접은 값 -->
       <div class="cf-facet">
-        <div class="cf-facet-title"><span>업종</span><span class="cf-facet-desc">여러 개 선택 가능 · 안 고르면 전부</span></div>
+        <div class="cf-facet-title"><span>업종</span></div>
         <div class="cf-pill-group" data-facet="bizType" id="cfBizTypeGroup"></div>
       </div>
       <!-- ★ v68: 면적 — 41%가 공백이라 '면적 미기재 포함' 토글을 반드시 같이 둔다 -->
       <div class="cf-facet">
-        <div class="cf-facet-title"><span>면적 (㎡)</span><span class="cf-facet-desc">여러 구간 선택 가능</span></div>
+        <div class="cf-facet-title"><span>면적 (㎡)</span></div>
         <div class="cf-pill-group" data-facet="areaBand" id="cfAreaBandGroup"></div>
       </div>
       <div class="cf-toggle-row">
@@ -813,10 +822,15 @@ let selectedStore = null;
 let searchTimer = null;
 let currentUserLocation = null;
 const CONTRACT_RADIUS_KM = 3;
-/* ★ v68: 타파트너영업중 표시 기간(유효리드 보장기간). 예전엔 isOtherPartnerActive() 안에
-   THIRTY_DAYS 로 묻혀 있어서 팀이 숫자를 모르고 있었다(2026-10-06 슬랙).
-   기준이 합의로 바뀌면 이 한 줄만 고치면 되고, 화면에도 이 값이 그대로 표시된다. */
-const OTHER_ACTIVE_DAYS = 30;
+/* ★ v68: 타파트너영업중 표시 기간 — 리드 상태별로 다르게 간다.
+   단순방문 30일 / 유효리드 60일 (2026-10-07 팀 합의).
+   유효리드는 접촉 밀도가 높고 계약까지 더 걸리므로 보호기간을 길게 잡았다.
+   예전엔 isOtherPartnerActive() 안에 THIRTY_DAYS 로 묻혀 있어 팀이 숫자를 몰랐다.
+   기준이 바뀌면 이 표만 고치면 되고, 업장 패널 문구도 같이 따라간다. */
+const OTHER_ACTIVE_DAYS_BY_STATUS = { visit: 30, lead: 60 };
+function otherActiveDaysFor_(status) {
+  return OTHER_ACTIVE_DAYS_BY_STATUS[status] || 0;   // 0 이면 표시 대상 아님
+}
 const DUPLICATE_RADIUS_M = 8;
 let myLocationMarker = null;
 let geoWatchId = null;
@@ -1348,8 +1362,9 @@ function isOtherPartnerActive(store) {
   if (isExternalUser) return false;
   const info = otherPartnerLastContactMap[store._key];
   if (!info || !info.ts) return false;
-  if (info.status !== "visit" && info.status !== "lead") return false;
-  if (Date.now() - info.ts > OTHER_ACTIVE_DAYS * 24 * 60 * 60 * 1000) return false;
+  const days = otherActiveDaysFor_(info.status);   // ★ v68: 단순방문 30 / 유효리드 60
+  if (!days) return false;                          // 그 외 상태는 애초에 표시 안 함
+  if (Date.now() - info.ts > days * 24 * 60 * 60 * 1000) return false;
   return true;
 }
 // ★ v53: 폐기물 유형별 다중 기록 지원. myVisitedStoreData는 대표 기록(핀색상/칩카운트 등 기존 로직 호환용)
@@ -1990,7 +2005,8 @@ function readComboFilterFromDOM() {
       .map(function(b) { return b.dataset.val; });
   };
   return {
-    category:   pick('category'),
+    // ★ v68: 구분은 패널이 아니라 상단 바에 있다. 패널 미리보기 계산엔 현재 상태를 그대로 쓴다.
+    category:   partnerComboFilter.category.slice(),
     leadStatus: pick('leadStatus'),
     repriority: pick('repriority'),
     wasteType:  pick('wasteType'),
@@ -2004,7 +2020,7 @@ function readComboFilterFromDOM() {
 // ★ 기본값과 다른 항목 개수 (트리거 버튼 배지용)
 function comboFilterActiveCount(f) {
   let n = 0;
-  if (!sameSet_(f.category, CATEGORY_DEFAULT_)) n++;   // ★ v62: 기본값({target,lead})과 다를 때만 '활성'으로 침
+  // ★ v68: 구분은 상단 바에 칩으로 늘 보이므로 배지에서 뺀다(이중 표시 방지).
   if (f.leadStatus.length) n++;
   if (f.repriority.length) n++;
   if (f.wasteType.length) n++;
@@ -2021,14 +2037,7 @@ function renderAppliedChipsRow() {
   const row = document.getElementById('appliedChipsRow');
   const f = partnerComboFilter;
   const chips = [];
-  // ★ v62: 구분1 — 기본값({target,lead})과 같으면 굳이 칩을 안 띄웁니다(기본 상태를 '필터 없음'으로 보이게).
-  if (!sameSet_(f.category, CATEGORY_DEFAULT_)) {
-    if (f.category.length === 0) {
-      chips.push({ key: 'category:__reset__', label: '구분: 제한없음(기계약 포함)' });
-    } else {
-      f.category.forEach(function(v) { chips.push({ key: 'category:' + v, label: CATEGORY_LABELS_[v] || v }); });
-    }
-  }
+  // ★ v68: 구분은 상단 칩으로 늘 보이므로 여기에 중복해서 띄우지 않는다.
   f.leadStatus.forEach(function(v) { chips.push({ key: 'leadStatus:' + v, label: COMBO_LEAD_LABELS[v] || v }); });
   f.repriority.forEach(function(v) { chips.push({ key: 'repriority:' + v, label: '우선순위 ' + v }); });
   f.wasteType.forEach(function(v) { // ★ v54
@@ -2052,15 +2061,6 @@ function renderAppliedChipsRow() {
 }
 // ★ 적용된 조건 칩의 ✕ 클릭 시 해당 조건만 해제하고 즉시 재적용
 function removeComboFilterChip(key) {
-  if (key === 'category:__reset__') {   // ★ v62: '제한없음' 상태를 기본값({target,lead})으로 되돌림
-    partnerComboFilter.category = CATEGORY_DEFAULT_.slice();
-    document.querySelectorAll('.cf-pill-group[data-facet="category"] .cf-pill').forEach(function(b) {
-      b.classList.toggle('sel', CATEGORY_DEFAULT_.indexOf(b.dataset.val) !== -1);
-    });
-    updateComboFilterBadgeAndChips();
-    if (currentFilter === 'all') renderMarkers();
-    return;
-  }
   if (key === 'areaIncludeBlank') {                     // ★ v68
     partnerComboFilter.areaIncludeBlank = true;
     document.getElementById('cfToggleAreaBlank').classList.add('on');
@@ -2094,6 +2094,7 @@ function syncPanelDOMFromState() {
   const f = partnerComboFilter;
   document.querySelectorAll('.cf-pill').forEach(function(b) {
     const facet = b.closest('.cf-pill-group').dataset.facet;
+    if (!facet || !Array.isArray(f[facet])) return;   // ★ v68: category 는 패널에 없다
     b.classList.toggle('sel', f[facet].indexOf(b.dataset.val) !== -1);
   });
   document.getElementById('cfToggleOtherActive').classList.toggle('on', f.otherActive);
@@ -2210,9 +2211,37 @@ function populateBizAreaFilterPills_() {
     }).join('');
   }
 }
+/* ★ v68: 상단 구분 칩 — partnerComboFilter.category 가 유일한 진실이고
+   이 함수는 그 값을 화면에 반영만 한다. 칩을 누르면 패널을 거치지 않고 즉시 적용된다. */
+function syncQuickCategoryChips_() {
+  const sel = partnerComboFilter.category || [];
+  document.querySelectorAll('.quick-cat').forEach(function(b) {
+    const on = sel.indexOf(b.dataset.val) !== -1;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+function bindQuickCategoryChips_() {
+  document.querySelectorAll('.quick-cat').forEach(function(b) {
+    if (b._quickCatBound) return;
+    b._quickCatBound = true;
+    b.onclick = function() {
+      const v = b.dataset.val;
+      const arr = partnerComboFilter.category.slice();
+      const i = arr.indexOf(v);
+      if (i === -1) arr.push(v); else arr.splice(i, 1);
+      partnerComboFilter.category = arr;
+      syncQuickCategoryChips_();
+      updateComboFilterBadgeAndChips();
+      if (currentFilter === 'all') renderMarkers();   // 패널을 열 필요 없이 바로 반영
+    };
+  });
+  syncQuickCategoryChips_();
+}
 function bindComboFilterUI() {
   populateWasteTypeFilterPills_(); // ★ v54
   populateBizAreaFilterPills_();   // ★ v68 — pill 생성이 onclick 바인딩보다 먼저여야 한다
+  bindQuickCategoryChips_();       // ★ v68 — 상단 구분 칩
   document.querySelectorAll('.cf-pill').forEach(function(btn) {
     btn.onclick = function() { btn.classList.toggle('sel'); updateApplyButtonCount(); };
   });
@@ -2224,15 +2253,12 @@ function bindComboFilterUI() {
   document.getElementById('comboFilterBackdrop').onclick = function() { closeComboFilterPanel(true); };
   document.getElementById('cfResetBtn').onclick = function() {
     document.querySelectorAll('.cf-pill.sel').forEach(function(b) { b.classList.remove('sel'); });
-    // ★ v62: 구분1은 '전부 해제'가 아니라 기본값({target,lead})으로 되돌립니다 — 예전 '전체' 기본화면과 동일
-    document.querySelectorAll('.cf-pill-group[data-facet="category"] .cf-pill').forEach(function(b) {
-      b.classList.toggle('sel', CATEGORY_DEFAULT_.indexOf(b.dataset.val) !== -1);
-    });
     document.getElementById('cfToggleOtherActive').classList.add('on');
     document.getElementById('cfToggleBasicOnly').classList.remove('on');
     document.getElementById('cfToggleAreaBlank').classList.add('on');   // ★ v68
     partnerComboFilter = { category: CATEGORY_DEFAULT_.slice(), leadStatus: [], repriority: [], wasteType: [],
                            bizType: [], areaBand: [], areaIncludeBlank: true, otherActive: true, basicOnly: false };
+    syncQuickCategoryChips_();            // ★ v68: 상단 구분 칩도 기본값으로
     updateComboFilterBadgeAndChips();
     updateApplyButtonCount();
     closeComboFilterPanel(false);
@@ -2549,9 +2575,12 @@ async function openPanel(store) {
   let otherContactHtml = '';
   if (!isExternalUser && otherInfo && otherInfo.ts) {
     const activeTag = isOtherPartnerActive(store) ? ' <span class="other-active-tag">타파트너영업중</span>' : '';
-    // ★ v68: 보장기간 30일이 isOtherPartnerActive() 안에만 있어 팀이 모르고 있었다. 화면에 적는다.
+    // ★ v68: 보장기간이 코드에만 있어 팀이 모르고 있었다. 상태별 일수를 그대로 화면에 적는다.
+    const guardDays = otherActiveDaysFor_(otherInfo.status);
     const guardNote = isOtherPartnerActive(store)
-      ? '<div style="font-size:11px;color:#00838F;margin-top:3px;">마지막 접촉 후 ' + OTHER_ACTIVE_DAYS + '일간 타파트너 영업중으로 표시됩니다</div>'
+      ? '<div style="font-size:11px;color:#00838F;margin-top:3px;">' +
+        getStatusLabel(otherInfo.status) + ' 건은 마지막 접촉 후 ' + guardDays +
+        '일간 타파트너 영업중으로 표시됩니다</div>'
       : '';
     otherContactHtml = '<div class="contact-info">타파트너 마지막접촉일자: ' + formatDate(otherInfo.ts) + activeTag + guardNote + '</div>';
   }
