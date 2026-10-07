@@ -368,6 +368,20 @@
         <div class="cf-facet-title"><span>폐기물 종류</span><span class="cf-facet-desc">내가 기록한 유형 기준 · 여러 개 선택 가능</span></div>
         <div class="cf-pill-group" data-facet="wasteType" id="cfWasteTypeGroup"></div>
       </div>
+      <!-- ★ v68: 업종 — 지도용DB F열 283종을 11개로 접은 값 -->
+      <div class="cf-facet">
+        <div class="cf-facet-title"><span>업종</span><span class="cf-facet-desc">여러 개 선택 가능 · 안 고르면 전부</span></div>
+        <div class="cf-pill-group" data-facet="bizType" id="cfBizTypeGroup"></div>
+      </div>
+      <!-- ★ v68: 면적 — 41%가 공백이라 '면적 미기재 포함' 토글을 반드시 같이 둔다 -->
+      <div class="cf-facet">
+        <div class="cf-facet-title"><span>면적 (㎡)</span><span class="cf-facet-desc">여러 구간 선택 가능</span></div>
+        <div class="cf-pill-group" data-facet="areaBand" id="cfAreaBandGroup"></div>
+      </div>
+      <div class="cf-toggle-row">
+        <span>면적 미기재 업장도 표시<br><span style="font-size:11px;color:#aaa;">끄면 23,579곳이 지도에서 빠집니다</span></span>
+        <button type="button" id="cfToggleAreaBlank" class="cf-switch on"></button>
+      </div>
       <div class="cf-toggle-row">
         <span>타파트너영업중 표시</span>
         <button type="button" id="cfToggleOtherActive" class="cf-switch on"></button>
@@ -383,7 +397,9 @@
       </div>
   </div>
   <div id="map">
-    <div id="statusBar">업장 로딩 중...</div>
+    <!-- ★ v68: 초기 텍스트를 비웠다. 예전엔 "업장 로딩 중..."이 하드코딩돼 있어서
+         스크립트가 죽어도 로딩 중처럼 보였고, 2026-09-28 백지 사고 때 원인 추적이 늦어졌다. -->
+    <div id="statusBar"></div>
     <button id="locBtn" title="현재 위치">📍</button>
     <button id="addBtn" title="업장 추가">＋ 업장추가</button>
   </div>
@@ -472,8 +488,9 @@
         </div>
       </div>
       <div class="ns-form-group">
-        <label>현재 수거업체명</label>
-        <input type="text" id="nsCurrentStoreName" placeholder="이미 거래 중인 업체가 있다면">
+        <label>현재 수거·운반 업체명</label>
+        <input type="text" id="nsCurrentStoreName" placeholder="예: ㅇㅇ환경 — 지금 폐기물을 가져가는 업체">
+        <div class="ns-helper">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 업장명이 다르면 상담내용에 적어주세요.</div>
       </div>
       <div class="ns-form-group">
         <label for="nsContact">담당자 연락처<span class="num-warn-msg"></span></label>
@@ -559,6 +576,23 @@
   </div>
 </div>
 <script>
+/* ★ v68: 초기화 실패를 화면에 드러낸다.
+   2026-09-28 에 const 선언 순서(TDZ) 한 줄 때문에 <script> 전체가 죽었는데,
+   화면은 그냥 흰 지도였고 statusBar 의 하드코딩 문구 탓에 로딩 중처럼 보였다.
+   앞으로는 같은 일이 나면 영업자가 바로 알아보고 알려줄 수 있어야 한다. */
+window.addEventListener('error', function(ev) {
+  try {
+    if (document.getElementById('bootErrorBanner')) return;
+    const el = document.createElement('div');
+    el.id = 'bootErrorBanner';
+    el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:30000;background:#E53935;color:#fff;' +
+      'padding:10px 14px;font-size:13px;line-height:1.5;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    el.textContent = '앱을 불러오지 못했습니다. 새로고침해도 같으면 관리자에게 알려주세요. (' +
+      String(ev && ev.message ? ev.message : '알 수 없는 오류').slice(0, 90) + ')';
+    document.body.appendChild(el);
+  } catch(e) {}
+});
+
 const firebaseConfig = {
   databaseURL: "https://salespartners-map-67daf-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
@@ -751,7 +785,11 @@ let currentFilter = "all";
 const CATEGORY_DEFAULT_ = ['target', 'lead'];
 const CATEGORY_LABELS_ = { target: '타겟업장', lead: '리드건', contract: '⭐ 기계약', project: '🎯 프로젝트영업' };
 // ★ 파트너 조합필터 상태 (currentFilter === 'all' + 파트너 화면일 때만 적용됨. 관리자/외주는 무관)
-let partnerComboFilter = { category: CATEGORY_DEFAULT_.slice(), leadStatus: [], repriority: [], wasteType: [], otherActive: true, basicOnly: false };
+// ★ v68: bizType(업종) · areaBand(면적) facet 추가.
+//   areaIncludeBlank 기본 true — 면적은 41%가 공백이라 끄면 23,579곳이 한꺼번에 사라진다.
+//   ⚠️ 여기서 쓰는 값은 전부 리터럴이어야 한다. const 를 참조하면 TDZ 로 스크립트 전체가 죽는다(v62 사고).
+let partnerComboFilter = { category: CATEGORY_DEFAULT_.slice(), leadStatus: [], repriority: [], wasteType: [],
+                           bizType: [], areaBand: [], areaIncludeBlank: true, otherActive: true, basicOnly: false };
 function sameSet_(a, b) {
   if (a.length !== b.length) return false;
   const s = new Set(a);
@@ -775,6 +813,10 @@ let selectedStore = null;
 let searchTimer = null;
 let currentUserLocation = null;
 const CONTRACT_RADIUS_KM = 3;
+/* ★ v68: 타파트너영업중 표시 기간(유효리드 보장기간). 예전엔 isOtherPartnerActive() 안에
+   THIRTY_DAYS 로 묻혀 있어서 팀이 숫자를 모르고 있었다(2026-10-06 슬랙).
+   기준이 합의로 바뀌면 이 한 줄만 고치면 되고, 화면에도 이 값이 그대로 표시된다. */
+const OTHER_ACTIVE_DAYS = 30;
 const DUPLICATE_RADIUS_M = 8;
 let myLocationMarker = null;
 let geoWatchId = null;
@@ -1307,8 +1349,7 @@ function isOtherPartnerActive(store) {
   const info = otherPartnerLastContactMap[store._key];
   if (!info || !info.ts) return false;
   if (info.status !== "visit" && info.status !== "lead") return false;
-  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-  if (Date.now() - info.ts > THIRTY_DAYS) return false;
+  if (Date.now() - info.ts > OTHER_ACTIVE_DAYS * 24 * 60 * 60 * 1000) return false;
   return true;
 }
 // ★ v53: 폐기물 유형별 다중 기록 지원. myVisitedStoreData는 대표 기록(핀색상/칩카운트 등 기존 로직 호환용)
@@ -1599,7 +1640,19 @@ async function moveToFilteredStoresForPartner(filter) {
 async function moveToContractStores() {
   const statusBar = document.getElementById('statusBar');
   try {
-    const snap = await db.ref('stores_light').once('value');
+    /* ★ v68: 전체 stores_light(13.8MB)를 받던 것을 lat 범위 질의로 교체.
+       기계약은 내 위치 반경 3km 안만 보면 되므로 전국을 받을 이유가 없었다.
+       stores_light 에 lat 인덱스가 걸려 있는 것은 확인했다(fetchContractsInCurrentBounds 와 동일 경로). */
+    let ref = db.ref('stores_light');
+    if (currentUserLocation) {
+      const dLat = CONTRACT_RADIUS_KM / 111;
+      ref = ref.orderByChild('lat')
+               .startAt(currentUserLocation.lat - dLat)
+               .endAt(currentUserLocation.lat + dLat);
+    } else {
+      ref = ref.orderByChild('lat').limitToFirst(3000);   // 위치를 모르면 과하게 받지 않는다
+    }
+    const snap = await ref.once('value');
     const all = snap.val() || {};
     const coords = [];
     for (const k in all) {
@@ -1869,14 +1922,84 @@ function getEffectiveStatus(store) {
   return getVisitStatus(store);
 }
 // ★ 조합필터: DOM의 선택 상태를 읽어서 partnerComboFilter 객체로 변환
+/* ★ v68: 업종(bt) · 면적(ar) — stores_light 에 2026-10-06 백필로 들어온 필드.
+   업종 코드는 firebase_sync.js 의 categorizeBiz_() 와 1:1로 맞춰야 한다.
+   지도용DB F열 283종을 접은 결과이며, 괄호 안은 2026-10-06 실측 건수다. */
+const BIZ_TYPES = [
+  { code: 'f', label: '음식점' },      { code: 'm', label: '급식' },
+  { code: 'c', label: '카페·휴게' },   { code: 's', label: '학교·보육' },
+  { code: 'i', label: '산업·물류' },   { code: 'r', label: '유통·매장' },
+  { code: 'l', label: '숙박' },        { code: 'h', label: '의료·요양' },
+  { code: 'e', label: '행사·예식' },   { code: 'g', label: '공공' },
+  { code: 'x', label: '그 밖' },       { code: '_', label: '미분류' }
+];
+const BIZ_LABELS = (function() { const m = {}; BIZ_TYPES.forEach(function(b) { m[b.code] = b.label; }); return m; })();
+// 면적 구간. from 이상 to 미만 (to 가 null 이면 상한 없음)
+const AREA_BANDS = [
+  { code: 'a1', label: '200 미만',   from: 0,    to: 200 },
+  { code: 'a2', label: '200~499',    from: 200,  to: 500 },
+  { code: 'a3', label: '500~999',    from: 500,  to: 1000 },
+  { code: 'a4', label: '1000 이상',  from: 1000, to: null }
+];
+const AREA_LABELS = (function() { const m = {}; AREA_BANDS.forEach(function(a) { m[a.code] = a.label; }); return m; })();
+
+function storeBizCode_(store) { return (store && store.bt) ? String(store.bt) : '_'; }
+function storeAreaBand_(store) {
+  const v = store ? Number(store.ar) : NaN;
+  if (!isFinite(v) || v <= 0) return null;                 // null = 면적 미기재
+  for (let i = 0; i < AREA_BANDS.length; i++) {
+    const b = AREA_BANDS[i];
+    if (v >= b.from && (b.to === null || v < b.to)) return b.code;
+  }
+  return null;
+}
+
+/* ★ v68: 파트너 화면 필터 판정을 한 곳으로 모았다.
+   예전엔 renderMarkers() 와 computeComboFilterMatchCount() 가 같은 조건을 각자 써서,
+   한쪽만 고치면 '적용 버튼의 개수'와 '실제 핀 수'가 조용히 달라졌다. */
+function passesPartnerFilter_(store, f, status, flags) {
+  if (!matchesCategory_(flags, f.category)) return false;
+  // 기계약은 별도 규칙 — 구분을 통과했으면 나머지 조건 면제
+  if (flags.contract) return true;
+
+  if (f.leadStatus.length && f.leadStatus.indexOf(status) === -1) return false;
+  if (f.repriority.length) {
+    const rec = myVisitedStoreData[store._key];
+    const rp = (rec && rec.current && rec.current.repriority) || "";
+    if (f.repriority.indexOf(rp) === -1) return false;
+  }
+  if (f.wasteType.length) {
+    const byType = myVisitedStoreDataByType[store._key] || {};
+    if (!f.wasteType.some(function(wt) { return !!byType[wt]; })) return false;
+  }
+  if (f.bizType && f.bizType.length && f.bizType.indexOf(storeBizCode_(store)) === -1) return false;
+  if (f.areaBand && f.areaBand.length) {
+    const band = storeAreaBand_(store);
+    if (band === null) {
+      if (f.areaIncludeBlank === false) return false;      // 미기재 제외를 명시했을 때만 뺀다
+    } else if (f.areaBand.indexOf(band) === -1) return false;
+  }
+  if (f.basicOnly && store.basic !== "ON") return false;
+  if (!f.otherActive && status === "none" && isOtherPartnerActive(store)) return false;
+  return true;
+}
+
 function readComboFilterFromDOM() {
-  const category = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="category"] .cf-pill.sel')).map(function(b) { return b.dataset.val; }); // ★ v62
-  const leadStatus = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="leadStatus"] .cf-pill.sel')).map(function(b) { return b.dataset.val; });
-  const repriority = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="repriority"] .cf-pill.sel')).map(function(b) { return b.dataset.val; });
-  const wasteType = Array.from(document.querySelectorAll('.cf-pill-group[data-facet="wasteType"] .cf-pill.sel')).map(function(b) { return b.dataset.val; }); // ★ v54
-  const otherActive = document.getElementById('cfToggleOtherActive').classList.contains('on');
-  const basicOnly = document.getElementById('cfToggleBasicOnly').classList.contains('on');
-  return { category: category, leadStatus: leadStatus, repriority: repriority, wasteType: wasteType, otherActive: otherActive, basicOnly: basicOnly }; // ★ v62
+  const pick = function(facet) {
+    return Array.from(document.querySelectorAll('.cf-pill-group[data-facet="' + facet + '"] .cf-pill.sel'))
+      .map(function(b) { return b.dataset.val; });
+  };
+  return {
+    category:   pick('category'),
+    leadStatus: pick('leadStatus'),
+    repriority: pick('repriority'),
+    wasteType:  pick('wasteType'),
+    bizType:    pick('bizType'),      // ★ v68
+    areaBand:   pick('areaBand'),     // ★ v68
+    areaIncludeBlank: document.getElementById('cfToggleAreaBlank').classList.contains('on'),
+    otherActive: document.getElementById('cfToggleOtherActive').classList.contains('on'),
+    basicOnly:   document.getElementById('cfToggleBasicOnly').classList.contains('on')
+  };
 }
 // ★ 기본값과 다른 항목 개수 (트리거 버튼 배지용)
 function comboFilterActiveCount(f) {
@@ -1885,6 +2008,9 @@ function comboFilterActiveCount(f) {
   if (f.leadStatus.length) n++;
   if (f.repriority.length) n++;
   if (f.wasteType.length) n++;
+  if (f.bizType.length) n++;                           // ★ v68
+  if (f.areaBand.length) n++;                          // ★ v68
+  if (f.areaIncludeBlank === false) n++;               // ★ v68
   if (!f.otherActive) n++;
   if (f.basicOnly) n++;
   return n;
@@ -1909,6 +2035,9 @@ function renderAppliedChipsRow() {
     const w = WASTE_TYPES.find(function(x) { return x.code === v; });
     chips.push({ key: 'wasteType:' + v, label: w ? w.label : v });
   });
+  f.bizType.forEach(function(v) { chips.push({ key: 'bizType:' + v, label: BIZ_LABELS[v] || v }); });        // ★ v68
+  f.areaBand.forEach(function(v) { chips.push({ key: 'areaBand:' + v, label: (AREA_LABELS[v] || v) + '㎡' }); }); // ★ v68
+  if (f.areaIncludeBlank === false) chips.push({ key: 'areaIncludeBlank', label: '면적 미기재 제외' });      // ★ v68
   if (!f.otherActive) chips.push({ key: 'otherActive', label: '타파트너영업중 숨김' });
   if (f.basicOnly) chips.push({ key: 'basicOnly', label: '베이직ON만' });
   row.innerHTML = '';
@@ -1932,7 +2061,10 @@ function removeComboFilterChip(key) {
     if (currentFilter === 'all') renderMarkers();
     return;
   }
-  if (key === 'otherActive') {
+  if (key === 'areaIncludeBlank') {                     // ★ v68
+    partnerComboFilter.areaIncludeBlank = true;
+    document.getElementById('cfToggleAreaBlank').classList.add('on');
+  } else if (key === 'otherActive') {
     partnerComboFilter.otherActive = true;
     document.getElementById('cfToggleOtherActive').classList.add('on');
   } else if (key === 'basicOnly') {
@@ -1966,6 +2098,7 @@ function syncPanelDOMFromState() {
   });
   document.getElementById('cfToggleOtherActive').classList.toggle('on', f.otherActive);
   document.getElementById('cfToggleBasicOnly').classList.toggle('on', f.basicOnly);
+  document.getElementById('cfToggleAreaBlank').classList.toggle('on', f.areaIncludeBlank !== false); // ★ v68
 }
 // ★ 중복그룹 내 특정 UID에 "기록"이 있는지 판단 (나 또는 타파트너, 단순접촉 이상만 인정)
 //   완전히 빈 값으로 저장된 기록(status===none)은 기록으로 안 침
@@ -2030,25 +2163,10 @@ function computeComboFilterMatchCount(f) {
   const suppressed = computeDupSuppressedKeys();
   for (const store of allStoresInView) {
     if (suppressed[store._key]) continue;
-    // ★ v62: 구분1(카테고리) — renderMarkers()와 동일한 로직
+    // ★ v68: 판정은 passesPartnerFilter_() 한 곳에서만 한다 (renderMarkers 와 공유)
     const status = getVisitStatus(store);
     const flags = computeCategoryFlags_(store, status);
-    if (!matchesCategory_(flags, f.category)) continue;
-    if (!flags.contract) {
-      if (f.leadStatus.length && f.leadStatus.indexOf(status) === -1) continue;
-      if (f.repriority.length) {
-        const rec = myVisitedStoreData[store._key];
-        const rp = (rec && rec.current && rec.current.repriority) || "";
-        if (f.repriority.indexOf(rp) === -1) continue;
-      }
-      if (f.wasteType.length) { // ★ v54
-        const byType = myVisitedStoreDataByType[store._key] || {};
-        const hasMatch = f.wasteType.some(function(wt) { return !!byType[wt]; });
-        if (!hasMatch) continue;
-      }
-      if (f.basicOnly && store.basic !== "ON") continue;
-      if (!f.otherActive && status === "none" && isOtherPartnerActive(store)) continue;
-    }
+    if (!passesPartnerFilter_(store, f, status, flags)) continue;
     n++;
   }
   return n;
@@ -2077,13 +2195,30 @@ function populateWasteTypeFilterPills_() {
     return '<button type="button" class="cf-pill" data-val="' + w.code + '">' + w.label + '</button>';
   }).join('');
 }
+// ★ v68: 업종·면적 pill 을 상수 배열에서 생성 (라벨 중복 관리 방지)
+function populateBizAreaFilterPills_() {
+  const bg = document.getElementById('cfBizTypeGroup');
+  if (bg && bg.children.length === 0) {
+    bg.innerHTML = BIZ_TYPES.map(function(b) {
+      return '<button type="button" class="cf-pill" data-val="' + b.code + '">' + escapeHtml(b.label) + '</button>';
+    }).join('');
+  }
+  const ag = document.getElementById('cfAreaBandGroup');
+  if (ag && ag.children.length === 0) {
+    ag.innerHTML = AREA_BANDS.map(function(a) {
+      return '<button type="button" class="cf-pill" data-val="' + a.code + '">' + escapeHtml(a.label) + '</button>';
+    }).join('');
+  }
+}
 function bindComboFilterUI() {
   populateWasteTypeFilterPills_(); // ★ v54
+  populateBizAreaFilterPills_();   // ★ v68 — pill 생성이 onclick 바인딩보다 먼저여야 한다
   document.querySelectorAll('.cf-pill').forEach(function(btn) {
     btn.onclick = function() { btn.classList.toggle('sel'); updateApplyButtonCount(); };
   });
   document.getElementById('cfToggleOtherActive').onclick = function() { this.classList.toggle('on'); updateApplyButtonCount(); };
   document.getElementById('cfToggleBasicOnly').onclick = function() { this.classList.toggle('on'); updateApplyButtonCount(); };
+  document.getElementById('cfToggleAreaBlank').onclick = function() { this.classList.toggle('on'); updateApplyButtonCount(); }; // ★ v68
   document.getElementById('comboFilterTrigger').onclick = function() { openComboFilterPanel(); };
   document.getElementById('comboFilterCloseBtn').onclick = function() { closeComboFilterPanel(true); };
   document.getElementById('comboFilterBackdrop').onclick = function() { closeComboFilterPanel(true); };
@@ -2095,7 +2230,9 @@ function bindComboFilterUI() {
     });
     document.getElementById('cfToggleOtherActive').classList.add('on');
     document.getElementById('cfToggleBasicOnly').classList.remove('on');
-    partnerComboFilter = { category: CATEGORY_DEFAULT_.slice(), leadStatus: [], repriority: [], wasteType: [], otherActive: true, basicOnly: false };
+    document.getElementById('cfToggleAreaBlank').classList.add('on');   // ★ v68
+    partnerComboFilter = { category: CATEGORY_DEFAULT_.slice(), leadStatus: [], repriority: [], wasteType: [],
+                           bizType: [], areaBand: [], areaIncludeBlank: true, otherActive: true, basicOnly: false };
     updateComboFilterBadgeAndChips();
     updateApplyButtonCount();
     closeComboFilterPanel(false);
@@ -2134,26 +2271,11 @@ function renderMarkers() {
     const isContract = isContractGrade(store.grade);
     // ★ v62: 파트너 화면 — 구분1(카테고리) + 조합필터. currentFilter는 이제 관리자 통계 전용입니다.
     if (!isAdminUser && !isExternalUser) {
-      const cf = partnerComboFilter;
+      // ★ v68: 판정은 passesPartnerFilter_() 한 곳에서만 한다
+      //   (예전엔 여기와 computeComboFilterMatchCount 가 조건을 각자 써서
+      //    '적용 버튼의 개수'와 실제 핀 수가 어긋날 수 있었다)
       const flags = computeCategoryFlags_(store, status);
-      if (!matchesCategory_(flags, cf.category)) continue;
-      // 기계약은 별도 규칙 — 구분1을 통과했으면 리드상태/성사가능성 등 나머지 조건은 면제합니다
-      // (기계약 업장엔 애초에 내가 기록한 리드상태·성사가능성이 없는 경우가 대부분입니다)
-      if (!flags.contract) {
-        if (cf.leadStatus.length && cf.leadStatus.indexOf(status) === -1) continue;
-        if (cf.repriority.length) {
-          const rec = myVisitedStoreData[store._key];
-          const rp = (rec && rec.current && rec.current.repriority) || "";
-          if (cf.repriority.indexOf(rp) === -1) continue;
-        }
-        if (cf.wasteType.length) {
-          const byType = myVisitedStoreDataByType[store._key] || {};
-          const hasMatch = cf.wasteType.some(function(wt) { return !!byType[wt]; });
-          if (!hasMatch) continue;
-        }
-        if (cf.basicOnly && store.basic !== "ON") continue;
-        if (!cf.otherActive && status === "none" && isOtherPartnerActive(store)) continue;
-      }
+      if (!passesPartnerFilter_(store, partnerComboFilter, status, flags)) continue;
     } else if (currentFilter !== "all") {
       // 관리자 통계바 클릭(단순방문/유효리드/계약성사/최종불발) 전용 — v62에서도 동작 그대로 유지
       if (!isContract && status !== currentFilter) continue;
@@ -2287,10 +2409,14 @@ function formatPartnerNameForPin(name) {
   }
   return [clean.substring(0, 2)];
 }
+/* ★ v68: 폐업을 회색(#616161)에서 빨강 계열로 옮겼다.
+   미방문(#9E9E9E)과 둘 다 회색이라 헷갈린다는 지적(고의준, 2026-10-06)을 반영한 것이다.
+   다만 최종불발(#E53935)과 같은 색으로 만들면 둘을 구분할 방법이 사라지므로,
+   폐업은 한 톤 어두운 적갈색(#8E2F2B)으로 둬서 '불발 계열이되 다른 상태'로 읽히게 했다. */
 function getStatusColor(status) {
   return {
     visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935",
-    contract:"#F2AC57", closedByMe:"#616161", none:"#9E9E9E",
+    contract:"#F2AC57", closedByMe:"#8E2F2B", none:"#9E9E9E",
     simpleContact:"#A79FD1"
   }[status] || "#9E9E9E";
 }
@@ -2423,7 +2549,11 @@ async function openPanel(store) {
   let otherContactHtml = '';
   if (!isExternalUser && otherInfo && otherInfo.ts) {
     const activeTag = isOtherPartnerActive(store) ? ' <span class="other-active-tag">타파트너영업중</span>' : '';
-    otherContactHtml = '<div class="contact-info">타파트너 마지막접촉일자: ' + formatDate(otherInfo.ts) + activeTag + '</div>';
+    // ★ v68: 보장기간 30일이 isOtherPartnerActive() 안에만 있어 팀이 모르고 있었다. 화면에 적는다.
+    const guardNote = isOtherPartnerActive(store)
+      ? '<div style="font-size:11px;color:#00838F;margin-top:3px;">마지막 접촉 후 ' + OTHER_ACTIVE_DAYS + '일간 타파트너 영업중으로 표시됩니다</div>'
+      : '';
+    otherContactHtml = '<div class="contact-info">타파트너 마지막접촉일자: ' + formatDate(otherInfo.ts) + activeTag + guardNote + '</div>';
   }
   let serviceHtml = '';
   if (!isContract) {
@@ -2935,8 +3065,9 @@ function buildVisitForm() {
     '<label>폐기물 선택</label>' +
     '<select id="v_wasteType">' + wasteOptions + '</select>' +
     '<div class="visit-dates" id="visitDates"></div>' +
-    '<label><span style="color:#E53935;">*</span> 현재 수거업체명</label>' +
-    '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 (없을경우 사유기재)">' +
+    '<label><span style="color:#E53935;">*</span> 현재 수거·운반 업체명</label>' +
+    '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 — 지금 폐기물을 가져가는 업체">' +
+    '<div style="font-size:11px;color:#888;margin-top:3px;">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 없으면 사유를 적어주세요.</div>' +
     '<label for="v_contact">담당자 연락처' + NUM_WARN_HTML_ + '</label>' +
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
     // ★ v56: 라벨 텍스트를 내부 span(lbl_*)으로 감쌈 — applyWasteTypeUI의 textContent 치환이
@@ -3322,29 +3453,93 @@ function getMatchGrade(nameNorm, addrNorm, roadNorm, queryVariants) {
 
   return { grade: bestGrade, roadOnly: roadHit && !addrHit };
 }
+/* ★ v68: 검색 인덱스 캐시를 IndexedDB + 버전 게이트로 교체.
+ *
+ *  문제 두 가지였다.
+ *   ① search_index/stores 는 16.0MB 인데 localStorage 한도는 보통 5MB 다.
+ *      setCache() 는 실패를 조용히 삼키므로(try/catch) 캐시가 사실상 한 번도
+ *      저장되지 않았을 가능성이 높다 → 검색을 쓸 때마다 16MB 재다운로드.
+ *   ② TTL 이 지나면 내용이 그대로여도 다시 받았다. 인덱스는 buildSearchIndex() 가
+ *      매일 04시에 한 번만 바꾸고 그때 meta.version 이 올라간다. meta 는 486바이트다.
+ *
+ *  → 본문은 IndexedDB(용량 넉넉)에 넣고, 열 때 먼저 meta.version 만 읽어
+ *    같으면 16MB를 건너뛴다. IndexedDB 가 막힌 환경이면 예전 경로로 조용히 되돌아간다.
+ */
+const IDB_NAME = 'upboxSalesMap', IDB_STORE = 'cache', IDB_IDX_KEY = 'search_index_v1';
+function _idbOpen_() {
+  return new Promise(function(resolve) {
+    try {
+      if (!window.indexedDB) { resolve(null); return; }
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = function() {
+        const d = req.result;
+        if (!d.objectStoreNames.contains(IDB_STORE)) d.createObjectStore(IDB_STORE);
+      };
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror   = function() { resolve(null); };
+    } catch(e) { resolve(null); }
+  });
+}
+function _idbGet_(key) {
+  return _idbOpen_().then(function(d) {
+    if (!d) return null;
+    return new Promise(function(resolve) {
+      try {
+        const r = d.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
+        r.onsuccess = function() { resolve(r.result || null); };
+        r.onerror   = function() { resolve(null); };
+      } catch(e) { resolve(null); }
+    });
+  });
+}
+function _idbPut_(key, val) {
+  return _idbOpen_().then(function(d) {
+    if (!d) return false;
+    return new Promise(function(resolve) {
+      try {
+        const r = d.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).put(val, key);
+        r.onsuccess = function() { resolve(true); };
+        r.onerror   = function() { resolve(false); };
+      } catch(e) { resolve(false); }
+    });
+  });
+}
+async function _fetchIdxVer_() {
+  try {
+    const snap = await db.ref('search_index/meta/version').once('value');
+    const v = snap.val();
+    return v ? String(v) : null;
+  } catch(e) { return null; }   // 못 읽으면 그냥 받는다
+}
+
 async function loadSearchIndex() {
   if (_searchIndexData) return _searchIndexData;
   if (_searchIndexLoadPromise) return _searchIndexLoadPromise;
-  const cached = getCache(CACHE.SEARCH_INDEX);
-  if (cached) {
-    _searchIndexData = cached;
-    console.log('[search_index] 캐시 적중: ' + Object.keys(cached).length + '개');
-    return _searchIndexData;
-  }
-  console.log('[search_index] Firebase에서 다운로드 시작');
-  _searchIndexLoadPromise = db.ref('search_index/stores').once('value')
-    .then(function(snap) {
+
+  _searchIndexLoadPromise = (async function() {
+    const srvVer = await _fetchIdxVer_();                 // 486바이트
+    const hit = await _idbGet_(IDB_IDX_KEY);
+    if (hit && hit.data && srvVer && hit.version === srvVer) {
+      _searchIndexData = hit.data;
+      console.log('[search_index] 버전 동일(' + srvVer + ') → 16MB 건너뜀, ' +
+                  Object.keys(hit.data).length + '개');
+      return _searchIndexData;
+    }
+    console.log('[search_index] 다운로드 시작 (서버 버전 ' + srvVer + ')');
+    try {
+      const snap = await db.ref('search_index/stores').once('value');
       const data = snap.val() || {};
       _searchIndexData = data;
-      setCache(CACHE.SEARCH_INDEX, data);
-      console.log('[search_index] 다운로드 완료: ' + Object.keys(data).length + '개');
+      const saved = await _idbPut_(IDB_IDX_KEY, { version: srvVer, data: data, t: Date.now() });
+      console.log('[search_index] 다운로드 완료: ' + Object.keys(data).length + '개, 캐시 저장 ' + saved);
       return data;
-    })
-    .catch(function(e) {
+    } catch(e) {
       console.error('[search_index] 다운로드 실패:', e);
       _searchIndexLoadPromise = null;
+      if (hit && hit.data) { _searchIndexData = hit.data; return hit.data; }   // 옛 캐시라도 쓴다
       return {};
-    });
+    }
+  })();
   return _searchIndexLoadPromise;
 }
 /* ★ v67: 방금 등록한 업장을 이 단말의 search_index 캐시에 즉시 끼워넣는다.
@@ -3764,7 +3959,14 @@ async function submitNewStore() {
   };
   const btn = document.getElementById('nsSubmitBtn');
   btn.disabled = true;
+  /* ★ v68: 등록은 6~10초 걸리는데(대부분 지도용DB 59,000행 append) 그동안 피드백이
+     버튼 글자 하나뿐이라 멈춘 것처럼 보였다. 경과에 따라 문구를 바꿔 진행 중임을 알린다. */
   btn.textContent = '등록 중...';
+  const nsProgress = [[2500, '시트에 기록 중...'], [5000, '지도에 반영 중...'], [9000, '거의 다 됐어요...']];
+  const nsTimers = nsProgress.map(function(p) {
+    return setTimeout(function() { if (btn.disabled) btn.textContent = p[1]; }, p[0]);
+  });
+  const clearNsProgress = function() { nsTimers.forEach(clearTimeout); };
   try {
     const response = await fetch(NEW_STORE_ENDPOINT, {
       method: 'POST',
@@ -3775,6 +3977,7 @@ async function submitNewStore() {
       redirect: 'follow'
     });
     const result = await response.json();
+    clearNsProgress();          // ★ v68
     if (result.ok) {
       closeNewStoreModal();
       // ★ v63: addNewStore.gs v1.14 + firebase_sync.gs v13.4 조합에서
@@ -3798,6 +4001,7 @@ async function submitNewStore() {
       btn.textContent = '등록';
     }
   } catch(err) {
+    clearNsProgress();          // ★ v68
     console.error('Submit error:', err);
     showNsToast('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
     btn.disabled = false;
