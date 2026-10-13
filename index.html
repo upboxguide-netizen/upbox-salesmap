@@ -9,7 +9,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services,clusterer"></script>
+<!-- ★ v70: autoload=false — 지도 라이브러리를 document.write 로 동기 로드하지 않고
+     kakao.maps.load() 로 받는다(kakaoReady_). 지도는 startApp 에서 이 약속이 풀린 뒤에만 만든다.
+     ⚠️ firebase 두 스크립트는 defer 하면 안 된다 — 아래 인라인 스크립트가 최상위에서 firebase.initializeApp 을 부른다. -->
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services,clusterer&autoload=false"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Noto Sans KR', sans-serif; overflow: hidden; }
@@ -272,6 +275,25 @@
   .ns-selected-place .ns-sp-clear { position: absolute; top: 8px; right: 10px; background: transparent; border: none; color: #F2AC57; cursor: pointer; font-size: 11px; text-decoration: underline; font-family: inherit; }
   .ns-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1C1C1E; color: #fff; padding: 13px 22px; border-radius: 12px; font-size: 13px; z-index: 20000; box-shadow: 0 8px 24px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s; max-width: 90%; text-align: center; font-family: inherit; }
   .ns-toast.show { opacity: 1; }
+  /* ★ v70: 같은 건물(좌표 8m 이내) 묶음 목록 · 관리자 파트너별 기록 목록.
+     행 높이 44px 이상, 키보드 포커스 표시, 상태는 색+기호+글자로 같이 보여준다(색만으로 구분 금지). */
+  .v70-list-head { font-size: 13px; color: #555; margin: 4px 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .v70-list { list-style: none; border: 1px solid #E6E6EE; border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+  .v70-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 12px; border: none; border-bottom: 1px solid #EEEEF3; background: #fff; text-align: left; font-family: inherit; cursor: pointer; color: #222; }
+  .v70-list li:last-child .v70-row { border-bottom: none; }
+  .v70-row:hover { background: #F7F7FA; }
+  .v70-row:focus-visible, .v70-back:focus-visible { outline: 3px solid #F2AC57; outline-offset: -3px; }
+  .v70-row-main { flex: 1; min-width: 0; }
+  .v70-row-title { font-size: 14px; font-weight: 600; color: #222; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v70-row-sub { font-size: 12px; color: #666; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v70-row-arrow { color: #888; font-size: 14px; flex-shrink: 0; }
+  .v70-status { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; white-space: nowrap; }
+  .v70-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; margin: 0 0 8px; border: 1px solid #CCC; border-radius: 8px; background: #fff; color: #363859; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .v70-rec-table { border-top: 1px solid #EEE; padding-top: 8px; margin-bottom: 12px; }
+  .v70-rec-table .info-row { padding: 5px 0; }
+  .v70-hist { margin: 6px 0 14px; font-size: 12px; color: #555; }
+  .v70-hist summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; color: #363859; }
+  .v70-hist-item { border-left: 3px solid #DDD; padding: 4px 10px; margin: 6px 0; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -610,6 +632,18 @@ const db = firebase.database();
 const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec';
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 const NEW_STORE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzSBmYw2I2NBTb8TwGtQe2r5hG0THf60eIROO7kbLWckHBGbYufoA8odWghYjs_sGJuNA/exec';
+/* ★ v69→v70 이식: 방문기록 저장 직후 서버에 "이 1건 시트에 반영해줘"를 알린다(addNewStore.gs v1.15 action=visitSaved).
+   예전엔 10분 동기화를 기다려야 방문기록 시트 → 담당매니저 슬랙 → SAL 쓰레드로 이어졌다.
+   응답은 기다리지 않는다 — 실패해도 10분 동기화가 그대로 보완하고, 파트너 화면엔 영향이 없다. */
+function notifyVisitSaved_(partnerKey, recKey) {
+  try {
+    fetch(NEW_STORE_ENDPOINT, {
+      method: 'POST', mode: 'cors', cache: 'no-cache', redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'visitSaved', partnerKey: partnerKey, recKey: recKey })
+    }).catch(function(e) { console.warn('[visitSaved 알림 실패 — 10분 동기화가 보완]', e); });
+  } catch (e) { /* 무시 */ }
+}
 const ADMIN_CODES = ['1111', '0001', '0002', '0003', '0004', '0005', '0006', '0007'];
 const CLUSTER_MIN_LEVEL = 7;
 const FILTER_MOVE_MAX_PINS = 500;
@@ -617,6 +651,23 @@ const ADMIN_INIT_LEVEL = 11;
 const ADMIN_CONTRACT_ZOOM_LEVEL = 8;
 const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
+/* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
+   APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
+const APP_VERSION = 'v70';
+const PARTNER_FETCH_MAX_LEVEL = 7;        // 파트너: 이 레벨보다 넓게 보면 업장을 새로 받지 않는다(전국 범위 질의 방지)
+const PARTNER_CLUSTER_MIN_LEVEL = 5;      // 파트너: 이 레벨부터 클러스터로 묶는다(가까이선 지금처럼 낱개 핀)
+const PARTNER_FETCH_PAD_RATIO = 0.5;      // 위도 띠를 화면 높이의 50%(최대 0.03°)씩 위아래로 넉넉히 받아 작은 이동엔 재조회 안 함
+const SPOT_GROUP_RADIUS_M = 8;            // 같은 건물로 묶는 거리(m). ⚠️ 9m 를 넘기려면 _gridCellDeg_() 도 키울 것
+const LAST_VIEW_KEY = 'upbox_last_view_v1';
+const IDB_ADMIN_AGG_KEY = 'admin_aggregate_v3';
+const ADMIN_AGG_TTL_MS = 12 * 60 * 60 * 1000;
+const IDB_CONTRACTS_KEY = 'contracts_index_v1';
+const IDB_IDX_ADDS_KEY = 'search_index_adds_v1';
+const SEARCH_DEDUP_TOP_N = 200;
+/* ★ v70: 핀 색을 정할 때 쓰는 상태 우선순위(앞일수록 높음) — 같은 건물 묶음 핀, 관리자 다중 파트너 핀이 공용.
+   리드 상태 재정의가 오면 이 배열과 highestPriorityStatus_() 만 고치면 된다.
+   기계약(contract)은 영업 진행 상태보다 낮고 불발·폐업보다 높게 뒀다. */
+const PIN_STATUS_PRIORITY = ['success', 'lead', 'visit', 'simpleContact', 'contract', 'fail', 'closedByMe', 'none'];
 function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
 }
@@ -665,12 +716,14 @@ function pickRepresentativeVisitRecord_(recordsByType) {
 }
 // ★ CACHE 블록 — 삭제되면 searchStores·loadSearchIndex 전체가 에러남
 // ★ 패치1: 캐시 키 승격 v3 → v4
+// ★ v70: ADMIN_AGGREGATE(1MB+)·SEARCH_INDEX(16MB)는 localStorage 에서 뺐다 → IndexedDB(IDB_ADMIN_AGG_KEY / IDB_IDX_KEY).
+//   localStorage 한도(보통 5MB)를 넘겨 조용히 실패하거나, setCache 의 비상 정리 로직이 다른 캐시를 지웠다.
 const CACHE = {
   OTHER_VISITS:    { key: 'cache_other_visits_v3',     ttlMs: 24 * 60 * 60 * 1000 },
-  MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 },
-  ADMIN_AGGREGATE: { key: 'cache_admin_aggregate_v2',  ttlMs: 12 * 60 * 60 * 1000 },
-  SEARCH_INDEX:    { key: 'cache_search_index_v4',     ttlMs: 6 * 60 * 60 * 1000 }
+  MY_PROJECTS:     { key: 'cache_my_projects_v3',      ttlMs: 30 * 24 * 60 * 60 * 1000 }
 };
+// ★ v70: IndexedDB 이름 — _idbOpen_() 보다 위에 있어야 한다(TDZ 방지로 위로 올림)
+const IDB_NAME = 'upboxSalesMap', IDB_STORE = 'cache', IDB_IDX_KEY = 'search_index_v1';
 function getCache(c) {
   try {
     const raw = localStorage.getItem(c.key);
@@ -698,14 +751,16 @@ function setCache(c, data) {
   }
 }
 function clearAllCaches() {
-  ['cache_other_visits_v2','cache_my_projects_v3','cache_my_projects_v2','cache_admin_aggregate_v2',
+  ['cache_other_visits_v2','cache_other_visits_v3','cache_my_projects_v3','cache_my_projects_v2','cache_admin_aggregate_v2',
    'cache_admin_aggregate_v1','cache_other_visits','cache_my_projects',
-   'cache_search_index_v1','cache_search_index_v2','cache_search_index_v3'].forEach(k => localStorage.removeItem(k));
+   'cache_search_index_v1','cache_search_index_v2','cache_search_index_v3','cache_search_index_v4'].forEach(k => localStorage.removeItem(k));
+  try { _idbDel_(IDB_ADMIN_AGG_KEY); } catch(e) {}   // ★ v70: 관리자 집계는 IndexedDB 에 있다
 }
 (function migrateOldCaches() {
-  ['cache_other_visits','cache_my_projects','cache_my_projects_v2','cache_admin_aggregate_v1',
-   'cache_search_index_v1','cache_search_index_v2','cache_search_index_v3'].forEach(k => {
-    if (localStorage.getItem(k)) localStorage.removeItem(k);
+  // ★ v70: cache_admin_aggregate_v2 · cache_search_index_v4 는 IndexedDB 로 옮겼으므로 남은 찌꺼기를 지운다
+  ['cache_other_visits','cache_my_projects','cache_my_projects_v2','cache_admin_aggregate_v1','cache_admin_aggregate_v2',
+   'cache_search_index_v1','cache_search_index_v2','cache_search_index_v3','cache_search_index_v4'].forEach(k => {
+    try { if (localStorage.getItem(k)) localStorage.removeItem(k); } catch(e) {}
   });
 })();
 const NOTICE_TYPES = {
@@ -863,6 +918,24 @@ let _nsSelectedPlace = null;
 let _nsSelectedAdminType = '';
 let _nsSelectedSalesType = '';
 let _nsSelectedOutcome = '';
+// ★ v70 전역 — 속도·비용 개선 + 다중 파트너 + 같은 건물 묶음
+let _storesBand = null;          // 파트너: 마지막으로 받은 위도 띠 { latMin, latMax, raw:{k:store} } — 띠 안 이동은 재조회 없음
+let _storesReqSeq = 0;           // 파트너: 늦게 온 옛 응답 버리기용 순번
+let _searchSeq = 0;              // 검색: 늦게 온 옛 결과 버리기용 순번
+let _panelSeq = 0;               // 패널: 빠르게 연달아 누를 때 옛 업장 내용이 덮어쓰는 것 방지
+let _visitsRev = 0;              // 내 방문기록·타파트너 접촉이 바뀔 때마다 +1 (검색 중복억제 캐시 무효화용)
+let _searchPrep = null;          // 검색: 인덱스 1회 정규화 결과 { src, rows:[{k,s,nN,aN,rN}], dupItems }
+let _searchDupCache = null;      // 검색: { src, rev, suppressed }
+let _searchIndexVersion = null;
+let _contractsIndexData = null;  // 외주: contracts_index/stores (서버에 있을 때만)
+const _storeDetailCache = new Map();   // stores/<key> 세션 메모 (패널 열 때마다 다시 읽지 않음)
+let _adminPartnerIdx = {};       // 관리자: storeKey → [{pk, name, status, at}] (최신순)
+let _adminPartnerIdxSrc = null;
+let _highlightGroupKeys = null;  // 같은 건물 목록을 열어 둔 묶음의 업장키 Set (핀 강조용)
+let _currentSpotGroup = null;    // 지금 열려 있는 같은 건물 목록
+let _userMovedMap = false;       // 사용자가 지도를 직접 움직였으면 위치 도착 시 자동 이동하지 않음
+let _myVisitsReady = null;       // loadMyVisits 완료 약속 (첫 핀 그리기 전에 기다린다)
+const _markerImageCache = new Map();   // MarkerImage 메모 (색|테두리|글자|크기 → 이미지)
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
 document.getElementById("logoutBtn").onclick = logout;
@@ -896,8 +969,19 @@ function logout() {
 (function autoLogin() {
   const saved = localStorage.getItem("upboxPartner");
   if (saved) {
-    try { currentUser = JSON.parse(saved); startApp(); }
-    catch(e) { localStorage.removeItem("upboxPartner"); }
+    // ★ v70: startApp 을 스크립트 평가가 끝난 뒤(마이크로태스크)에 돌린다.
+    //   예전엔 여기서 동기 호출이라, startApp 이 첫 await 전에 아래쪽 const 를 건드리면 TDZ 로 죽었다
+    //   (실제로 purgeExpiredDrafts_ 가 DRAFT_PREFIX_ TDZ 를 try/catch 로 삼켜 초안 정리가 한 번도 안 돌았다).
+    try { currentUser = JSON.parse(saved); }
+    catch(e) { localStorage.removeItem("upboxPartner"); currentUser = null; }
+    if (currentUser) {
+      Promise.resolve().then(startApp).catch(function(e) {
+        console.error('[startApp 실패]', e);
+        try { document.getElementById('statusBar').textContent = '앱 시작 실패 — 새로고침해주세요'; } catch(e2) {}
+      });
+    } else {
+      document.getElementById("loginScreen").style.display = "flex";
+    }
   } else {
     document.getElementById("loginScreen").style.display = "flex";
   }
@@ -975,8 +1059,42 @@ async function checkMyProjectAssignmentLegacy() {
     }
   } catch(e) { console.warn("프로젝트 배정 확인 실패:", e); }
 }
+/* ★ v70: Kakao SDK 를 autoload=false 로 받는다. 지도 객체는 이 약속이 풀린 뒤에만 만든다.
+   이미 로드돼 있으면(autoload 로 바꿔 되돌린 경우 등) 바로 풀린다. 15초 안에 안 오면 거부 → 상태바에 안내. */
+function kakaoReady_() {
+  if (window.__upboxKakaoReady) return window.__upboxKakaoReady;
+  window.__upboxKakaoReady = new Promise(function(resolve, reject) {
+    try {
+      if (typeof kakao === 'undefined' || !kakao.maps) { reject(new Error('카카오 지도 SDK를 불러오지 못했습니다')); return; }
+      if (kakao.maps.Map && kakao.maps.MarkerClusterer && kakao.maps.services) { resolve(); return; }
+      let done = false;
+      const t = setTimeout(function() { if (!done) reject(new Error('카카오 지도 응답이 15초 안에 오지 않았습니다')); }, 15000);
+      kakao.maps.load(function() { done = true; clearTimeout(t); resolve(); });
+    } catch(e) { reject(e); }
+  });
+  return window.__upboxKakaoReady;
+}
+// ★ v70: 마지막으로 보던 지도 위치 — 위치 권한을 기다리지 않고 지도부터 띄우는 데 쓴다.
+function readLastView_() {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_VIEW_KEY) || 'null');
+    if (v && isFinite(v.lat) && isFinite(v.lng) && isFinite(v.level)) return v;
+  } catch(e) {}
+  return null;
+}
+function saveLastView_() {
+  try {
+    if (!map) return;
+    const c = map.getCenter();
+    localStorage.setItem(LAST_VIEW_KEY, JSON.stringify({ lat: c.getLat(), lng: c.getLng(), level: map.getLevel() }));
+  } catch(e) {}
+}
+/* ★ v70: 시작 순서 변경
+   예전: 내 방문기록 다 받기 → 위치 최대 3초 기다리기 → 그제야 지도 생성 (흰 화면 3~5초)
+   지금: 지도를 마지막 위치(없으면 서울)로 바로 띄우고, 방문기록·위치는 병렬로 받는다.
+         위치가 오면 그때 내 위치로 옮긴다(그 사이 사용자가 지도를 움직였으면 안 옮김).
+         첫 핀은 loadStoresInView 가 방문기록 완료(_myVisitsReady)를 기다린 뒤 그린다 — 색이 틀린 핀이 잠깐 뜨지 않게. */
 async function startApp() {
-  purgeExpiredDrafts_();   // ★ v61: 7일 지난 초안 정리
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("userInfo").textContent = currentUser.name;
   isAdminUser = isAdmin(currentUser.code);
@@ -986,7 +1104,19 @@ async function startApp() {
     document.getElementById('filterBar').style.display = 'none';
     console.log('[관리자 모드] 자동 활성화 - ' + currentUser.name);
   }
+  console.log('[영업지도] ' + APP_VERSION + ' 시작');
   const locationPromise = fetchInitialLocation();
+  const onLocation = function(loc) {
+    if (!loc) return;
+    initialLocation = loc;
+    if (!currentUserLocation) currentUserLocation = loc;
+    if (map) updateMyLocationMarker(loc.lat, loc.lng);
+    if (!isAdminUser && !isExternalUser && !_userMovedMap && map) {
+      suppressNextIdle = false;
+      map.setCenter(new kakao.maps.LatLng(loc.lat, loc.lng));
+      map.setLevel(3);
+    }
+  };
   // ★ v51.7: 외주 모드 분기 (기계약 열람 전용) — 캐시/방문 로딩 전에 조기 탈출
   isExternalUser = isExternal(currentUser.code);
   if (isExternalUser) {
@@ -994,18 +1124,15 @@ async function startApp() {
     document.getElementById('adminBadge').textContent = '기계약 열람';
     document.getElementById('filterBar').style.display = 'none';
     document.getElementById('addBtn').style.display = 'none';
-    initialLocation = await Promise.race([
-      locationPromise,
-      new Promise(resolve => setTimeout(() => resolve(null), 3000))
-    ]);
-    if (initialLocation) currentUserLocation = initialLocation;
+    try { await kakaoReady_(); }
+    catch(e) { document.getElementById('statusBar').textContent = '지도를 불러오지 못했습니다 — 새로고침해주세요'; throw e; }
     initMap();
+    locationPromise.then(onLocation);
     return; // 외주는 여기서 종료 — 이후 파트너/관리자 로직 실행 안 함
   }
   const cachedOtherVisits = getCache(CACHE.OTHER_VISITS);
   const cachedMyProjects = getCache(CACHE.MY_PROJECTS);
-  const cachedAggregate = isAdminUser ? getCache(CACHE.ADMIN_AGGREGATE) : null;
-  if (cachedOtherVisits) otherPartnerLastContactMap = cachedOtherVisits;
+  if (cachedOtherVisits) { otherPartnerLastContactMap = cachedOtherVisits; _visitsRev++; }
   if (cachedMyProjects) {
     hasMyProjects = cachedMyProjects.hasMyProjects;
     myProjectStores = cachedMyProjects.myProjectStores || [];
@@ -1014,21 +1141,23 @@ async function startApp() {
       if (projChip) projChip.classList.add('visible');
     }
   }
-  if (cachedAggregate) visitsAggregate = cachedAggregate;
-  await loadMyVisits();
-  updateChipCounts();
-  initialLocation = await Promise.race([
-    locationPromise,
-    new Promise(resolve => setTimeout(() => resolve(null), 3000))
-  ]);
-  if (initialLocation) currentUserLocation = initialLocation;
-
-  // ★ v64: 지도를 먼저 띄운다.
-  //   기존엔 관리자일 때 loadAdminMasterStores()를 await 한 뒤에야 initMap()이 돌았다.
-  //   이 함수는 visits_aggregate의 업장 수(2026-09-28 기준 2,825개)만큼 stores_light를
-  //   낱개로 읽으므로, 느려지면 지도가 아예 안 그려지고 흰 화면이 된다.
-  //   이제 지도부터 그리고 관리자 핀은 뒤에서 채운다(await 하지 않음).
+  // 방문기록·관리자 집계 캐시·카카오 SDK 를 동시에 받는다
+  _myVisitsReady = loadMyVisits();
+  const cachedAggPromise = isAdminUser ? loadAdminAggregateCache_() : Promise.resolve(null);
+  try { await kakaoReady_(); }
+  catch(e) { document.getElementById('statusBar').textContent = '지도를 불러오지 못했습니다 — 새로고침해주세요'; throw e; }
+  const cachedAggregate = await cachedAggPromise;
+  if (isAdminUser && cachedAggregate) {
+    visitsAggregate = cachedAggregate;
+    buildAdminPartnerIndex_();
+  }
   initMap();
+  locationPromise.then(onLocation);
+  purgeExpiredDrafts_();   // ★ v61: 7일 지난 초안 정리 (v70: TDZ 로 안 돌던 것을 await 뒤로 옮김)
+  await _myVisitsReady;
+  updateChipCounts();
+
+  // ★ v64: 지도를 먼저 띄운다. 관리자 핀은 뒤에서 채운다(await 하지 않음).
   if (isAdminUser && cachedAggregate) {
     loadAdminMasterStores().then(function() {
       updateAdminStatsBar();
@@ -1240,21 +1369,59 @@ async function fetchContractsInCurrentBounds() {
     return [];
   }
 }
+// ★ v70: 관리자 집계 캐시는 IndexedDB 에 둔다(1MB+ 라 localStorage 에 넣으면 다른 캐시를 밀어냈다). TTL 12시간 그대로.
+async function loadAdminAggregateCache_() {
+  try {
+    const hit = await _idbGet_(IDB_ADMIN_AGG_KEY);
+    if (hit && hit.d && hit.t && (Date.now() - hit.t) <= ADMIN_AGG_TTL_MS) return hit.d;
+  } catch(e) {}
+  return null;
+}
 async function loadVisitsAggregate() {
   try {
     const snap = await db.ref('visits_aggregate').once('value');
     const data = snap.val();
     if (!data) {
       visitsAggregate = { stores: {}, summary: {}, byPartner: {}, version: '미집계', updatedAt: 0 };
+      buildAdminPartnerIndex_();
       return;
     }
     visitsAggregate = data;
-    setCache(CACHE.ADMIN_AGGREGATE, data);
+    buildAdminPartnerIndex_();
+    _idbPut_(IDB_ADMIN_AGG_KEY, { t: Date.now(), d: data });   // 기다리지 않음
     console.log('[관리자 집계] 로드 완료');
   } catch(e) {
     visitsAggregate = { stores: {}, summary: {}, byPartner: {}, version: '오류', updatedAt: 0 };
+    buildAdminPartnerIndex_();
   }
 }
+/* ★ v70: 업장별 접촉 파트너 목록 — visits_aggregate.byPartner.<pk>.stores.<storeKey> = {lastStatus, lastUpdatedAt}
+   를 한 번 뒤집어 storeKey → [{pk, name, status, at}] (최신순) 으로 만든다. 집계를 새로 받을 때마다 다시 만든다.
+   2026-10-13 실측: 집계 업장 3,066곳 중 파트너 2명 이상 63곳, 최대 3명. */
+function buildPartnerStoreIndex_(agg) {
+  const idx = {};
+  const byPartner = (agg && agg.byPartner) || {};
+  for (const pk in byPartner) {
+    const p = byPartner[pk] || {};
+    const stores = p.stores || {};
+    const name = p.partnerName || pk;
+    for (const sk in stores) {
+      const r = stores[sk] || {};
+      (idx[sk] || (idx[sk] = [])).push({ pk: pk, name: name, status: r.lastStatus || 'none', at: Number(r.lastUpdatedAt) || 0 });
+    }
+  }
+  for (const sk in idx) {
+    idx[sk].sort(function(a, b) { return (b.at - a.at) || (a.pk < b.pk ? -1 : (a.pk > b.pk ? 1 : 0)); });
+  }
+  return idx;
+}
+function buildAdminPartnerIndex_() {
+  if (_adminPartnerIdxSrc === visitsAggregate) return;
+  _adminPartnerIdx = buildPartnerStoreIndex_(visitsAggregate);
+  _adminPartnerIdxSrc = visitsAggregate;
+}
+/* ★ v70: 관리자 마스터 업장 — 서버가 visits_aggregate/stores/<k>/sl 에 stores_light 사본을 넣어 주면
+   그걸 그대로 쓰고, sl 이 없는 키만 예전처럼 stores_light/<k> 를 낱개로 읽는다(서버 변경 전에도 동작). */
 async function loadAdminMasterStores() {
   if (!visitsAggregate) {
     visitsAggregate = { stores: {}, summary: {}, byPartner: {} };
@@ -1269,10 +1436,27 @@ async function loadAdminMasterStores() {
     const pData = byPartner[selectedAdminPartner];
     targetStoresMap = (pData && pData.stores) || {};
   }
+  const allAggStores = visitsAggregate.stores || {};
   const aggKeys = Object.keys(targetStoresMap);
-  console.log('[관리자 마스터] partner=' + selectedAdminPartner + ', ' + aggKeys.length + '개 fetch 시작');
+  const fromSl = [];
+  const needFetch = [];
+  aggKeys.forEach(function(k) {
+    const a = allAggStores[k];
+    const sl = a && a.sl;
+    if (sl && typeof sl === 'object') {
+      if (!isNaN(sl.lat) && !isNaN(sl.lng)) {
+        const v = Object.assign({}, sl);
+        v._key = k;
+        v._isContract = false;
+        fromSl.push(v);
+      }
+    } else {
+      needFetch.push(k);
+    }
+  });
+  console.log('[관리자 마스터] partner=' + selectedAdminPartner + ', ' + aggKeys.length + '개 (sl 사용 ' + fromSl.length + ', 낱개 조회 ' + needFetch.length + ')');
   try {
-    const fetchPromises = aggKeys.map(function(k) {
+    const fetchPromises = needFetch.map(function(k) {
       return db.ref('stores_light/' + k).once('value').then(function(snap) {
         const v = snap.val();
         if (v && !isNaN(v.lat) && !isNaN(v.lng)) {
@@ -1284,7 +1468,7 @@ async function loadAdminMasterStores() {
       }).catch(function() { return null; });
     });
     const results = await Promise.all(fetchPromises);
-    let validStores = results.filter(function(s) { return s !== null; });
+    let validStores = fromSl.concat(results.filter(function(s) { return s !== null; }));
     validStores = validStores.filter(function(s) {
       if (!isClosed(s)) return true;
       const aggData = targetStoresMap[s._key];
@@ -1325,7 +1509,7 @@ function updateAdminStatsBar() {
     const mi = String(d.getMinutes()).padStart(2, '0');
     versionText = '집계: ' + mm + '/' + dd + ' ' + hh + ':' + mi;
   }
-  document.getElementById('adminStatsVersion').textContent = versionText;
+  document.getElementById('adminStatsVersion').textContent = versionText + ' · 앱 ' + APP_VERSION;   // ★ v70: 앱 버전 표시
   document.getElementById('adminStatsBar').classList.add('visible');
 }
 function moveToMyProjectStores() {
@@ -1354,6 +1538,7 @@ async function loadOtherPartnerContacts() {
         }
       }
     }
+    _visitsRev++;   // ★ v70: 검색 중복억제 캐시 무효화
     setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
   } catch(e) {}
 }
@@ -1384,37 +1569,15 @@ async function loadMyVisits() {
     for (const storeKey in myVisitedStoreDataByType) {
       myVisitedStoreData[storeKey] = pickRepresentativeVisitRecord_(myVisitedStoreDataByType[storeKey]);
     }
+    _visitsRev++;   // ★ v70
   } catch(e) {}
 }
-function computeMyVisitCounts() {
-  const counts = { visit: 0, lead: 0, success: 0, fail: 0 };
-  for (const storeKey in myVisitedStoreData) {
-    const rec = myVisitedStoreData[storeKey];
-    const cur = rec.current || {};
-    const outcome = String(cur.outcome || "").trim();
-    if (outcome === "성사") { counts.success++; continue; }
-    if (outcome === "실패") { counts.fail++; continue; }
-    const eff = effectiveVisitValues_(cur);   // ★ v57: 임의값 제외
-    const visitFields = [eff.currentStoreName, eff.bins, eff.vinyl, eff.truck];
-    const leadAdditionalFields = [eff.contact, eff.amount, eff.suggestedPrice, eff.note];
-    const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
-    const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-    if (allVisitFilled && allLeadAdditionalFilled) { counts.lead++; continue; }
-    if (allVisitFilled) { counts.visit++; continue; }
-  }
-  return counts;
-}
+/* ★ v70: computeMyVisitCounts() 삭제 — 결과를 받는 .chip-count 요소가 v62 상단 칩 폐지 이후 화면에 없다.
+   (방문기록 전체를 저장할 때마다 다시 세던 헛계산). 호출부 3곳을 건드리지 않으려고 이 함수만 빈 껍데기로 남긴다. */
 function updateChipCounts() {
-  if (isAdminUser) {
-    document.querySelectorAll('.chip-count').forEach(el => { el.textContent = ''; });
-    return;
-  }
-  const counts = computeMyVisitCounts();
-  document.querySelectorAll('.chip-count').forEach(el => {
-    const key = el.dataset.countFor;
-    const n = counts[key] || 0;
-    el.textContent = n > 0 ? '(' + n + ')' : '';
-  });
+  const els = document.querySelectorAll('.chip-count');
+  if (!els.length) return;
+  els.forEach(function(el) { el.textContent = ''; });
 }
 function initMap() {
   const container = document.getElementById("map");
@@ -1428,15 +1591,22 @@ function initMap() {
     initialCenter = new kakao.maps.LatLng(initialLocation.lat, initialLocation.lng);
     initialLevel = 3;
   } else {
-    initialCenter = new kakao.maps.LatLng(37.5665, 126.9780);
-    initialLevel = 4;
+    // ★ v70: 위치를 기다리지 않는다 — 마지막으로 보던 곳(없으면 서울)에서 시작하고, 위치가 오면 옮긴다
+    const lv = readLastView_();
+    if (lv) {
+      initialCenter = new kakao.maps.LatLng(lv.lat, lv.lng);
+      initialLevel = Math.min(Math.max(Math.round(lv.level), 1), PARTNER_FETCH_MAX_LEVEL);
+    } else {
+      initialCenter = new kakao.maps.LatLng(37.5665, 126.9780);
+      initialLevel = 4;
+    }
   }
   const options = { center: initialCenter, level: initialLevel };
   map = new kakao.maps.Map(container, options);
   // ★ v51.7: 외주도 클러스터러 생성
-  if (isAdminUser || isExternalUser) {
-    markerClusterer = createClusterer();
-  }
+  // ★ v70: 파트너도 클러스터러를 쓴다 — 레벨 5 이상에서만 묶이고, 그보다 가까우면 지금처럼 낱개 핀이다
+  markerClusterer = createClusterer((isAdminUser || isExternalUser) ? CLUSTER_MIN_LEVEL : PARTNER_CLUSTER_MIN_LEVEL);
+  kakao.maps.event.addListener(map, 'dragstart', function() { _userMovedMap = true; });
   startLocationTracking();
   if (initialLocation) updateMyLocationMarker(initialLocation.lat, initialLocation.lng);
   if (isAdminUser) {
@@ -1462,6 +1632,7 @@ function initMap() {
   } else {
     let moveDebounce;
     kakao.maps.event.addListener(map, "idle", function() {
+      saveLastView_();   // ★ v70
       if (suppressNextIdle) { suppressNextIdle = false; return; }
       clearTimeout(moveDebounce);
       moveDebounce = setTimeout(function() { loadStoresInView(); }, 400);
@@ -1484,7 +1655,7 @@ function initMap() {
     const q = e.target.value.trim();
     searchTimer = setTimeout(function() {
       if (q.length >= SEARCH_MIN_QUERY_LEN) searchStores(q);
-      else document.getElementById("searchResults").style.display = "none";
+      else { _searchSeq++; document.getElementById("searchResults").style.display = "none"; }   // ★ v70: 진행 중 검색 무효화
     }, 300);
   };
   document.addEventListener("click", function(e) {
@@ -1519,13 +1690,13 @@ function initMap() {
 function getFilterColor(f) {
   return { all:"#363859", visit:"#4d4678", lead:"#43A047", success:"#F5B800", fail:"#E53935", contract:"#F2AC57" }[f] || "#363859";
 }
-function createClusterer() {
+function createClusterer(minLevel) {
   const baseStyle = {
     color: 'white', border: '3px solid white', borderRadius: '50%',
     textAlign: 'center', fontWeight: '700', boxShadow: '0 2px 10px rgba(0,0,0,0.25)'
   };
   const clusterer = new kakao.maps.MarkerClusterer({
-    map: map, averageCenter: true, minLevel: CLUSTER_MIN_LEVEL,
+    map: map, averageCenter: true, minLevel: minLevel || CLUSTER_MIN_LEVEL,
     minClusterSize: 2, disableClickZoom: true, gridSize: 60,
     calculator: [10, 100],
     styles: [
@@ -1564,7 +1735,9 @@ function handleClusterClick(cluster) {
     positions.forEach(function(p) { bounds.extend(p); });
     map.setBounds(bounds, 80, 80, 80, 80);
     setTimeout(function() {
-      if (map.getLevel() >= CLUSTER_MIN_LEVEL) map.setLevel(CLUSTER_MIN_LEVEL - 1);
+      // ★ v70: 파트너 클러스터는 레벨 5부터 묶이므로 그 아래로 내려야 핀이 풀린다
+      const minLv = (isAdminUser || isExternalUser) ? CLUSTER_MIN_LEVEL : PARTNER_CLUSTER_MIN_LEVEL;
+      if (map.getLevel() >= minLv) map.setLevel(minLv - 1);
       if (isAdminUser) setTimeout(function() { renderAdminView(); }, 250);
     }, 150);
   } catch(e) {
@@ -1620,97 +1793,8 @@ function computeDominantClusterColor(cluster) {
   }
   return getStatusColor(dominant);
 }
-async function moveToFilteredStoresForPartner(filter) {
-  const statusBar = document.getElementById('statusBar');
-  if (statusBar) statusBar.textContent = '필터 적용 중...';
-  if (filter === 'all') { renderMarkers(); return; }
-  if (filter === 'contract') { await moveToContractStores(); return; }
-  const targetKeys = [];
-  for (const storeKey in myVisitedStoreData) {
-    const rec = myVisitedStoreData[storeKey];
-    const cur = rec.current || {};
-    const outcome = String(cur.outcome || "").trim();
-    let status = 'none';
-    if (outcome === '성사') status = 'success';
-    else if (outcome === '실패') status = 'fail';
-    else {
-      const eff = effectiveVisitValues_(cur);   // ★ v57: 임의값 제외
-      const visitFields = [eff.currentStoreName, eff.bins, eff.vinyl, eff.truck];
-      const leadAdditionalFields = [eff.contact, eff.amount, eff.suggestedPrice, eff.note];
-      const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
-      const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-      if (allVisitFilled && allLeadAdditionalFilled) status = 'lead';
-      else if (allVisitFilled) status = 'visit';
-      else if (outcome === '폐업') status = 'closedByMe';
-    }
-    if (status === filter) targetKeys.push(storeKey);
-  }
-  if (targetKeys.length === 0) {
-    if (statusBar) statusBar.textContent = '해당 상태 업장 없음';
-    renderMarkers();
-    return;
-  }
-  await fitMapToStoreKeys(targetKeys, filter);
-}
-async function moveToContractStores() {
-  const statusBar = document.getElementById('statusBar');
-  try {
-    /* ★ v68: 전체 stores_light(13.8MB)를 받던 것을 lat 범위 질의로 교체.
-       기계약은 내 위치 반경 3km 안만 보면 되므로 전국을 받을 이유가 없었다.
-       stores_light 에 lat 인덱스가 걸려 있는 것은 확인했다(fetchContractsInCurrentBounds 와 동일 경로). */
-    let ref = db.ref('stores_light');
-    if (currentUserLocation) {
-      const dLat = CONTRACT_RADIUS_KM / 111;
-      ref = ref.orderByChild('lat')
-               .startAt(currentUserLocation.lat - dLat)
-               .endAt(currentUserLocation.lat + dLat);
-    } else {
-      ref = ref.orderByChild('lat').limitToFirst(3000);   // 위치를 모르면 과하게 받지 않는다
-    }
-    const snap = await ref.once('value');
-    const all = snap.val() || {};
-    const coords = [];
-    for (const k in all) {
-      const s = all[k];
-      if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
-      if (!isContractGrade(s.grade)) continue;
-      if (currentUserLocation) {
-        const dist = haversine(currentUserLocation.lat, currentUserLocation.lng, s.lat, s.lng);
-        if (dist > CONTRACT_RADIUS_KM) continue;
-      }
-      coords.push({ lat: s.lat, lng: s.lng });
-      if (coords.length >= FILTER_MOVE_MAX_PINS) break;
-    }
-    if (coords.length === 0) {
-      if (statusBar) statusBar.textContent = '근처 기계약 업장 없음';
-      renderMarkers();
-      return;
-    }
-    fitToCoords(coords);
-  } catch(e) { renderMarkers(); }
-}
-async function fitMapToStoreKeys(targetKeys, filterLabel) {
-  const statusBar = document.getElementById('statusBar');
-  if (statusBar) statusBar.textContent = '필터 적용 중... (' + targetKeys.length + '개)';
-  const limited = targetKeys.slice(0, FILTER_MOVE_MAX_PINS);
-  try {
-    const fetchPromises = limited.map(function(k) {
-      return db.ref('stores_light/' + k).once('value').then(function(snap) {
-        const v = snap.val();
-        if (v && !isNaN(v.lat) && !isNaN(v.lng)) return { lat: v.lat, lng: v.lng };
-        return null;
-      }).catch(function() { return null; });
-    });
-    const results = await Promise.all(fetchPromises);
-    const validCoords = results.filter(function(c) { return c !== null; });
-    if (validCoords.length === 0) {
-      if (statusBar) statusBar.textContent = '좌표 없음';
-      renderMarkers();
-      return;
-    }
-    fitToCoords(validCoords);
-  } catch(e) { renderMarkers(); }
-}
+/* ★ v70: moveToFilteredStoresForPartner() · moveToContractStores() · fitMapToStoreKeys() 삭제.
+   v62 에서 상단 상태칩이 없어진 뒤 호출하는 곳이 한 군데도 없었다(grep + 코드그래프 확인, 2026-10-13). */
 function fitToCoords(coords) {
   if (!coords || coords.length === 0) return;
   if (coords.length === 1) {
@@ -1763,22 +1847,68 @@ function moveToMyLocation() {
     alert("현재 위치를 가져올 수 없습니다.\n위치 권한을 허용해주세요.");
   });
 }
-async function loadStoresInView() {
+/* ★ v70: 파트너 업장 불러오기 — 비용·속도 개선
+   예전: 지도가 멈출 때마다(idle) 화면 위도 범위 × 전국 경도를 통째로 다시 받았고, 줌 제한도 없었다.
+         그래서 조금만 움직여도 수 MB 재다운로드, 늦게 온 옛 응답이 새 화면을 덮어쓰기도 했다.
+   지금: ① 레벨 7(PARTNER_FETCH_MAX_LEVEL)보다 넓게 보면 새로 받지 않고 "지도를 확대해 주세요" 안내
+         ② 받은 위도 띠(_storesBand)를 기억해 두고, 새 화면이 그 띠 안이면 재조회 없이 메모리에서 거른다
+            (띠는 위아래로 화면 높이 50%, 최대 0.03°씩 넉넉히 받는다)
+         ③ 요청 순번(_storesReqSeq)으로 늦게 온 옛 응답은 버린다
+         ④ 첫 그리기는 내 방문기록 로딩(_myVisitsReady)을 기다린다 — 색이 틀린 핀이 잠깐 뜨지 않게
+   opts.force = true 면 띠를 무시하고 다시 받는다(신규업장 등록 직후). */
+async function loadStoresInView(opts) {
+  const force = !!(opts && opts.force);
+  const seq = ++_storesReqSeq;
+  const statusBar = document.getElementById("statusBar");
   const bounds = map.getBounds();
   const sw = bounds.getSouthWest();
   const ne = bounds.getNorthEast();
   const latMin = sw.getLat(), latMax = ne.getLat();
   const lngMin = sw.getLng(), lngMax = ne.getLng();
-  document.getElementById("statusBar").textContent = "업장 로딩 중...";
+  if (map.getLevel() > PARTNER_FETCH_MAX_LEVEL) {
+    if (_myVisitsReady) { try { await _myVisitsReady; } catch(e) {} }
+    if (seq !== _storesReqSeq) return;
+    const wantsProject = partnerComboFilter.category.indexOf('project') !== -1;
+    if (wantsProject && myProjectStores && myProjectStores.length) {
+      // 프로젝트 업장은 내 배정 인덱스(partner_projects)를 이미 들고 있으므로 추가 조회 없이 띄운다
+      allStoresInView = buildProjectOnlyStores_();
+      renderMarkers();
+      statusBar.textContent = '🎯 내 프로젝트 업장 ' + allStoresInView.length + '곳 · 다른 업장은 지도를 확대해 주세요';
+    } else {
+      allStoresInView = [];
+      renderMarkers();
+      statusBar.textContent = '지도를 확대해 주세요';
+    }
+    return;
+  }
+  let band = _storesBand;
+  const inBand = !force && band && latMin >= band.latMin && latMax <= band.latMax;
+  if (!inBand) {
+    statusBar.textContent = "업장 로딩 중...";
+    const pad = Math.min((latMax - latMin) * PARTNER_FETCH_PAD_RATIO, 0.03);
+    const qMin = latMin - pad, qMax = latMax + pad;
+    try {
+      const snap = await db.ref("stores_light").orderByChild("lat").startAt(qMin).endAt(qMax).once("value");
+      if (seq !== _storesReqSeq) return;            // 그 사이 더 새 요청이 나갔다 — 옛 응답은 버린다
+      const raw = snap.val() || {};
+      for (const k in raw) { if (raw[k]) raw[k]._key = k; }
+      band = { latMin: qMin, latMax: qMax, raw: raw };
+      _storesBand = band;
+    } catch(e) {
+      if (seq === _storesReqSeq) statusBar.textContent = "로딩 실패";
+      return;
+    }
+  }
+  if (_myVisitsReady) { try { await _myVisitsReady; } catch(e) {} }
+  if (seq !== _storesReqSeq) return;
   try {
-    const snap = await db.ref("stores_light").orderByChild("lat").startAt(latMin).endAt(latMax).once("value");
-    const raw = snap.val() || {};
+    const raw = band.raw;
     let list = [];
     for (const k in raw) {
       const s = raw[k];
       if (!s || isNaN(s.lat) || isNaN(s.lng)) continue;
+      if (s.lat < latMin || s.lat > latMax) continue;   // 띠가 화면보다 넓으므로 위도도 거른다
       if (s.lng < lngMin || s.lng > lngMax) continue;
-      s._key = k;
       list.push(s);
     }
     list = list.filter(s => {
@@ -1800,8 +1930,25 @@ async function loadStoresInView() {
     allStoresInView = list;
     renderMarkers();
   } catch(e) {
-    document.getElementById("statusBar").textContent = "로딩 실패";
+    console.error('[loadStoresInView]', e);
+    statusBar.textContent = "로딩 실패";
   }
+}
+/* ★ v70: 넓은 화면(레벨 8+)에서 '프로젝트영업' 칩이 켜져 있을 때 — partner_projects 인덱스만으로 핀을 만든다.
+   이름·등급은 없으므로 패널을 열면 stores/<key> 상세로 채워진다. projects 는 amIAssignedToProject() 가
+   알아보도록 { 프로젝트명: 내 키 } 모양으로 바꿔 둔다. */
+function buildProjectOnlyStores_() {
+  const idx = _searchIndexData || null;
+  return (myProjectStores || []).filter(function(p) {
+    return p && p.key && !isNaN(p.lat) && !isNaN(p.lng);
+  }).map(function(p) {
+    const projects = {};
+    const names = Array.isArray(p.projects) ? p.projects : Object.keys(p.projects || {});
+    names.forEach(function(n) { projects[n] = currentUser.key; });
+    const s = { _key: p.key, lat: p.lat, lng: p.lng, projects: projects, _projectOnly: true };
+    if (idx && idx[p.key] && idx[p.key].n) s.name = idx[p.key].n;
+    return s;
+  });
 }
 function isVisibleForProject(store, currentPartnerKey) {
   if (!store.projects) return true;
@@ -1859,51 +2006,128 @@ function isMasterSourced_(key) {
   return false;
 }
 
+/* ★ v70: 근접 판정용 격자 — 중복 제거·같은 건물 묶음이 같이 쓴다.
+   칸 크기: 위도 10m, 경도는 그 2배(도 단위) → 위도 60° 이하에서 동서 폭도 10m 이상이다(한국 33~39°).
+   그래서 8m 이내 두 점은 반드시 같은 칸이거나 바로 옆 칸(3×3)에 있다 → 옆 칸만 보면 전수 비교와 결과가 같다.
+   ⚠️ 반경을 9m 넘게 키우려면 _gridCellDeg_() 의 10m 도 같이 키울 것. */
+function _gridCellDeg_() { return 10 / 111320; }
+function _gridKey_(lat, lng) {
+  const c = _gridCellDeg_();
+  return Math.floor(lat / c) + ':' + Math.floor(lng / (c * 2));
+}
+function buildGeoGrid_(items) {
+  const grid = new Map();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const lat = Number(it.lat), lng = Number(it.lng);
+    if (!isFinite(lat) || !isFinite(lng)) continue;     // 좌표 없는 항목은 예전에도 어떤 것과도 안 맞았다(NaN)
+    const k = _gridKey_(lat, lng);
+    let arr = grid.get(k);
+    if (!arr) { arr = []; grid.set(k, arr); }
+    arr.push(it);
+  }
+  return grid;
+}
+// (lat,lng) 주변 3×3 칸의 항목을 하나씩 fn 에 넘긴다. fn 이 true 를 돌려주면 멈춘다.
+function forEachGridNeighbor_(grid, lat, lng, fn) {
+  lat = Number(lat); lng = Number(lng);
+  if (!isFinite(lat) || !isFinite(lng) || grid.size === 0) return;
+  const c = _gridCellDeg_();
+  const cy = Math.floor(lat / c), cx = Math.floor(lng / (c * 2));
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const arr = grid.get((cy + dy) + ':' + (cx + dx));
+      if (!arr) continue;
+      for (let i = 0; i < arr.length; i++) { if (fn(arr[i]) === true) return; }
+    }
+  }
+}
+// 예전 이중 for 문의 판정식(거리 ≤ 8m && 이름유사도 ≥ 0.5)을 그대로, 옆 칸 후보에만 적용한다.
+function hasNearNamedDuplicate_(grid, o) {
+  let hit = false;
+  forEachGridNeighbor_(grid, o.lat, o.lng, function(c) {
+    const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
+    if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) { hit = true; return true; }
+    return false;
+  });
+  return hit;
+}
+/* ★ v70: O(구행×마스터) 하버사인 전수 비교 → 격자 이웃 비교. 결과는 예전과 같다(_test/test_v70_units.js 에서 대조). */
 function filterLegacyDuplicatesAgainstMaster_(list) {
   const masters = list.filter(function(s) { return isMasterSourced_(s._key); });
   if (masters.length === 0) return list;
   const rest = list.filter(function(s) { return !isMasterSourced_(s._key); });
-
+  const grid = buildGeoGrid_(masters);
   const filteredRest = rest.filter(function(o) {
     if (isContractGrade(o.grade)) return true;                          // 기계약은 별도 규칙, 여기선 항상 통과
     if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;  // 내 방문기록 있으면 보존
-
-    for (const m of masters) {
-      const distM = haversine(o.lat, o.lng, m.lat, m.lng) * 1000;
-      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, m.name) >= 0.5) return false;
-    }
-    return true;
+    return !hasNearNamedDuplicate_(grid, o);
   });
-
   return masters.concat(filteredRest);
 }
 function removeContractDuplicates(list) {
   const contracts = list.filter(s => isContractGrade(s.grade));
   const others = list.filter(s => !isContractGrade(s.grade));
+  const grid = buildGeoGrid_(contracts);
   const filteredOthers = others.filter(function(o) {
     if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
-    for (const c of contracts) {
-      const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
-      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) return false;
-    }
-    return true;
+    return !hasNearNamedDuplicate_(grid, o);
   });
   return contracts.concat(filterLegacyDuplicatesAgainstMaster_(filteredOthers));
 }
-// ★ 검색 결과용: 지도의 removeContractDuplicates와 동일한 규칙을 검색 후보(candidates)에도 적용
-//   (같은 업장의 기계약/미방문 핀이 둘 다 뜨는 문제를 검색에서도 막기 위함)
+// ★ 검색 결과용: 지도의 removeContractDuplicates와 동일한 규칙 (v70: 본문이 완전히 같아서 위임)
 function removeContractDuplicatesForSearch(list) {
-  const contracts = list.filter(function(s) { return isContractGrade(s.grade); });
-  const others = list.filter(function(s) { return !isContractGrade(s.grade); });
-  const filteredOthers = others.filter(function(o) {
-    if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
-    for (const c of contracts) {
-      const distM = haversine(o.lat, o.lng, c.lat, c.lng) * 1000;
-      if (distM <= DUPLICATE_RADIUS_M && nameSimilarity(o.name, c.name) >= 0.5) return false;
+  return removeContractDuplicates(list);
+}
+/* ★ v70: 같은 건물(좌표가 같거나 8m 이내) 업장을 핀 하나로 묶는다.
+   먼저 나온 항목이 묶음의 기준점이 되고, 뒤 항목은 기준점 8m 안의 가장 가까운 묶음에 들어간다(순서가 같으면 결과도 같다).
+   반환: 묶음 배열(각 묶음 = 원래 항목 배열), 원래 순서 유지. getLL 은 항목 → {lat,lng}. */
+function groupBySpot_(items, radiusM, getLL) {
+  getLL = getLL || function(x) { return x; };
+  const grid = new Map();
+  const groups = [];
+  const c = _gridCellDeg_();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const ll = getLL(it);
+    const lat = Number(ll.lat), lng = Number(ll.lng);
+    if (!isFinite(lat) || !isFinite(lng)) { groups.push({ members: [it] }); continue; }
+    const cy = Math.floor(lat / c), cx = Math.floor(lng / (c * 2));
+    let best = null, bestD = Infinity;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const arr = grid.get((cy + dy) + ':' + (cx + dx));
+        if (!arr) continue;
+        for (let j = 0; j < arr.length; j++) {
+          const g = arr[j];
+          const d = (g.lat === lat && g.lng === lng) ? 0 : haversine(lat, lng, g.lat, g.lng) * 1000;
+          if (d <= radiusM && d < bestD) { best = g; bestD = d; }
+        }
+      }
     }
-    return true;
-  });
-  return contracts.concat(filterLegacyDuplicatesAgainstMaster_(filteredOthers));
+    if (best) { best.members.push(it); continue; }
+    const g = { lat: lat, lng: lng, members: [it] };
+    groups.push(g);
+    const k = cy + ':' + cx;
+    let arr = grid.get(k);
+    if (!arr) { arr = []; grid.set(k, arr); }
+    arr.push(g);
+  }
+  return groups.map(function(g) { return g.members; });
+}
+/* ★ v70: 여러 상태 중 핀 색으로 쓸 '가장 높은' 상태. 순서는 PIN_STATUS_PRIORITY 한 곳에서만 정한다.
+   목록에 없는 값은 맨 뒤로 친다. 빈 목록이면 'none'. */
+function statusPriorityRank_(status) {
+  const i = PIN_STATUS_PRIORITY.indexOf(status);
+  return i === -1 ? PIN_STATUS_PRIORITY.length : i;
+}
+function highestPriorityStatus_(statuses) {
+  let best = 'none', bestRank = Infinity;
+  for (let i = 0; i < (statuses || []).length; i++) {
+    const r = statusPriorityRank_(statuses[i]);
+    if (r < bestRank) { bestRank = r; best = statuses[i]; }
+  }
+  return best;
 }
 function nameSimilarity(a, b) {
   if (!a || !b) return 0;
@@ -1931,10 +2155,20 @@ function getEffectiveStatus(store) {
     const aggData = targetStoresMap[store._key];
     if (aggData && aggData.lastStatus) {
       if (isContractGrade(store.grade)) return "contract";
+      // ★ v70: '전체' 보기에선 마지막 파트너가 아니라 파트너들 중 가장 높은 상태로 칠한다
+      if (selectedAdminPartner === 'all') return adminPinStatusForStore_(store._key, aggData.lastStatus);
       return aggData.lastStatus;
     }
   }
   return getVisitStatus(store);
+}
+/* ★ v70: 관리자 '전체' 핀 색 = 그 업장을 기록한 파트너들의 상태 중 가장 높은 것(highestPriorityStatus_).
+   예전엔 마지막에 기록한 파트너의 상태였다(A 유효리드 뒤에 B 가 단순방문을 남기면 단순방문으로 보였다).
+   파트너가 1명이면 예전과 같다. 리드 상태 재정의 때는 이 함수와 PIN_STATUS_PRIORITY 만 보면 된다. */
+function adminPinStatusForStore_(storeKey, fallbackStatus) {
+  const list = _adminPartnerIdx[storeKey];
+  if (!list || list.length < 2) return fallbackStatus;
+  return highestPriorityStatus_(list.map(function(x) { return x.status; }));
 }
 // ★ 조합필터: DOM의 선택 상태를 읽어서 partnerComboFilter 객체로 변환
 /* ★ v68: 업종(bt) · 면적(ar) — stores_light 에 2026-10-06 백필로 들어온 필드.
@@ -2233,6 +2467,8 @@ function bindQuickCategoryChips_() {
       partnerComboFilter.category = arr;
       syncQuickCategoryChips_();
       updateComboFilterBadgeAndChips();
+      // ★ v70: 넓은 화면(레벨 8+)에선 프로젝트 칩에 따라 보여줄 목록 자체가 달라지므로 다시 고른다(조회 없음)
+      if (!isAdminUser && !isExternalUser && map && map.getLevel() > PARTNER_FETCH_MAX_LEVEL) { loadStoresInView(); return; }
       if (currentFilter === 'all') renderMarkers();   // 패널을 열 필요 없이 바로 반영
     };
   });
@@ -2281,15 +2517,17 @@ function bindComboFilterUI() {
     renderMarkers();
   };
 }
+/* ★ v70: 핀 그리기
+   - 같은 건물(8m 이내) 업장은 groupBySpot_() 로 묶어 핀 하나(숫자 표시)로 그린다 → 겹쳐서 위 핀만 눌리던 문제 해결
+   - 파트너도 클러스터러에 넣는다(레벨 5 이상에서만 묶임). 선택된 핀·관리자 기계약 핀만 직접 지도에 올린다.
+   - 각 핀에 _upboxMembers(묶음 구성원)를 달아 두어, 선택이 바뀔 때 그 핀만 다시 만든다(refreshMarkerSelection). */
 function renderMarkers() {
   if (markerClusterer) markerClusterer.clear();
   markers.forEach(m => m.setMap(null));
   markers = [];
   markerByKey = {};
   let shown = 0;
-  let selectedRendered = false;
-  const clusterMarkers = [];
-  const directMarkers = [];
+  const visible = [];
   const dupSuppressed = computeDupSuppressedKeys();
   for (const store of allStoresInView) {
     if (dupSuppressed[store._key]) continue; // ★ 중복의심 업장: 대표(기록 있는 UID들) 외에는 숨김
@@ -2298,37 +2536,35 @@ function renderMarkers() {
     // ★ v62: 파트너 화면 — 구분1(카테고리) + 조합필터. currentFilter는 이제 관리자 통계 전용입니다.
     if (!isAdminUser && !isExternalUser) {
       // ★ v68: 판정은 passesPartnerFilter_() 한 곳에서만 한다
-      //   (예전엔 여기와 computeComboFilterMatchCount 가 조건을 각자 써서
-      //    '적용 버튼의 개수'와 실제 핀 수가 어긋날 수 있었다)
       const flags = computeCategoryFlags_(store, status);
       if (!passesPartnerFilter_(store, partnerComboFilter, status, flags)) continue;
     } else if (currentFilter !== "all") {
       // 관리자 통계바 클릭(단순방문/유효리드/계약성사/최종불발) 전용 — v62에서도 동작 그대로 유지
       if (!isContract && status !== currentFilter) continue;
     }
-    const isSelected = selectedStore && selectedStore._key === store._key;
-    if (isSelected) selectedRendered = true;
-    const marker = createMarker(store, status, isSelected);
-    markers.push(marker);
-    markerByKey[store._key] = marker;
+    visible.push({ store: store, status: status });
     shown++;
-    // ★ v51.7: 외주도 클러스터러 사용 (선택된 핀만 직접 표시)
-    if (!isAdminUser && !isExternalUser) {
-      directMarkers.push(marker);
-    } else if (isSelected || (isAdminUser && adminViewActive && isContract)) {
-      directMarkers.push(marker);
-    } else {
-      clusterMarkers.push(marker);
-    }
   }
+  const groups = groupBySpot_(visible, SPOT_GROUP_RADIUS_M, function(e) { return e.store; });
+  let selectedRendered = false;
+  const clusterMarkers = [];
+  const directMarkers = [];
+  groups.forEach(function(members) {
+    const marker = buildMarkerForMembers_(members);
+    if (marker._upboxHasSelected && selectedStore &&
+        members.some(function(e) { return e.store._key === selectedStore._key; })) selectedRendered = true;
+    markers.push(marker);
+    members.forEach(function(e) { markerByKey[e.store._key] = marker; });
+    if (markerGoesDirect_(marker)) directMarkers.push(marker); else clusterMarkers.push(marker);
+  });
   if (selectedStore && !selectedRendered) {
-    const status = getEffectiveStatus(selectedStore);
-    const marker = createMarker(selectedStore, status, true);
+    const marker = buildExtraSelectedMarker_();
     markers.push(marker);
     markerByKey[selectedStore._key] = marker;
     directMarkers.push(marker);
   }
   if (markerClusterer && clusterMarkers.length > 0) {
+    clusterMarkers.forEach(function(m) { m._upboxInClusterer = true; });
     markerClusterer.addMarkers(clusterMarkers);
     setTimeout(function() {
       try {
@@ -2337,8 +2573,98 @@ function renderMarkers() {
       } catch(e) {}
     }, 100);
   }
-  directMarkers.forEach(function(m) { m.setMap(map); });
+  directMarkers.forEach(function(m) { m._upboxInClusterer = false; m.setMap(map); });
   document.getElementById("statusBar").textContent = shown + "개 업장 표시됨";
+}
+// 선택된 핀(또는 선택 업장을 품은 묶음 핀)과 관리자 기계약 핀은 클러스터에 넣지 않는다(예전 규칙 그대로).
+function markerGoesDirect_(marker) {
+  if (marker._upboxHasSelected) return true;
+  if (isAdminUser && adminViewActive && marker._upboxIsContract) return true;
+  if (!markerClusterer) return true;
+  return false;
+}
+function isKeySelectedOrHighlighted_(key) {
+  if (selectedStore && selectedStore._key === key) return true;
+  return !!(_highlightGroupKeys && _highlightGroupKeys.has(key));
+}
+function buildMarkerForMembers_(members) {
+  const isSelected = members.some(function(e) { return isKeySelectedOrHighlighted_(e.store._key); });
+  const marker = members.length === 1
+    ? createMarker(members[0].store, members[0].status, isSelected)
+    : createGroupMarker_(members, isSelected);
+  marker._upboxMembers = members;
+  marker._upboxHasSelected = isSelected;
+  return marker;
+}
+// 지금 화면 목록에 없는 업장을 선택했을 때(검색 결과 등) 그 업장만 따로 그리는 핀
+function buildExtraSelectedMarker_() {
+  const status = getEffectiveStatus(selectedStore);
+  const marker = createMarker(selectedStore, status, true);
+  marker._upboxMembers = [{ store: selectedStore, status: status }];
+  marker._upboxHasSelected = true;
+  marker._upboxExtra = true;
+  return marker;
+}
+function removeMarkerFromMap_(m) {
+  if (!m) return;
+  if (m._upboxInClusterer && markerClusterer) {
+    try { markerClusterer.removeMarker(m); } catch(e) { m.setMap(null); }
+  } else {
+    m.setMap(null);
+  }
+}
+function placeMarker_(m) {
+  if (markerGoesDirect_(m)) { m._upboxInClusterer = false; m.setMap(map); }
+  else { m._upboxInClusterer = true; markerClusterer.addMarker(m); }
+}
+/* ★ v70: 선택이 바뀔 때 전체 핀을 다시 만들지 않고, 해당 키가 속한 핀만 바꿔 끼운다.
+   (예전엔 업장 하나 누를 때마다 수천 개 핀 + SVG 를 다시 만들었고, 관리자는 기계약 재조회까지 돌았다) */
+function refreshMarkersForKeys_(keys) {
+  if (!map) return;
+  const done = new Set();
+  (keys || []).forEach(function(key) {
+    if (!key) return;
+    const old = markerByKey[key];
+    if (!old || done.has(old)) return;
+    done.add(old);
+    if (old._upboxExtra) {
+      if (!(selectedStore && selectedStore._key === key)) {   // 더는 선택이 아니면 따로 그린 핀은 치운다
+        removeMarkerFromMap_(old);
+        delete markerByKey[key];
+        const i = markers.indexOf(old);
+        if (i !== -1) markers.splice(i, 1);
+      }
+      return;
+    }
+    const fresh = buildMarkerForMembers_(old._upboxMembers);
+    removeMarkerFromMap_(old);
+    const i = markers.indexOf(old);
+    if (i !== -1) markers[i] = fresh; else markers.push(fresh);
+    fresh._upboxMembers.forEach(function(e) { markerByKey[e.store._key] = fresh; });
+    placeMarker_(fresh);
+    done.add(fresh);
+  });
+  // 새로 선택된 업장이 화면 목록에 없으면 따로 하나 그린다
+  if (selectedStore && !markerByKey[selectedStore._key]) {
+    const m = buildExtraSelectedMarker_();
+    markers.push(m);
+    markerByKey[selectedStore._key] = m;
+    m._upboxInClusterer = false;
+    m.setMap(map);
+  }
+}
+/* ★ v70: MarkerImage 메모 — 같은 색·테두리·글자·크기면 SVG·base64·MarkerImage 를 다시 만들지 않는다.
+   핀 수천 개를 그릴 때 실제로 만들어지는 이미지는 수십 종뿐이다. 400종을 넘으면 비운다(메모리 상한). */
+function getMarkerImage_(w, h, anchorX, anchorY, color, strokeColor, strokeWidth, labelLines, strokeDash) {
+  const key = [w, h, anchorX, anchorY, color, strokeColor, strokeWidth, strokeDash || '', (labelLines || []).join('\u0001')].join('|');
+  let img = _markerImageCache.get(key);
+  if (img) return img;
+  const svg = buildPinSvg(w, h, color, strokeColor, strokeWidth, labelLines, strokeDash);
+  const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+  img = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(w, h), { offset: new kakao.maps.Point(anchorX, anchorY) });
+  if (_markerImageCache.size >= 400) _markerImageCache.clear();
+  _markerImageCache.set(key, img);
+  return img;
 }
 function createMarker(store, status, isSelected) {
   const position = new kakao.maps.LatLng(store.lat, store.lng);
@@ -2375,9 +2701,7 @@ function createMarker(store, status, isSelected) {
     strokeWidth = 3;
     strokeDash = '3,2';
   }
-  const svg = buildPinSvg(w, h, color, strokeColor, strokeWidth, labelLines, strokeDash);
-  const imageSrc = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
-  const markerImage = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(w, h), { offset: new kakao.maps.Point(anchorX, anchorY) });
+  const markerImage = getMarkerImage_(w, h, anchorX, anchorY, color, strokeColor, strokeWidth, labelLines, strokeDash);   // ★ v70: 메모
   const marker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: zIdx });
   marker._upboxStatus = status;
   marker._upboxStoreKey = store._key;
@@ -2392,6 +2716,49 @@ function createMarker(store, status, isSelected) {
       }, 300);
     } else {
       openPanel(store);
+    }
+  });
+  return marker;
+}
+/* ★ v70: 같은 건물 묶음 핀 — 숫자(업장 수)를 적고 짙은 남색 테두리로 낱개 핀과 구별한다.
+   색 = 구성원 상태 중 가장 높은 것(highestPriorityStatus_). 누르면 목록(openSpotGroupPanel_). */
+function createGroupMarker_(members, isSelected) {
+  const first = members[0].store;
+  const position = new kakao.maps.LatLng(first.lat, first.lng);
+  const status = highestPriorityStatus_(members.map(function(e) { return e.status; }));
+  const color = getStatusColor(status);
+  const n = members.length;
+  const labelLines = [n > 99 ? '99+' : String(n)];
+  let w, h, anchorX, anchorY, zIdx, strokeColor, strokeWidth;
+  if (isSelected) {
+    w = 34; h = 42; anchorX = 17; anchorY = 42; zIdx = 1000;
+    strokeColor = '#1a1a1a'; strokeWidth = 2.5;
+  } else {
+    w = 28; h = 35; anchorX = 14; anchorY = 35; zIdx = 2;
+    strokeColor = '#363859'; strokeWidth = 2.6;
+  }
+  let strokeDash = '';
+  if (!isSelected && status === 'none' &&
+      members.some(function(e) { return e.status === 'none' && isOtherPartnerActive(e.store); })) {
+    strokeColor = '#07e81a';
+    strokeWidth = 3;
+    strokeDash = '3,2';
+  }
+  const markerImage = getMarkerImage_(w, h, anchorX, anchorY, color, strokeColor, strokeWidth, labelLines, strokeDash);
+  const marker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: zIdx, title: '같은 위치 업장 ' + n + '곳' });
+  marker._upboxStatus = status;
+  marker._upboxStoreKey = first._key;
+  marker._upboxIsContract = members.some(function(e) { return isContractGrade(e.store.grade); });
+  kakao.maps.event.addListener(marker, "click", function() {
+    if (isAdminUser && map.getLevel() >= CLUSTER_MIN_LEVEL) {
+      map.setCenter(position);
+      map.setLevel(4);
+      setTimeout(function() {
+        openSpotGroupPanel_(members);
+        renderAdminView();
+      }, 300);
+    } else {
+      openSpotGroupPanel_(members);
     }
   });
   return marker;
@@ -2525,21 +2892,38 @@ function buildWasteBadgesHtml_(store) {
   if (items.length === 0) return '';
   return '<div class="waste-badges-row">' + items.join('') + '</div>';
 }
-async function openPanel(store) {
+/* ★ v70: stores/<key> 상세를 세션 동안 기억한다(같은 업장을 다시 눌러도 재조회 없음).
+   동시에 여러 번 불려도 요청은 한 번만 나간다(약속 자체를 저장). 실패하면 기억하지 않는다. */
+function getStoreDetail_(key) {
+  if (_storeDetailCache.has(key)) return _storeDetailCache.get(key);
+  const p = db.ref("stores/" + key).once("value")
+    .then(function(snap) { return snap.val(); })
+    .catch(function() { _storeDetailCache.delete(key); return null; });
+  _storeDetailCache.set(key, p);
+  return p;
+}
+// opts.fromGroup: 같은 건물 목록에서 들어왔으면 그 목록(구성원 배열) — 맨 위에 '목록으로' 버튼을 단다
+async function openPanel(store, opts) {
+  const mySeq = ++_panelSeq;   // ★ v70: 빠르게 연달아 누르면 마지막 것만 그린다
+  const fromGroup = (opts && opts.fromGroup) ? opts.fromGroup : null;
   rvInstance = null;
   currentRvState = 'collapsed';
   const previousKey = selectedStore ? selectedStore._key : null;
+  const prevHighlight = _highlightGroupKeys;
+  _highlightGroupKeys = null;
+  _currentSpotGroup = fromGroup;
   selectedStore = store;
-  if (previousKey !== store._key) refreshMarkerSelection(previousKey, store._key);
+  if (previousKey !== store._key || prevHighlight) {
+    refreshMarkerSelection(previousKey, store._key);
+    if (prevHighlight) refreshMarkersForKeys_(Array.from(prevHighlight).slice(0, 1));
+  }
   const panel = document.getElementById("storePanel");
   const content = document.getElementById("panelContent");
   content.innerHTML = '<h2 style="color:#999;">업장 정보 불러오는 중...</h2>';
   panel.classList.add("open");
-  try {
-    const detailSnap = await db.ref("stores/" + store._key).once("value");
-    const detail = detailSnap.val();
-    if (detail) store = Object.assign({}, detail, store);
-  } catch(e) {}
+  const detail = await getStoreDetail_(store._key);   // ★ v70: 세션 메모
+  if (mySeq !== _panelSeq) return;                     // 그 사이 다른 업장/목록을 열었다
+  if (detail) store = Object.assign({}, detail, store);
   selectedStore = store;
   const isContract = isContractGrade(store.grade);
   const closedFlag = isClosed(store);
@@ -2605,36 +2989,208 @@ async function openPanel(store) {
   const visitFormHtml = isContract ? '' : buildVisitForm();
   // ★ v55: 순서 재배치 — 업장명 → 주소 → 폐기물배지 → 로드뷰 → 배지/서비스 → 정보테이블(회색라인 포함)
   const wasteBadgesHtml = buildWasteBadgesHtml_(store);
+  // ★ v70: 같은 건물 목록에서 왔으면 되돌아가기, 관리자는 접촉 파트너 목록을 맨 위에
+  const backHtml = fromGroup
+    ? '<button type="button" class="v70-back" id="v70BackToGroup">‹ 목록으로 (' + fromGroup.length + '곳)</button>'
+    : '';
+  const partnerListHtml = buildAdminPartnerListHtml_(store);
   content.innerHTML =
+    backHtml +
     '<h2>' + escapeHtml(store.name || '(이름 없음)') + '</h2>' +
     '<div class="addr">' + escapeHtml(store.address || '') + '</div>' +
+    partnerListHtml +
     wasteBadgesHtml +
     roadviewHtml +
     '<div class="badges">' + adminBadge + gradeBadge + closedBadge + '</div>' +
     projectsBadgeHtml + adminInfoHtml + otherContactHtml + serviceHtml +
     infoHtml + memoHtml + priceGuideBtnHtml + navBtnHtml + visitFormHtml;
   if (!isContract) { loadMyVisit(store); bindVisitForm(store); }
+  const backBtn = document.getElementById('v70BackToGroup');
+  if (backBtn) backBtn.onclick = function() { openSpotGroupPanel_(fromGroup); };
+  content.querySelectorAll('.v70-row[data-pk]').forEach(function(btn) {
+    btn.onclick = function() { openPartnerRecordView_(store, btn.dataset.pk, fromGroup); };
+  });
 }
+// ★ v70: 전체 다시 그리기(renderAdminView/renderMarkers) 대신 바뀐 두 핀만 바꿔 끼운다.
 function refreshMarkerSelection(previousKey, newKey) {
-  if (isAdminUser) {
-    renderAdminView();
-  } else if (isExternalUser) {
-    // ★ v51.7
-    renderExternalView();
-  } else {
-    renderMarkers();
-  }
+  refreshMarkersForKeys_([previousKey, newKey]);
 }
 function closePanel(clearSelection) {
   document.getElementById("storePanel").classList.remove("open");
   rvInstance = null;
   currentRvState = 'collapsed';
-  if (clearSelection && selectedStore) {
+  _panelSeq++;   // ★ v70: 닫은 뒤 늦게 도착한 상세가 패널을 다시 채우지 않게
+  if (clearSelection && (selectedStore || _highlightGroupKeys)) {
+    const prevKey = selectedStore ? selectedStore._key : null;
+    const prevHighlight = _highlightGroupKeys;
     selectedStore = null;
-    if (isAdminUser) renderAdminView();
-    else if (isExternalUser) renderExternalView(); // ★ v51.7
-    else renderMarkers();
+    _highlightGroupKeys = null;
+    _currentSpotGroup = null;
+    refreshMarkersForKeys_([prevKey].concat(prevHighlight ? Array.from(prevHighlight).slice(0, 1) : []));
   }
+}
+/* ★ v70: 상태 배지 — 색만으로 구분하지 않도록 기호 + 글자를 같이 쓴다. 밝은 바탕엔 어두운 글자. */
+const STATUS_SHAPES_ = { success: '✔', lead: '◆', visit: '●', simpleContact: '○', fail: '✕', closedByMe: '■', contract: '★', none: '–' };
+function readableTextOn_(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return '#fff';
+  const n = parseInt(m[1], 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function(v) {
+    v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  const L = 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  return L > 0.35 ? '#1a1a1a' : '#fff';
+}
+function statusBadgeHtml_(status) {
+  const color = getStatusColor(status);
+  return '<span class="v70-status" style="background:' + color + ';color:' + readableTextOn_(color) + ';">' +
+         '<span aria-hidden="true">' + (STATUS_SHAPES_[status] || '–') + '</span>' + escapeHtml(getStatusLabel(status)) + '</span>';
+}
+/* ★ v70: 같은 건물 목록 — 행 = 업장명 · 상태(기호+글자) · 주소. 행을 누르면 평소 업장 패널(방문기록 폼)로 간다.
+   주소는 stores_light 에 없어서 검색 인덱스(받아 둔 경우) → stores/<key> 상세(세션 메모) 순으로 채운다. */
+const SPOT_ADDR_AUTOFILL_MAX_ = 30;
+function openSpotGroupPanel_(members) {
+  if (!members || !members.length) return;
+  _panelSeq++;
+  rvInstance = null;
+  currentRvState = 'collapsed';
+  const prevKey = selectedStore ? selectedStore._key : null;
+  const prevHighlight = _highlightGroupKeys;
+  selectedStore = null;
+  _currentSpotGroup = members;
+  _highlightGroupKeys = new Set(members.map(function(e) { return e.store._key; }));
+  refreshMarkersForKeys_([prevKey, members[0].store._key].concat(prevHighlight ? Array.from(prevHighlight).slice(0, 1) : []));
+  // 상태가 높은 순, 같으면 이름순
+  const rows = members.slice().sort(function(a, b) {
+    const r = statusPriorityRank_(a.status) - statusPriorityRank_(b.status);
+    if (r) return r;
+    return String(a.store.name || '').localeCompare(String(b.store.name || ''), 'ko');
+  });
+  const idx = _searchIndexData || null;
+  const content = document.getElementById("panelContent");
+  content.innerHTML =
+    '<h2>같은 위치 업장 ' + members.length + '곳</h2>' +
+    '<div class="addr">한 건물이거나 좌표가 ' + SPOT_GROUP_RADIUS_M + 'm 안으로 겹치는 업장입니다. 업장을 눌러 기록하세요.</div>' +
+    '<ul class="v70-list" aria-label="같은 위치 업장 목록">' +
+    rows.map(function(e, i) {
+      const s = e.store;
+      const ie = idx && idx[s._key];
+      const addr = s.address || (ie ? (ie.a || ie.r || '') : '') || (i < SPOT_ADDR_AUTOFILL_MAX_ ? '주소 불러오는 중…' : '눌러서 상세 보기');
+      return '<li><button type="button" class="v70-row" data-i="' + i + '">' +
+        '<span class="v70-row-main">' +
+          '<span class="v70-row-title" style="display:block;">' + escapeHtml(s.name || '(이름 없음)') + '</span>' +
+          '<span class="v70-row-sub" style="display:block;" data-addr-i="' + i + '">' + escapeHtml(addr) + '</span>' +
+        '</span>' + statusBadgeHtml_(e.status) +
+        '<span class="v70-row-arrow" aria-hidden="true">›</span></button></li>';
+    }).join('') +
+    '</ul>';
+  document.getElementById("storePanel").classList.add("open");
+  content.querySelectorAll('.v70-row[data-i]').forEach(function(btn) {
+    const e = rows[Number(btn.dataset.i)];
+    btn.onclick = function() { openPanel(e.store, { fromGroup: members }); };
+  });
+  const mySeq = _panelSeq;
+  rows.forEach(function(e, i) {
+    if (i >= SPOT_ADDR_AUTOFILL_MAX_) return;   // 큰 묶음(최대 87곳 실측)은 앞쪽만 미리 채운다 — 상세 조회 폭주 방지
+    const s = e.store;
+    const ie = idx && idx[s._key];
+    if (s.address || (ie && (ie.a || ie.r))) return;
+    getStoreDetail_(s._key).then(function(d) {
+      if (mySeq !== _panelSeq) return;
+      const el = content.querySelector('[data-addr-i="' + i + '"]');
+      if (el) el.textContent = (d && (d.address || d.roadAddress)) || '주소 정보 없음';
+    });
+  });
+}
+/* ★ v70(관리자): 이 업장을 기록한 파트너 목록 — 최신 접촉순. 핀 색은 그중 가장 높은 상태다.
+   데이터: visits_aggregate.byPartner.<pk>.stores.<storeKey> = {lastStatus, lastUpdatedAt} 를 뒤집은 _adminPartnerIdx */
+function buildAdminPartnerListHtml_(store) {
+  if (isExternalUser || !isAdminUser || !adminViewActive) return '';
+  const list = _adminPartnerIdx[store._key];
+  if (!list || !list.length) return '';
+  const head = '<div class="v70-list-head"><span>접촉 파트너 ' + list.length + '명' +
+    (list.length >= 2 ? ' · 핀 색은 가장 높은 상태' : '') + '</span></div>';
+  return head + '<ul class="v70-list" aria-label="접촉 파트너 목록">' + list.map(function(x) {
+    return '<li><button type="button" class="v70-row" data-pk="' + escapeHtml(x.pk) + '">' +
+      '<span class="v70-row-main">' +
+        '<span class="v70-row-title" style="display:block;">' + escapeHtml(x.name) + '</span>' +
+        '<span class="v70-row-sub" style="display:block;">마지막 접촉 ' + escapeHtml(x.at ? formatDate(x.at) : '-') + '</span>' +
+      '</span>' + statusBadgeHtml_(x.status) +
+      '<span class="v70-row-arrow" aria-hidden="true">›</span></button></li>';
+  }).join('') + '</ul>';
+}
+/* ★ v70(관리자): 파트너 한 명의 이 업장 기록(읽기 전용). recKey 규칙은 buildWasteRecKey_ 와 같다
+   (2026-10-13 visits 3,218건 전수 확인: 예외 0건). 폐기물 3종을 한 번에 읽는다(각 1건, 수 KB). */
+async function loadPartnerRecordsForStore_(pk, storeKey) {
+  const out = await Promise.all(WASTE_TYPES.map(function(w) {
+    const recKey = buildWasteRecKey_(pk, storeKey, w.code);
+    return db.ref('visits/' + pk + '/' + recKey).once('value')
+      .then(function(snap) { const v = snap.val(); return v ? { wasteType: w.code, recKey: recKey, rec: v } : null; })
+      .catch(function() { return null; });
+  }));
+  return out.filter(Boolean);
+}
+const PARTNER_REC_FIELDS_ = [
+  ['currentStoreName', '현재 수거·운반 업체'], ['contact', '담당자 연락처'], ['amount', '월 예상배출량'],
+  ['price', '현재 단가'], ['suggestedPrice', '제안 단가'], ['freq', '주 수거횟수'], ['bins', '통 갯수'],
+  ['vinyl', '비닐 사용여부'], ['truck', '5톤 차량 진입'], ['repriority', '성사가능성'], ['salesType', '영업구분'],
+  ['contactMethod', '접촉방식'], ['expectedContractDate', '예상계약일자'], ['outcome', '최종영업결과'],
+  ['failReason', '불발사유'], ['failReasonEtc', '기타 불발사유'], ['note', '상세 상담내용']
+];
+async function openPartnerRecordView_(store, pk, fromGroup) {
+  const mySeq = ++_panelSeq;
+  const content = document.getElementById("panelContent");
+  const bp = (visitsAggregate && visitsAggregate.byPartner) || {};
+  const pName = (bp[pk] && bp[pk].partnerName) || pk;
+  const back = '<button type="button" class="v70-back" id="v70BackToStore">‹ 업장으로</button>';
+  const head = '<h2>' + escapeHtml(pName) + '</h2><div class="addr">' + escapeHtml(store.name || '') + ' · 파트너 기록 (읽기 전용)</div>';
+  content.innerHTML = back + head + '<div class="contact-info">기록 불러오는 중...</div>';
+  const bindBack = function() {
+    const b = document.getElementById('v70BackToStore');
+    if (b) b.onclick = function() { openPanel(store, fromGroup ? { fromGroup: fromGroup } : undefined); };
+  };
+  bindBack();
+  const recs = await loadPartnerRecordsForStore_(pk, store._key);
+  if (mySeq !== _panelSeq) return;
+  if (!recs.length) {
+    content.innerHTML = back + head + '<div class="contact-info">이 파트너의 기록을 찾지 못했습니다(삭제됐거나 집계가 아직 갱신되지 않았을 수 있습니다).</div>';
+    bindBack();
+    return;
+  }
+  const wLabel = function(code) { const w = WASTE_TYPES.find(function(x) { return x.code === code; }); return w ? w.label : code; };
+  const blocks = recs.map(function(r) {
+    const rec = r.rec || {};
+    const cur = rec.current || {};
+    const status = classifyVisitCurrent(cur);
+    const labels = WASTE_FIELD_LABELS[r.wasteType] || WASTE_FIELD_LABELS[WASTE_TYPE_DEFAULT];
+    const rows = PARTNER_REC_FIELDS_.map(function(f) {
+      const v = cur[f[0]];
+      if (v === undefined || v === null || String(v).trim() === '') return '';
+      const k = (f[0] === 'amount' || f[0] === 'price' || f[0] === 'suggestedPrice') ? labels[f[0]] : f[1];
+      return '<div class="info-row"><span class="info-key">' + escapeHtml(k) + '</span><span class="info-value" style="white-space:pre-wrap;">' + escapeHtml(v) + '</span></div>';
+    }).join('');
+    const first = rec.firstVisitAt ? formatDate(rec.firstVisitAt) : '-';
+    const last = rec.lastUpdatedAt ? formatDate(rec.lastUpdatedAt) : '-';
+    let hist = rec.history || [];
+    if (!Array.isArray(hist)) hist = Object.keys(hist).map(function(k) { return hist[k]; });
+    hist = hist.filter(Boolean).slice().sort(function(a, b) { return (Number(b.savedAt || b.updatedAt) || 0) - (Number(a.savedAt || a.updatedAt) || 0); });
+    const histHtml = hist.length
+      ? '<details class="v70-hist"><summary>이전 기록 ' + hist.length + '건 보기</summary>' + hist.map(function(h) {
+          const hs = classifyVisitCurrent(h);
+          const when = formatDate(h.savedAt || h.updatedAt) || '-';
+          const note = String(h.note || '').trim();
+          return '<div class="v70-hist-item">' + escapeHtml(when) + ' · ' + statusBadgeHtml_(hs) +
+                 (note ? '<div style="white-space:pre-wrap;margin-top:3px;">' + escapeHtml(note.slice(0, 300)) + '</div>' : '') + '</div>';
+        }).join('') + '</details>'
+      : '';
+    return '<div class="visit-form" style="margin-top:6px;">' +
+      '<h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + escapeHtml(wLabel(r.wasteType)) + ' ' + statusBadgeHtml_(status) + '</h3>' +
+      '<div class="visit-dates">최초 방문: ' + escapeHtml(first) + ' · 마지막 수정: ' + escapeHtml(last) + '</div>' +
+      '<div class="v70-rec-table">' + (rows || '<div class="info-row"><span class="info-value" style="color:#999;">입력된 항목 없음</span></div>') + '</div>' +
+      histHtml + '</div>';
+  }).join('');
+  content.innerHTML = back + head + blocks;
+  bindBack();
 }
 function toggleRoadview() {
   const body = document.getElementById("rvBody");
@@ -3365,6 +3921,7 @@ async function saveVisit(store) {
       };
     }
     await withTimeout_(recRef.set(payload), SAVE_TIMEOUT_MS_, '저장');
+    notifyVisitSaved_(currentUser.key, recKey);   // ★ v69→v70 이식: 시트·슬랙 즉시 반영 (응답 안 기다림)
 
     // 성공 — 남아있던 초안은 더 이상 필요 없습니다.
     clearDraft_(store._key, wasteType);
@@ -3375,6 +3932,7 @@ async function saveVisit(store) {
     if (!myVisitedStoreDataByType[store._key]) myVisitedStoreDataByType[store._key] = {};
     myVisitedStoreDataByType[store._key][wasteType] = payload;
     myVisitedStoreData[store._key] = pickRepresentativeVisitRecord_(myVisitedStoreDataByType[store._key]);
+    _visitsRev++;   // ★ v70: 검색 중복억제 캐시 무효화
     if (isAdminUser) renderAdminView(); else renderMarkers();
     updateChipCounts();
 
@@ -3494,9 +4052,11 @@ function getMatchGrade(nameNorm, addrNorm, roadNorm, queryVariants) {
  *  → 본문은 IndexedDB(용량 넉넉)에 넣고, 열 때 먼저 meta.version 만 읽어
  *    같으면 16MB를 건너뛴다. IndexedDB 가 막힌 환경이면 예전 경로로 조용히 되돌아간다.
  */
-const IDB_NAME = 'upboxSalesMap', IDB_STORE = 'cache', IDB_IDX_KEY = 'search_index_v1';
+// (IDB_NAME · IDB_STORE · IDB_IDX_KEY 상수는 v70 에서 스크립트 위쪽 CACHE 옆으로 옮겼다 — TDZ 방지)
+let _idbDbPromise = null;   // ★ v70: DB 연결을 한 번만 연다
 function _idbOpen_() {
-  return new Promise(function(resolve) {
+  if (_idbDbPromise) return _idbDbPromise;
+  _idbDbPromise = new Promise(function(resolve) {
     try {
       if (!window.indexedDB) { resolve(null); return; }
       const req = indexedDB.open(IDB_NAME, 1);
@@ -3507,7 +4067,8 @@ function _idbOpen_() {
       req.onsuccess = function() { resolve(req.result); };
       req.onerror   = function() { resolve(null); };
     } catch(e) { resolve(null); }
-  });
+  }).then(function(d) { if (!d) _idbDbPromise = null; return d; });
+  return _idbDbPromise;
 }
 function _idbGet_(key) {
   return _idbOpen_().then(function(d) {
@@ -3533,6 +4094,18 @@ function _idbPut_(key, val) {
     });
   });
 }
+function _idbDel_(key) {
+  return _idbOpen_().then(function(d) {
+    if (!d) return false;
+    return new Promise(function(resolve) {
+      try {
+        const r = d.transaction(IDB_STORE, 'readwrite').objectStore(IDB_STORE).delete(key);
+        r.onsuccess = function() { resolve(true); };
+        r.onerror   = function() { resolve(false); };
+      } catch(e) { resolve(false); }
+    });
+  });
+}
 async function _fetchIdxVer_() {
   try {
     const snap = await db.ref('search_index/meta/version').once('value');
@@ -3540,7 +4113,21 @@ async function _fetchIdxVer_() {
     return v ? String(v) : null;
   } catch(e) { return null; }   // 못 읽으면 그냥 받는다
 }
-
+/* ★ v70: 이 단말에서 방금 등록한 업장(검색 인덱스 버전이 다음 날 04시에야 오르므로 캐시본엔 없다)을
+   IndexedDB 의 작은 덧붙임 목록(IDB_IDX_ADDS_KEY)에 따로 두고, 인덱스를 열 때마다 끼워 넣는다.
+   서버본을 새로 받으면 거기 이미 들어 있는 항목은 덧붙임 목록에서 지운다. */
+async function _mergeSearchIndexAdds_(data, freshFromServer) {
+  try {
+    const adds = await _idbGet_(IDB_IDX_ADDS_KEY);
+    if (!adds || !adds.entries) return;
+    let changed = false;
+    for (const k in adds.entries) {
+      if (data[k]) { if (freshFromServer) { delete adds.entries[k]; changed = true; } continue; }
+      data[k] = adds.entries[k];
+    }
+    if (changed) _idbPut_(IDB_IDX_ADDS_KEY, adds);
+  } catch(e) {}
+}
 async function loadSearchIndex() {
   if (_searchIndexData) return _searchIndexData;
   if (_searchIndexLoadPromise) return _searchIndexLoadPromise;
@@ -3549,7 +4136,9 @@ async function loadSearchIndex() {
     const srvVer = await _fetchIdxVer_();                 // 486바이트
     const hit = await _idbGet_(IDB_IDX_KEY);
     if (hit && hit.data && srvVer && hit.version === srvVer) {
+      await _mergeSearchIndexAdds_(hit.data, false);
       _searchIndexData = hit.data;
+      _searchIndexVersion = srvVer;
       console.log('[search_index] 버전 동일(' + srvVer + ') → 16MB 건너뜀, ' +
                   Object.keys(hit.data).length + '개');
       return _searchIndexData;
@@ -3558,8 +4147,10 @@ async function loadSearchIndex() {
     try {
       const snap = await db.ref('search_index/stores').once('value');
       const data = snap.val() || {};
-      _searchIndexData = data;
       const saved = await _idbPut_(IDB_IDX_KEY, { version: srvVer, data: data, t: Date.now() });
+      await _mergeSearchIndexAdds_(data, true);   // 저장 뒤에 끼워 넣는다(캐시본은 서버본 그대로)
+      _searchIndexData = data;
+      _searchIndexVersion = srvVer;
       console.log('[search_index] 다운로드 완료: ' + Object.keys(data).length + '개, 캐시 저장 ' + saved);
       return data;
     } catch(e) {
@@ -3572,35 +4163,62 @@ async function loadSearchIndex() {
   return _searchIndexLoadPromise;
 }
 /* ★ v67: 방금 등록한 업장을 이 단말의 search_index 캐시에 즉시 끼워넣는다.
- *   서버(firebase_sync v13.4)는 등록 즉시 search_index/stores에 PATCH 하지만,
- *   파트너 단말은 그 인덱스를 localStorage에 6시간 TTL로 캐싱하므로
- *   이 처리가 없으면 "지도엔 핀이 보이는데 이름으로 검색하면 안 나오는" 상태가
- *   최대 6시간 지속된다. 캐시를 통째로 버리면 13MB를 다시 받아야 하니
- *   항목 하나만 추가한다.
  *   ⚠️ 키 변환은 Apps Script safeFbKey와 같은 규칙을 써야 한다. */
 function safeFbKeyClient_(uid) {
   // Firebase 공식 금지 6문자만 치환 (Apps Script safeFbKey와 동일 규칙).
   // recKey는 'NEW_<숫자>_<파트너코드>' 형태라 제어문자가 들어올 여지가 없다.
   return String(uid || '').replace(/[.#$\/\[\]]/g, '_');
 }
+/* ★ v70: v68 이 검색 인덱스를 IndexedDB 로 옮기면서 이 함수만 빠뜨렸다 — 여전히 localStorage(setCache)에
+   16MB 를 쓰려다 조용히 실패했고, 그 과정에서 setCache 비상 정리가 다른 캐시를 지웠다.
+   이제 메모리 인덱스에 바로 넣고, IndexedDB 의 작은 덧붙임 목록에도 남긴다(다시 열어도 검색됨). */
 function addToSearchIndexCache_(recKey, entry) {
   try {
     const k = safeFbKeyClient_(recKey);
     if (!k || !entry || isNaN(entry.lat) || isNaN(entry.lng)) return false;
-    // 아직 인덱스를 한 번도 안 받았으면 건드릴 캐시가 없다 —
-    // 다음에 받을 때 서버본에 이미 들어 있으므로 아무것도 안 해도 된다.
-    if (!_searchIndexData) {
-      const cached = getCache(CACHE.SEARCH_INDEX);
-      if (!cached) return false;
-      _searchIndexData = cached;
+    if (_searchIndexData) {
+      _searchIndexData[k] = entry;
+      if (_searchPrep && _searchPrep.src === _searchIndexData) {
+        _searchPrep.rows.push({ k: k, s: entry, nN: normalizeText(entry.n), aN: normalizeText(entry.a), rN: normalizeText(entry.r) });
+      }
     }
-    _searchIndexData[k] = entry;
-    setCache(CACHE.SEARCH_INDEX, _searchIndexData);
-    console.log('[search_index] 신규 등록 1건 캐시 반영: ' + k);
+    _idbGet_(IDB_IDX_ADDS_KEY).then(function(adds) {
+      adds = (adds && adds.entries) ? adds : { entries: {} };
+      adds.entries[k] = entry;
+      adds.t = Date.now();
+      return _idbPut_(IDB_IDX_ADDS_KEY, adds);
+    }).then(function(ok) {
+      console.log('[search_index] 신규 등록 1건 캐시 반영: ' + k + ' (IndexedDB ' + ok + ')');
+    }).catch(function(e) { console.warn('[search_index] 덧붙임 저장 실패', e); });
     return true;
   } catch(e) { console.warn('[search_index] 캐시 반영 실패', e); return false; }
 }
+/* ★ v70: 검색 인덱스(5.4만 건)를 한 번만 정규화해 둔다. 예전엔 글자를 칠 때마다 5.4만 건 × 3필드를
+   정규식으로 다시 다듬었다. 인덱스 객체가 바뀌면(새로 받음) 다시 만든다. */
+function getSearchPrep_(indexData) {
+  if (_searchPrep && _searchPrep.src === indexData) return _searchPrep;
+  const rows = [];
+  const dupItems = [];
+  for (const k in indexData) {
+    const s = indexData[k];
+    if (!s) continue;
+    rows.push({ k: k, s: s, nN: normalizeText(s.n), aN: normalizeText(s.a), rN: normalizeText(s.r) });
+    if (s.dup) dupItems.push({ _key: k, dup: s.dup });
+  }
+  _searchPrep = { src: indexData, rows: rows, dupItems: dupItems };
+  _searchDupCache = null;
+  return _searchPrep;
+}
+// ★ v70: 중복의심 억제 목록은 인덱스와 내 방문기록·타파트너 접촉이 그대로면 다시 계산하지 않는다(_visitsRev).
+function getSearchDupSuppressed_(prep) {
+  if (isAdminUser || isExternalUser) return {};
+  if (_searchDupCache && _searchDupCache.src === prep.src && _searchDupCache.rev === _visitsRev) return _searchDupCache.suppressed;
+  const suppressed = computeDupSuppressedKeysFromList(prep.dupItems, function(s) { return s._key; });
+  _searchDupCache = { src: prep.src, rev: _visitsRev, suppressed: suppressed };
+  return suppressed;
+}
 async function searchStores(q) {
+  const mySeq = ++_searchSeq;   // ★ v70: 늦게 끝난 옛 검색이 새 결과를 덮어쓰지 않게
   const resultsEl = document.getElementById('searchResults');
   if (!q || q.trim().length < SEARCH_MIN_QUERY_LEN) {
     resultsEl.style.display = 'none';
@@ -3613,13 +4231,16 @@ async function searchStores(q) {
   }
   let indexData;
   try {
-    indexData = await loadSearchIndex();
+    // ★ v70: 외주는 기계약만 보므로 contracts_index 를 받아 뒀으면 그걸로 검색한다(16MB 인덱스 불필요)
+    indexData = (isExternalUser && _contractsIndexData) ? _contractsIndexData : await loadSearchIndex();
   } catch(e) {
     console.error('[검색] 인덱스 로드 실패', e);
+    if (mySeq !== _searchSeq) return;
     resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px;">검색 인덱스 로드 실패. 잠시 후 다시 시도해주세요.</div>';
     resultsEl.style.display = 'block';
     return;
   }
+  if (mySeq !== _searchSeq) return;
   if (!indexData || Object.keys(indexData).length === 0) {
     resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px;">검색 인덱스가 비어있습니다. 관리자에게 문의해주세요.</div>';
     resultsEl.style.display = 'block';
@@ -3631,24 +4252,23 @@ async function searchStores(q) {
   if (Array.isArray(myProjectStores)) {
     myProjectStores.forEach(function(p) { if (p && p.key) myProjectStoresKeySet.add(p.key); });
   }
+  const prep = getSearchPrep_(indexData);
   // ★ 중복의심 그룹: 기록 없는 형제 UID는 검색결과에서도 제외 (지도와 동일 기준)
-  const dupSuppressedSearch = computeDupSuppressedKeysForSearch(indexData);
+  const dupSuppressedSearch = getSearchDupSuppressed_(prep);
+  const myCode = currentUser ? String(currentUser.code || '').trim() : '';
 
-  for (const fbKey in indexData) {
+  for (let i = 0; i < prep.rows.length; i++) {
+    const row = prep.rows[i];
+    const fbKey = row.k;
     if (dupSuppressedSearch[fbKey]) continue;
-    const s = indexData[fbKey];
-    if (!s) continue;
+    const s = row.s;
 
     // v52: 신규업장추가 유래 업장은 등록 파트너 본인에게만 검색 노출 (관리자 제외)
     if (s.regBy && !isAdminUser) {
-      const myCode = currentUser ? String(currentUser.code || '').trim() : '';
       if (String(s.regBy).trim() !== myCode) continue;
     }
 
-    const nameNorm = normalizeText(s.n);
-    const addrNorm = normalizeText(s.a);
-    const roadNorm = normalizeText(s.r);          // ★ 도로명주소
-    const m = getMatchGrade(nameNorm, addrNorm, roadNorm, queryVariants);
+    const m = getMatchGrade(row.nN, row.aN, row.rN, queryVariants);
     if (m.grade === 0) continue;
 
     let dist = Infinity;
@@ -3670,18 +4290,18 @@ async function searchStores(q) {
       _distKm: dist
     });
   }
-  // ★ 신규: 같은 업장의 기계약/미방문 중복 제거 (지도와 동일 규칙)
-  candidates = removeContractDuplicatesForSearch(candidates);
-  candidates.sort(function(a, b) {
+  const bySortKey = function(a, b) {
     if (a._matchGrade !== b._matchGrade) return b._matchGrade - a._matchGrade;
     return a._distKm - b._distKm;
-  });
-  // ★ v51.7: 외주 모드 — 기계약(c:true)만 노출
-  const top = (isExternalUser
-    ? candidates.filter(c => isContractGrade(c.grade))
-    : candidates
-  ).slice(0, SEARCH_MAX_RESULTS);
-  renderSearchResults(top);
+  };
+  // ★ v51.7: 외주 모드 — 기계약(c:true)만 노출 (v70: 상위 N 자르기 전에 거른다)
+  if (isExternalUser) candidates = candidates.filter(c => isContractGrade(c.grade));
+  // ★ v70: 정렬 → 상위 200건만 기계약/구행 중복 제거 → 다시 정렬. 15건만 보여주므로 결과는 사실상 같고,
+  //   '서울'처럼 수천 건 걸리는 검색에서 중복 제거 비용이 크게 준다.
+  candidates.sort(bySortKey);
+  candidates = removeContractDuplicatesForSearch(candidates.slice(0, SEARCH_DEDUP_TOP_N));
+  candidates.sort(bySortKey);
+  renderSearchResults(candidates.slice(0, SEARCH_MAX_RESULTS));
 }
 function renderSearchResults(list) {
   const resultsEl = document.getElementById("searchResults");
@@ -4022,7 +4642,8 @@ async function submitNewStore() {
       const idxEntry = { n: storeName, a: address, lat: fbLat, lng: fbLng, regBy: String(currentUser.code || '').trim() };
       if (payload.roadAddress && payload.roadAddress !== address) idxEntry.r = payload.roadAddress;
       addToSearchIndexCache_(result.recKey, idxEntry);
-      try { await loadStoresInView(); } catch(e) { console.warn('[신규등록] 지도 갱신 실패', e); }
+      // ★ v70: 파트너는 메모리 띠를 무시하고 다시 받는다. 관리자는 관리자 화면을 다시 그린다(예전엔 파트너 경로를 타서 관리자 핀이 사라졌다).
+      try { if (isAdminUser) await renderAdminView(); else await loadStoresInView({ force: true }); } catch(e) { console.warn('[신규등록] 지도 갱신 실패', e); }
     } else {
       console.error('Submit failed:', result);
       showNsToast('등록 실패: ' + (result.error || '알 수 없는 오류'));
@@ -4040,10 +4661,38 @@ async function submitNewStore() {
 // ============================================================
 // v51.7: 외주 모드 — 기계약 열람 전용
 // ============================================================
+/* ★ v70: 외주(기계약 열람 전용) — 서버의 작은 contracts_index({version, stores}) 가 있으면 그것만 받는다.
+   예전엔 기계약 몇천 곳을 고르려고 16MB search_index 전체를 받았다. 없으면(서버 반영 전) 예전 경로 그대로.
+   contracts_index 는 버전이 같으면 IndexedDB(IDB_CONTRACTS_KEY) 본을 쓴다. */
+async function loadContractsIndex_() {
+  try {
+    const verSnap = await db.ref('contracts_index/version').once('value');
+    const ver = verSnap.val();
+    if (!ver) return null;                                   // 서버에 아직 없음 → 폴백
+    const hit = await _idbGet_(IDB_CONTRACTS_KEY);
+    if (hit && hit.data && hit.version === String(ver)) return hit.data;
+    const snap = await db.ref('contracts_index/stores').once('value');
+    const data = snap.val();
+    if (!data || typeof data !== 'object' || !Object.keys(data).length) return null;
+    // 항목 모양은 search_index 와 같다. c 가 빠져 있으면 기계약으로 본다(이 노드는 기계약 전용).
+    for (const k in data) { if (data[k] && data[k].c === undefined) data[k].c = true; }
+    _idbPut_(IDB_CONTRACTS_KEY, { version: String(ver), data: data, t: Date.now() });
+    return data;
+  } catch(e) {
+    console.warn('[외주] contracts_index 읽기 실패 → search_index 로 폴백', e);
+    return null;
+  }
+}
 async function loadExternalContracts() {
   document.getElementById('statusBar').textContent = '기계약 업장 로딩 중...';
   try {
-    const indexData = await loadSearchIndex();
+    let indexData = await loadContractsIndex_();
+    if (indexData) {
+      _contractsIndexData = indexData;
+      console.log('[외주] contracts_index 사용 (16MB 인덱스 생략)');
+    } else {
+      indexData = await loadSearchIndex();
+    }
     externalContracts = [];
     for (const fbKey in indexData) {
       const s = indexData[fbKey];
