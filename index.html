@@ -8,10 +8,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<!-- ★ v72: Firebase Auth(커스텀 토큰 로그인). AUTH_ENABLED=false 면 firebase.auth() 를 한 번도 부르지 않는다 -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <!-- ★ v70: autoload=false — 지도 라이브러리를 document.write 로 동기 로드하지 않고
      kakao.maps.load() 로 받는다(kakaoReady_). 지도는 startApp 에서 이 약속이 풀린 뒤에만 만든다.
-     ⚠️ firebase 두 스크립트는 defer 하면 안 된다 — 아래 인라인 스크립트가 최상위에서 firebase.initializeApp 을 부른다. -->
+     ⚠️ firebase 스크립트(app·auth·database)는 defer 하면 안 된다 — 아래 인라인 스크립트가 최상위에서 firebase.initializeApp 을 부른다. -->
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services,clusterer&autoload=false"></script>
 <style>
   /* ★ v71: 색 토큰 — 아래 CSS 의 원래 hex 는 빌드가 이 변수로 바꿨다(값은 같음 → 화면 변화 없음).
@@ -413,6 +415,62 @@
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
                              transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
   }
+
+  /* ════ ★ v72 모바일 압축 (iPhone 14·Safari 390pt 피드백: "글씨가 너무 크다", "저장 버튼이 키보드에 가린다") ════
+     v71 블록 뒤에 같은 선택자를 다시 써서 이긴다. 입력칸 글자 16px 은 그대로(iOS 포커스 확대 방지),
+     포커스 링·대비 개선(v71)도 그대로. 칸 하나 높이 ≈ 78px → 65px, 저장 바 ≈ 112px → 76px. */
+  #panelContent { padding: 2px 14px 16px; }
+  #panelContent h2 { font-size: 17px; margin-bottom: 4px; line-height: 1.3; }
+  #panelContent .addr { font-size: 13px; margin-bottom: 6px; }
+  #panelContent .badges { margin-bottom: 6px; }
+  .info-table { padding-top: 8px; margin-bottom: 10px; }
+  .info-row { font-size: 13px; padding: 3px 0; }
+  .memo { font-size: 13px; padding: 6px 10px; margin-bottom: 10px; }
+  .contact-info { font-size: 13px; padding: 5px 10px; margin-bottom: 8px; }
+  .service { margin-bottom: 10px; }
+  .waste-badges-row { margin-bottom: 8px; }
+  .roadview-section { margin-bottom: 10px; }
+  .roadview-header { min-height: 40px; padding: 6px 12px; }
+  .priceGuideBtn, .navBtn { min-height: 44px; padding: 8px 10px; font-size: 14px; }
+  .navBtn { margin-bottom: 10px; }
+
+  /* 방문기록 폼: 라벨 12 · 입력 높이 40 · 줄간격 1.3 · 칸 사이 간격 축소 */
+  .visit-form { padding-top: 10px; }
+  .visit-form h3 { font-size: 14px; margin-bottom: 2px; }
+  .visit-dates { margin-bottom: 4px; }
+  .visit-form label { font-size: 12px; line-height: 1.3; margin: 6px 0 3px 0; }
+  .visit-form input, .visit-form select, .visit-form textarea { font-size: 16px; line-height: 1.3; padding: 6px 10px; min-height: 40px; }
+  .visit-form select { height: 40px; }
+  .visit-form textarea { min-height: 64px; }
+  .date-select-row select { padding: 6px 4px; }
+  .num-warn-msg { font-size: 12px; line-height: 1.3; margin-top: 2px; }
+  .repriority-toggle button { min-height: 40px; padding: 6px 0; }
+  .draft-notice { padding: 6px 10px; margin-bottom: 8px; }
+
+  /* 저장 바: 안내 한 줄(넘치면 … , 전체 문구는 title) + 44px 저장 버튼 */
+  .save-bar { margin: 10px -14px -16px; padding: 6px 14px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .save-bar .save-btn { margin-top: 4px; min-height: 44px; padding: 10px; font-size: 15px; }
+  .lead-hint { font-size: 12px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #storePanel.kb-open .save-bar { padding-bottom: 8px; }   /* 키보드 위에선 홈 인디케이터 여백이 필요 없다 */
+
+  /* 머리줄·필터: 손가락 영역 44px 은 유지, 글자만 13px */
+  #header .header-btn, .filter-icon-btn, .filter-chip, .applied-chip, .cf-pill { font-size: 13px; }
+
+  /* 신규업장 등록 */
+  .new-store-header h2 { font-size: 17px; }
+  .new-store-body { padding: 10px 14px 12px; }
+  .ns-stepper { padding: 8px 14px 2px; }
+  .ns-stepper li { padding-bottom: 6px; }
+  .ns-form-group { margin-bottom: 8px; }
+  .ns-form-group label { font-size: 12px; line-height: 1.3; margin-bottom: 3px; }
+  .ns-form-group input, .ns-form-group select, .ns-form-group textarea { font-size: 16px; line-height: 1.3; padding: 6px 10px; min-height: 40px; }
+  .ns-form-group select { height: 40px; }
+  .ns-search-wrapper input { font-size: 16px; line-height: 1.3; padding: 8px 12px; min-height: 40px; }
+  .ns-submit-row { padding: 8px 14px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .ns-submit-row button { min-height: 44px; padding: 10px; }
+  .new-store-modal.kb-open { padding: 0; }
+  .new-store-modal.kb-open .new-store-content { margin: 8px; }
+  .new-store-modal.kb-open .ns-submit-row { padding-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -567,7 +625,7 @@
     <input type="text" id="loginName" placeholder="파트너명">
     <input type="text" id="loginCode" placeholder="파트너사 코드">
     <button id="loginBtn">로그인</button>
-    <div class="login-error" id="loginError"></div>
+    <div class="login-error" id="loginError" role="alert" aria-live="assertive"></div>
   </div>
 </div>
 <div id="storePanel">
@@ -774,12 +832,37 @@ window.addEventListener('error', function(ev) {
   } catch(e) {}
 });
 
+/* ★ v72: Firebase 로그인(커스텀 토큰) — 단계적 적용. ⚠️ 이 상수들은 firebaseConfig 보다 위에 있어야 한다(TDZ).
+   FIREBASE_WEB_API_KEY 가 빈 문자열 → AUTH_ENABLED=false → v71 과 똑같이 동작(partners/<key> 를 직접 읽는 예전 로그인).
+   콘솔 설정(커스텀 토큰 서명 권한·웹 앱 등록)이 끝나면 웹 API 키만 채워 배포한다. */
+const FIREBASE_WEB_API_KEY = '';
+const FIREBASE_AUTH_DOMAIN = 'salespartners-map-67daf.firebaseapp.com';
+const FIREBASE_PROJECT_ID = 'salespartners-map-67daf';
+const AUTH_ENABLED = FIREBASE_WEB_API_KEY !== '';
+/* 서버 로그인이 안 될 때(연결 실패·15초 초과·예상 밖 응답) 예전 로그인으로 넘어갈지.
+   DB 규칙을 잠그면 예전 로그인은 어차피 실패하므로 false 로 바꾼다. */
+const LOGIN_FALLBACK_TO_LEGACY = true;
+const LOGIN_TIMEOUT_MS = 15000;           // 로그인·영업기준표 토큰 요청 상한
+const AUTH_STATE_TIMEOUT_MS = 8000;       // 저장된 Firebase 세션 복원 대기 상한
+const SSO_STORAGE_KEY = 'upbox_sso_v1';   // 서버가 준 영업기준표 토큰 { token, date(KST) }
+const USER_ROLES_ = ['partner', 'admin', 'external'];
+const KB_OPEN_THRESHOLD_PX = 120;         // visualViewport 높이가 innerHeight 보다 이만큼 작으면 키보드가 열린 것
+const KB_PANEL_VH_RATIO = 0.67;           // 업장 패널 기본 높이(67vh)
+const KB_FOCUS_SCROLL_DELAY_MS = 320;     // 키보드가 다 올라온 뒤 입력칸을 가운데로
+let _ssoMem = null;                       // 영업기준표 토큰 메모리 사본
+let _kbOpen = false;                      // 지금 키보드가 열려 있나
 const firebaseConfig = {
   databaseURL: "https://salespartners-map-67daf-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
+if (AUTH_ENABLED) {   // ★ v72: AUTH 꺼짐이면 설정도 v71 과 같다
+  firebaseConfig.apiKey = FIREBASE_WEB_API_KEY;
+  firebaseConfig.authDomain = FIREBASE_AUTH_DOMAIN;
+  firebaseConfig.projectId = FIREBASE_PROJECT_ID;
+}
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const PRICE_GUIDE_URL = 'https://script.google.com/macros/s/AKfycbx09Kv-N_Jk0fOpnoP2AdCXnYVICdJcYusk0611Y_EZVccTfin_1uk5nXSKBFkZpd9c/exec';
+// ★ v72: AUTH_ENABLED 이면 쓰지 않는다(서버가 ssoToken 을 준다). AUTH 를 켜고 안정되면 서버 비밀값을 바꾸고 이 줄을 지운다.
 const SSO_SECRET = 'upbox-sso-2026-secret-x7k9m';
 const NEW_STORE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzSBmYw2I2NBTb8TwGtQe2r5hG0THf60eIROO7kbLWckHBGbYufoA8odWghYjs_sGJuNA/exec';
 /* ★ v69→v70 이식: 방문기록 저장 직후 서버에 "이 1건 시트에 반영해줘"를 알린다(addNewStore.gs v1.15 action=visitSaved).
@@ -803,7 +886,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v71';   // ★ v71
+const APP_VERSION = 'v72';   // ★ v72
 const PARTNER_FETCH_MAX_LEVEL = 7;        // 파트너: 이 레벨보다 넓게 보면 업장을 새로 받지 않는다(전국 범위 질의 방지)
 const PARTNER_CLUSTER_MIN_LEVEL = 5;      // 파트너: 이 레벨부터 클러스터로 묶는다(가까이선 지금처럼 낱개 핀)
 const PARTNER_FETCH_PAD_RATIO = 0.5;      // 위도 띠를 화면 높이의 50%(최대 0.03°)씩 위아래로 넉넉히 받아 작은 이동엔 재조회 안 함
@@ -1118,12 +1201,38 @@ const _markerImageCache = new Map();   // MarkerImage 메모 (색|테두리|글�
 document.getElementById("loginBtn").onclick = tryLogin;
 document.getElementById("loginCode").onkeypress = (e) => { if(e.key==="Enter") tryLogin(); };
 document.getElementById("logoutBtn").onclick = logout;
+/* ★ v72: 로그인 — 단계적 Firebase Auth 적용
+   AUTH_ENABLED=false(웹 API 키 비어 있음) → v71 과 똑같다: partners/<key> 를 직접 읽어 이름을 맞춰 본다(legacyLogin_).
+   AUTH_ENABLED=true → 서버(Web App action='login')가 이름·코드를 확인하고 Firebase 커스텀 토큰을 준다.
+     · 토큰으로 signInWithCustomToken → 이후 모든 db 읽기/쓰기는 auth.uid(=파트너 키)로 규칙 검사를 받는다.
+     · 서버가 안 되거나(연결 실패·15초 초과·예상 밖 응답) LOGIN_FALLBACK_TO_LEGACY=true 면 예전 방식으로 넘어간다
+       (규칙을 잠그기 전 서버 사고로 전원이 못 들어오는 걸 막는 안전판. 규칙을 잠그면 false 로 바꾼다).
+     · 서버가 '이름/코드 불일치'·'시도 횟수 초과'라고 분명히 답하면 넘어가지 않고 그 이유를 보여 준다.
+   currentUser = { name, code, key, role?, authMode: 'server' | 'legacy' } */
 async function tryLogin() {
   const name = document.getElementById("loginName").value.trim();
   const code = document.getElementById("loginCode").value.trim();
   const errEl = document.getElementById("loginError");
   errEl.textContent = "";
   if (!name || !code) { errEl.textContent = "이름과 코드를 모두 입력하세요."; return; }
+  if (!AUTH_ENABLED) { await legacyLogin_(name, code, errEl); return; }   // v71 그대로
+  setLoginBusy_(true);
+  try {
+    const r = await serverLogin_(name, code);
+    if (r.kind === 'ok') { startApp(); return; }
+    if (r.kind === 'denied') { errEl.textContent = r.message; return; }
+    if (LOGIN_FALLBACK_TO_LEGACY) {
+      console.warn('[로그인] 서버 로그인 불가(' + r.reason + ') → 예전 방식으로 진행. 규칙을 잠근 뒤엔 LOGIN_FALLBACK_TO_LEGACY=false');
+      await legacyLogin_(name, code, errEl);
+      return;
+    }
+    errEl.textContent = r.message;
+  } finally {
+    setLoginBusy_(false);
+  }
+}
+// v71 tryLogin 본문 그대로(partners/<key> 직접 조회). AUTH 꺼짐 또는 서버 장애 폴백에서만 쓴다.
+async function legacyLogin_(name, code, errEl) {
   try {
     const key = code.replace(/[.#$\/\[\]]/g, "_");
     const snap = await db.ref("partners/" + key).once("value");
@@ -1133,20 +1242,162 @@ async function tryLogin() {
       return;
     }
     currentUser = { name: name, code: code, key: key };
+    if (AUTH_ENABLED) currentUser.authMode = 'legacy';
     localStorage.setItem("upboxPartner", JSON.stringify(currentUser));
     startApp();
   } catch(e) {
     errEl.textContent = "로그인 오류: " + e.message;
   }
 }
+function setLoginBusy_(on) {
+  const btn = document.getElementById('loginBtn');
+  if (!btn) return;
+  btn.disabled = !!on;
+  btn.textContent = on ? '로그인 중…' : '로그인';
+}
+function showLoginScreen_(message, name) {
+  document.getElementById("loginScreen").style.display = "flex";
+  if (message) document.getElementById("loginError").textContent = message;
+  if (name) { try { document.getElementById("loginName").value = name; } catch(e) {} }
+}
+function authAvailable_() {
+  return AUTH_ENABLED && typeof firebase !== 'undefined' && typeof firebase.auth === 'function';
+}
+function normalizeRole_(role) {
+  const r = String(role || '').trim();
+  return USER_ROLES_.indexOf(r) !== -1 ? r : 'partner';
+}
+// ★ v72: 관리자·외주 판정 — 서버 로그인이면 서버가 준 role 만 믿는다. 코드 목록은 AUTH 꺼짐/예전 로그인일 때만.
+function userIsAdmin_(u) {
+  if (u && u.authMode === 'server' && u.role) return u.role === 'admin';
+  return !!isAdmin(u && u.code);
+}
+function userIsExternal_(u) {
+  if (u && u.authMode === 'server' && u.role) return u.role === 'external';
+  return !!isExternal(u && u.code);
+}
+/* Web App 에 POST (다른 호출과 같은 text/plain — CORS 사전요청 없음). 15초 넘으면 'TIMEOUT' 으로 거부.
+   진 쪽 약속의 늦은 거부가 콘솔에 '처리 안 된 거부'로 남지 않게 따로 받아 둔다. */
+function postWebApp_(payload, timeoutMs) {
+  const ms = timeoutMs || LOGIN_TIMEOUT_MS;
+  let ctrl = null;
+  try { if (typeof AbortController !== 'undefined') ctrl = new AbortController(); } catch(e) { ctrl = null; }
+  const opts = {
+    method: 'POST', mode: 'cors', cache: 'no-cache', redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  };
+  if (ctrl) opts.signal = ctrl.signal;
+  const req = fetch(NEW_STORE_ENDPOINT, opts).then(function(res) { return res.json(); });
+  req.catch(function() {});
+  let timer = null;
+  const timeout = new Promise(function(_, reject) {
+    timer = setTimeout(function() {
+      try { if (ctrl) ctrl.abort(); } catch(e) {}
+      reject(new Error('TIMEOUT'));
+    }, ms);
+  });
+  timeout.catch(function() {});
+  return Promise.race([req, timeout]).finally(function() { clearTimeout(timer); });
+}
+/* 서버 응답 분류 → { kind: 'ok' | 'denied' | 'unavailable', reason, message }
+   ⚠️ 'denied' 는 서버가 로그인 실패를 '분명히' 말한 경우만. 지금 서버(login 미배포)는 action 을 몰라
+      { ok:false, error:'MISSING_STORE_NAME' } 같은 걸 돌려주는데, 이걸 '코드 불일치'로 읽으면 전원이 잠긴다 → unavailable. */
+function classifyLoginResponse_(data) {
+  if (data && data.ok === true && typeof data.token === 'string' && data.token &&
+      data.uid !== undefined && data.uid !== null && String(data.uid) !== '') {
+    return { kind: 'ok', reason: 'ok', message: '' };
+  }
+  if (data && data.ok === false && data.error) {
+    const err = String(data.error) + ' ' + String(data.code || '');
+    if (/ACTION|PAYLOAD|MISSING_STORE|MISSING_ADDRESS|MISSING_PARTNER/i.test(err)) {
+      return { kind: 'unavailable', reason: 'not-deployed', message: '로그인 서버가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.' };
+    }
+    if (/RATE|LIMIT|TOO_?MANY|429|잠시|횟수|초과/i.test(err)) {
+      return { kind: 'denied', reason: 'rate', message: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.' };
+    }
+    if (/INVALID|CREDENTIAL|MISMATCH|NOT_FOUND|NO_SUCH|INACTIVE|DISABLED|WRONG|UNKNOWN_PARTNER|일치|없는|비활성/i.test(err)) {
+      return { kind: 'denied', reason: 'credentials', message: '이름 또는 코드가 일치하지 않습니다.' };
+    }
+  }
+  return { kind: 'unavailable', reason: 'shape', message: '로그인 서버 응답이 올바르지 않습니다. 잠시 후 다시 시도해주세요.' };
+}
+async function serverLogin_(name, code) {
+  let data;
+  try {
+    data = await postWebApp_({ action: 'login', name: name, code: code }, LOGIN_TIMEOUT_MS);
+  } catch(e) {
+    const timeout = !!(e && e.message === 'TIMEOUT');
+    return { kind: 'unavailable', reason: timeout ? 'timeout' : 'network',
+             message: timeout ? '로그인 서버가 15초 안에 응답하지 않았습니다. 인터넷 연결을 확인하고 다시 시도해주세요.'
+                              : '로그인 서버에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.' };
+  }
+  const c = classifyLoginResponse_(data);
+  if (c.kind !== 'ok') return c;
+  if (!authAvailable_()) {
+    return { kind: 'unavailable', reason: 'auth-sdk', message: '로그인 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.' };
+  }
+  try {
+    await withTimeout_(firebase.auth().signInWithCustomToken(data.token), LOGIN_TIMEOUT_MS, '로그인 인증');
+  } catch(e) {
+    console.warn('[로그인] signInWithCustomToken 실패', e);
+    return { kind: 'unavailable', reason: 'signin', message: '로그인 인증에 실패했습니다. 잠시 후 다시 시도해주세요.' };
+  }
+  currentUser = {
+    name: String(data.name || name), code: String(data.code || code),
+    key: String(data.uid),            // 규칙은 auth.uid 로 검사하므로 방문기록 경로 키 = uid
+    role: normalizeRole_(data.role), authMode: 'server'
+  };
+  if (data.key && String(data.key) !== currentUser.key) console.warn('[로그인] 서버 key 와 uid 가 다름 — uid 를 씀', data.key, data.uid);
+  localStorage.setItem("upboxPartner", JSON.stringify(currentUser));
+  if (data.ssoToken) storeSsoToken_(data.ssoToken);
+  return { kind: 'ok', reason: 'ok', message: '' };
+}
+// 저장된 Firebase 세션 복원을 기다린다(첫 onAuthStateChanged). 늦으면 AUTH_STATE_TIMEOUT_MS 뒤 현재값으로.
+function waitAuthReady_(timeoutMs) {
+  return new Promise(function(resolve) {
+    let done = false, unsub = null, timer = null;
+    const finish = function(u) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { if (typeof unsub === 'function') unsub(); } catch(e) {}
+      resolve(u || null);
+    };
+    timer = setTimeout(function() {
+      let u = null;
+      try { u = firebase.auth().currentUser; } catch(e) {}
+      finish(u);
+    }, timeoutMs || AUTH_STATE_TIMEOUT_MS);
+    try { unsub = firebase.auth().onAuthStateChanged(function(u) { finish(u); }); }
+    catch(e) { finish(null); }
+    if (done && typeof unsub === 'function') { try { unsub(); } catch(e) {} }
+  });
+}
 function logout() {
   stopLocationTracking();
   localStorage.removeItem("upboxPartner");
+  clearSsoToken_();   // ★ v72
   clearAllCaches();
-  location.reload();
+  if (!authAvailable_()) { location.reload(); return; }
+  // ★ v72: Firebase 세션도 끊는다. 응답이 늦어도 3초 뒤엔 새로고침.
+  let gone = false;
+  const go = function() { if (gone) return; gone = true; location.reload(); };
+  setTimeout(go, 3000);
+  try { firebase.auth().signOut().then(go, go); } catch(e) { go(); }
 }
 (function autoLogin() {
   const saved = localStorage.getItem("upboxPartner");
+  if (AUTH_ENABLED) {
+    // ★ v72: 세션 확인이 끝나기 전엔 db 를 읽지 않는다(startApp 은 autoLoginWithAuth_ 가 부른다)
+    let parsed = null;
+    try { parsed = saved ? JSON.parse(saved) : null; } catch(e) { localStorage.removeItem("upboxPartner"); parsed = null; }
+    Promise.resolve().then(function() { return autoLoginWithAuth_(parsed); }).catch(function(e) {
+      console.error('[자동 로그인 실패]', e);
+      try { document.getElementById('statusBar').textContent = '앱 시작 실패 — 새로고침해주세요'; } catch(e2) {}
+    });
+    return;
+  }
   if (saved) {
     // ★ v70: startApp 을 스크립트 평가가 끝난 뒤(마이크로태스크)에 돌린다.
     //   예전엔 여기서 동기 호출이라, startApp 이 첫 await 전에 아래쪽 const 를 건드리면 TDZ 로 죽었다
@@ -1165,6 +1416,125 @@ function logout() {
     document.getElementById("loginScreen").style.display = "flex";
   }
 })();
+/* ★ v72 자동 로그인 순서
+   1) 저장된 Firebase 세션이 있고 저장된 프로필(server)과 uid 가 같으면 그대로 시작
+   2) 아니면 저장된 이름·코드로 서버 로그인을 조용히 다시 한다
+   3) 서버가 '불일치'라 하면 저장 정보를 지우고 로그인 화면 / 서버 장애면 폴백 허용 시 v71 처럼 저장 정보로 시작 */
+async function autoLoginWithAuth_(saved) {
+  try { document.getElementById('statusBar').textContent = '로그인 확인 중…'; } catch(e) {}
+  const fbUser = authAvailable_() ? await waitAuthReady_() : null;
+  if (fbUser && saved && saved.authMode === 'server' && saved.key && String(saved.key) === String(fbUser.uid)) {
+    currentUser = saved;
+    currentUser.role = normalizeRole_(saved.role);
+    return startApp();
+  }
+  if (fbUser) { try { await firebase.auth().signOut(); } catch(e) {} }   // 프로필과 안 맞는 세션은 끊고 다시 로그인
+  if (!saved || !saved.name || !saved.code) { showLoginScreen_(); return; }
+  const r = await serverLogin_(String(saved.name), String(saved.code));
+  if (r.kind === 'ok') return startApp();
+  if (r.kind === 'denied') {
+    if (r.reason === 'credentials') localStorage.removeItem("upboxPartner");
+    showLoginScreen_(r.message, saved.name);
+    return;
+  }
+  if (LOGIN_FALLBACK_TO_LEGACY) {
+    console.warn('[자동 로그인] 서버 로그인 불가(' + r.reason + ') → 저장된 정보로 예전 방식 시작');
+    currentUser = { name: saved.name, code: saved.code, key: saved.key || String(saved.code).replace(/[.#$\/\[\]]/g, "_"), authMode: 'legacy' };
+    return startApp();
+  }
+  showLoginScreen_(r.message, saved.name);
+}
+/* ★ v72: iOS 소프트 키보드가 업장 패널의 저장 바(.save-bar)와 신규등록 하단 버튼(.ns-submit-row)을 가리던 문제.
+   iOS Safari 는 키보드가 떠도 layout viewport(=position:fixed 기준)를 줄이지 않고 visual viewport 만 줄인다.
+   → visualViewport 의 resize/scroll 때 키보드가 열렸으면(높이가 innerHeight−120 보다 작음)
+     패널 bottom 을 키보드 윗변에 맞추고 높이를 min(67vh, 보이는 높이−8) 로 줄여 sticky 저장 바가 키보드 바로 위에 오게 한다.
+     닫히면 인라인 값을 지워 CSS(67vh, bottom:0)로 되돌린다. visualViewport 가 없는 브라우저는 아무것도 안 한다. */
+function computeKeyboardLayout_(vv, innerH) {
+  if (!vv || !isFinite(vv.height) || !isFinite(innerH) || innerH <= 0) return { open: false };
+  if (!(vv.height < innerH - KB_OPEN_THRESHOLD_PX)) return { open: false };
+  const offTop = isFinite(vv.offsetTop) ? Math.max(0, vv.offsetTop) : 0;
+  const bottom = Math.max(0, Math.round(innerH - (vv.height + offTop)));
+  const panelH = Math.max(120, Math.min(Math.round(innerH * KB_PANEL_VH_RATIO), Math.round(vv.height - 8)));
+  return { open: true, bottom: bottom, panelH: panelH, top: Math.round(offTop), vvH: Math.round(vv.height) };
+}
+function applyKeyboardLayout_() {
+  const L = computeKeyboardLayout_(window.visualViewport, window.innerHeight);
+  const panel = document.getElementById('storePanel');
+  if (panel) {
+    if (L.open && panel.classList.contains('open')) {
+      panel.style.bottom = L.bottom + 'px';
+      panel.style.height = L.panelH + 'px';
+      panel.style.maxHeight = L.panelH + 'px';
+      panel.classList.add('kb-open');
+    } else if (panel.classList.contains('kb-open')) {
+      panel.style.bottom = ''; panel.style.height = ''; panel.style.maxHeight = '';
+      panel.classList.remove('kb-open');
+    }
+  }
+  const modal = document.getElementById('newStoreModal');
+  if (modal) {
+    const content = modal.querySelector ? modal.querySelector('.new-store-content') : null;
+    if (L.open && modal.classList.contains('open')) {
+      modal.style.top = L.top + 'px';
+      modal.style.bottom = L.bottom + 'px';
+      modal.classList.add('kb-open');
+      if (content) content.style.maxHeight = Math.max(160, L.vvH - 16) + 'px';
+    } else if (modal.classList.contains('kb-open')) {
+      modal.style.top = ''; modal.style.bottom = '';
+      modal.classList.remove('kb-open');
+      if (content) content.style.maxHeight = '';
+    }
+  }
+  _kbOpen = !!L.open;
+  return L;
+}
+/* 입력칸에 포커스가 가면 그 칸을 스크롤 상자 가운데로(업장 패널은 아래 저장 바 높이만큼 뺀 영역 기준).
+   신규등록은 하단 버튼 줄이 스크롤 상자(#nsBody) 밖이라 상자 기준으로만 맞춘다. */
+function ensureFieldVisible_(el) {
+  if (!el || !el.getBoundingClientRect) return false;
+  const panel = document.getElementById('storePanel');
+  const nsBody = document.getElementById('nsBody');
+  let box = null, footerH = 0;
+  if (panel && panel.contains(el)) {
+    if (el.closest && el.closest('.save-bar')) return false;
+    box = panel;
+    const bar = panel.querySelector ? panel.querySelector('.save-bar') : null;
+    footerH = (bar && bar.getBoundingClientRect) ? bar.getBoundingClientRect().height : 0;
+  } else if (nsBody && nsBody.contains(el)) {
+    box = nsBody;
+  } else {
+    return false;
+  }
+  const r = el.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  const visTop = b.top + 8;
+  const visBottom = b.bottom - footerH - 8;
+  if (visBottom <= visTop) return false;
+  if (r.top >= visTop && r.bottom <= visBottom) return false;
+  box.scrollTop += (r.top + r.height / 2) - (visTop + visBottom) / 2;
+  return true;
+}
+function initKeyboardAvoidance_() {
+  if (window.__v72KbBound) return;
+  window.__v72KbBound = true;
+  const vv = window.visualViewport;
+  if (vv && typeof vv.addEventListener === 'function') {
+    vv.addEventListener('resize', function() {
+      const wasOpen = _kbOpen;
+      applyKeyboardLayout_();
+      if (_kbOpen && !wasOpen) { try { ensureFieldVisible_(document.activeElement); } catch(e) {} }
+    });
+    vv.addEventListener('scroll', function() { applyKeyboardLayout_(); });
+  }
+  document.addEventListener('focusin', function(e) {
+    const t = e && e.target;
+    if (!t || !/^(INPUT|SELECT|TEXTAREA)$/.test(String(t.tagName || ''))) return;
+    setTimeout(function() {
+      try { applyKeyboardLayout_(); ensureFieldVisible_(t); } catch(err) {}
+    }, KB_FOCUS_SCROLL_DELAY_MS);
+  });
+}
+initKeyboardAvoidance_();
 async function fetchInitialLocation() {
   return new Promise(function(resolve) {
     if (!navigator.geolocation) { resolve(null); return; }
@@ -1276,7 +1646,7 @@ function saveLastView_() {
 async function startApp() {
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("userInfo").textContent = currentUser.name;
-  isAdminUser = isAdmin(currentUser.code);
+  isAdminUser = userIsAdmin_(currentUser);   // ★ v72: 서버 role 우선
   if (isAdminUser) {
     adminViewActive = true;
     document.getElementById('adminBadge').style.display = 'inline-block';
@@ -1297,7 +1667,7 @@ async function startApp() {
     }
   };
   // ★ v51.7: 외주 모드 분기 (기계약 열람 전용) — 캐시/방문 로딩 전에 조기 탈출
-  isExternalUser = isExternal(currentUser.code);
+  isExternalUser = userIsExternal_(currentUser);   // ★ v72: 서버 role 우선
   if (isExternalUser) {
     document.getElementById('adminBadge').style.display = 'inline-block';
     document.getElementById('adminBadge').textContent = '기계약 열람';
@@ -1716,7 +2086,47 @@ function moveToMyProjectStores() {
     if (map.getLevel() > 10) map.setLevel(10);
   }, 100);
 }
+/* ★ v72: 타파트너 최근 접촉 — 작은 색인 visits_contacts/<storeKey>/<partnerKey> = { ts, s } 를 읽는다.
+   예전(v71)엔 /visits 전체(전 파트너 방문기록 원문)를 받았는데, 규칙을 잠그면 남의 기록은 못 읽는다.
+   노드가 아직 없으면(서버 미배포): AUTH 꺼짐·예전 로그인은 v71 처럼 /visits 로, 서버 로그인 상태는 읽지 않고 넘어간다
+   (그땐 캐시하지 않아 다음 시작 때 다시 시도). s 는 서버가 같은 v2 규칙으로 판정한 상태 키다. */
 async function loadOtherPartnerContacts() {
+  try {
+    const snap = await db.ref("visits_contacts").once("value");
+    const node = snap.val();
+    if (node && typeof node === 'object') {
+      otherPartnerLastContactMap = buildOtherContactsFromIndex_(node, currentUser.key);
+      _visitsRev++;
+      setCache(CACHE.OTHER_VISITS, otherPartnerLastContactMap);
+      return;
+    }
+  } catch(e) { console.warn('[visits_contacts] 읽기 실패', e); }
+  if (AUTH_ENABLED && currentUser && currentUser.authMode === 'server') {
+    console.warn('[visits_contacts] 없음 — 서버 로그인 상태라 /visits 전체는 읽지 않는다(타파트너 표시 생략)');
+    return;
+  }
+  await loadOtherPartnerContactsLegacy_();
+}
+function buildOtherContactsFromIndex_(node, myKey) {
+  const out = {};
+  const me = String(myKey);
+  for (const storeKey in node) {
+    const byPartner = node[storeKey];
+    if (!byPartner || typeof byPartner !== 'object') continue;
+    for (const pk in byPartner) {
+      if (pk === me) continue;
+      const c = byPartner[pk];
+      if (!c) continue;
+      const ts = Number(c.ts) || 0;
+      if (!ts) continue;
+      const prev = out[storeKey];
+      if (!prev || prev.ts < ts) out[storeKey] = { ts: ts, status: String(c.s || 'none') };
+    }
+  }
+  return out;
+}
+// v71 loadOtherPartnerContacts 그대로(/visits 전체). AUTH 꺼짐·예전 로그인에서 visits_contacts 가 없을 때만.
+async function loadOtherPartnerContactsLegacy_() {
   try {
     const snap = await db.ref("visits").once("value");
     const all = snap.val() || {};
@@ -1977,12 +2387,14 @@ function applyClusterColors(clusters) {
 function computeDominantClusterColor(cluster) {
   const ms = cluster.getMarkers ? cluster.getMarkers() : [];
   if (ms.length === 0) return '#363859';
-  const counts = { visit: 0, lead: 0, success: 0, fail: 0, contract: 0, closedByMe: 0, none: 0 };
+  // ★ v72: 단순접촉(simpleContact)도 센다. 개수가 같으면 PIN_STATUS_PRIORITY 앞쪽(높은 상태)이 이긴다. 'none' 은 후보 아님.
+  const counts = {};
+  PIN_STATUS_PRIORITY.forEach(function(k) { counts[k] = 0; });
   ms.forEach(function(m) {
     const status = m._upboxStatus || 'none';
     if (counts[status] !== undefined) counts[status]++;
   });
-  const priorityOrder = ['success', 'lead', 'visit', 'fail', 'contract', 'closedByMe'];
+  const priorityOrder = PIN_STATUS_PRIORITY.filter(function(k) { return k !== 'none'; });
   let maxCount = 0;
   let dominant = 'none';
   for (const key of priorityOrder) {
@@ -3145,7 +3557,8 @@ function updateLeadHint_() {
     const h = leadHintFor_(f.cur, f.hidden);
     el.innerHTML = '<span class="lead-hint-now">지금: ' + escapeHtml(getStatusLabel(h.status)) + '</span>' +
       h.lines.map(function(l) { return '<span class="lead-hint-line">' + escapeHtml(l) + '</span>'; }).join('');
-  } catch (e) { el.textContent = ''; }
+    el.title = ['지금: ' + getStatusLabel(h.status)].concat(h.lines).join(' · ');   // ★ v72: 한 줄로 잘려도 전체 문구
+  } catch (e) { el.textContent = ''; el.title = ''; }
 }
 function getVisitStatus(store) {
   if (isContractGrade(store.grade)) return "contract";
@@ -3530,33 +3943,76 @@ function openKakaoNav(store) {
   });
   window.location.href = appScheme;
 }
-async function generateSSOToken(partnerName, partnerCode) {
-  const now = new Date();
+// ★ v72: 한국 날짜(YYYYMMDD). 영업기준표 토큰은 하루 단위라 날짜가 바뀌면 새로 받는다.
+function kstDateStr_(d) {
+  const now = d || new Date();
   const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
   const kst = new Date(utc + 9 * 60 * 60 * 1000);
-  const today = kst.getFullYear() + String(kst.getMonth() + 1).padStart(2, '0') + String(kst.getDate()).padStart(2, '0');
+  return kst.getFullYear() + String(kst.getMonth() + 1).padStart(2, '0') + String(kst.getDate()).padStart(2, '0');
+}
+/* ★ v72: AUTH 켜짐 → 영업기준표 토큰은 서버가 준다(로그인 응답 ssoToken, 날짜 바뀌면 action='ssoToken').
+   비밀값(SSO_SECRET)으로 브라우저에서 만드는 길은 AUTH 꺼짐(v71 호환)일 때만 쓴다. */
+function storeSsoToken_(token) {
+  _ssoMem = { token: String(token), date: kstDateStr_() };
+  try { localStorage.setItem(SSO_STORAGE_KEY, JSON.stringify(_ssoMem)); } catch(e) {}
+}
+function readSsoToken_() {
+  if (!_ssoMem) {
+    try { _ssoMem = JSON.parse(localStorage.getItem(SSO_STORAGE_KEY) || 'null'); } catch(e) { _ssoMem = null; }
+  }
+  if (_ssoMem && _ssoMem.token && _ssoMem.date === kstDateStr_()) return _ssoMem.token;
+  return null;
+}
+function clearSsoToken_() {
+  _ssoMem = null;
+  try { localStorage.removeItem(SSO_STORAGE_KEY); } catch(e) {}
+}
+async function fetchServerSsoToken_() {
+  const data = await postWebApp_({ action: 'ssoToken', name: currentUser.name, code: currentUser.code }, LOGIN_TIMEOUT_MS);
+  if (data && data.ok === true && typeof data.ssoToken === 'string' && data.ssoToken) {
+    storeSsoToken_(data.ssoToken);
+    return data.ssoToken;
+  }
+  throw new Error('영업기준표 토큰을 받지 못했습니다');
+}
+async function generateSSOToken(partnerName, partnerCode) {
+  if (AUTH_ENABLED) return readSsoToken_() || await fetchServerSsoToken_();   // ★ v72
+  const today = kstDateStr_();
   const raw = partnerName + '|' + partnerCode + '|' + today + '|' + SSO_SECRET;
   const data = new TextEncoder().encode(raw);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(hashBuffer)).slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
 }
+function buildPriceGuideUrl_(store, token) {
+  const params = new URLSearchParams();
+  params.append('sso', '1');
+  params.append('partner_name', currentUser.name);
+  params.append('partner_code', currentUser.code);
+  params.append('token', token);
+  if (store.sido) params.append('sido', store.sido);
+  if (store.sigungu) params.append('sidodong', store.sigungu);
+  if (store.gu) params.append('gueup', store.gu);
+  else params.append('gueup', '없음');
+  if (store.emd) params.append('dong', store.emd);
+  params.append('service', '베이직');
+  return PRICE_GUIDE_URL + '?' + params.toString();
+}
 async function openPriceGuide() {
   if (!selectedStore || !currentUser) return;
+  const store = selectedStore;
+  // ★ v72: 오늘 토큰이 있으면 누른 그 순간 바로 연다(iOS 는 await 뒤 window.open 을 팝업으로 막는다)
+  const cached = AUTH_ENABLED ? readSsoToken_() : null;
+  if (cached) { window.open(buildPriceGuideUrl_(store, cached), '_blank'); return; }
+  // 서버에서 받아야 하면 빈 창부터 열어 두고(사용자 동작 안) 주소를 나중에 채운다
+  let w = null;
+  if (AUTH_ENABLED) { try { w = window.open('', '_blank'); } catch(e) { w = null; } }
   try {
     const token = await generateSSOToken(currentUser.name, currentUser.code);
-    const params = new URLSearchParams();
-    params.append('sso', '1');
-    params.append('partner_name', currentUser.name);
-    params.append('partner_code', currentUser.code);
-    params.append('token', token);
-    if (selectedStore.sido) params.append('sido', selectedStore.sido);
-    if (selectedStore.sigungu) params.append('sidodong', selectedStore.sigungu);
-    if (selectedStore.gu) params.append('gueup', selectedStore.gu);
-    else params.append('gueup', '없음');
-    if (selectedStore.emd) params.append('dong', selectedStore.emd);
-    params.append('service', '베이직');
-    window.open(PRICE_GUIDE_URL + '?' + params.toString(), '_blank');
+    const url = buildPriceGuideUrl_(store, token);
+    if (w) w.location.href = url;
+    else window.open(url, '_blank');
   } catch(err) {
+    if (w) { try { w.close(); } catch(e) {} }
     showNsToast('영업기준표를 여는 중 오류가 발생했습니다. 잠시 후 다시 눌러주세요.', 4000);   // ★ v71: alert → 토스트
   }
 }
