@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>업박스 영업 지도</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,286 +14,405 @@
      ⚠️ firebase 두 스크립트는 defer 하면 안 된다 — 아래 인라인 스크립트가 최상위에서 firebase.initializeApp 을 부른다. -->
 <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=a7050b4e5c7978fee1bbe76c3489378c&libraries=services,clusterer&autoload=false"></script>
 <style>
+  /* ★ v71: 색 토큰 — 아래 CSS 의 원래 hex 는 빌드가 이 변수로 바꿨다(값은 같음 → 화면 변화 없음).
+     핀 SVG(getStatusColor)는 data URI 라 변수를 못 써서 JS 안의 hex 를 그대로 둔다 — 상태색을 바꿀 땐 두 곳 다. */
+  :root {
+    --navy: #363859; --navy-2: #5c5e8a; --amber: #F2AC57; --amber-ink: #8A5A00;
+    --ink: #222; --ink-2: #333; --text-sub: #5B5E73; --line: #DDD; --line-2: #EEE;
+    --surface: #fff; --surface-2: #F5F5F7;
+    --st-visit: #4d4678; --st-lead: #43A047; --st-success: #F5B800; --st-fail: #E53935;
+    --st-closed: #8E2F2B; --st-simple: #A79FD1; --st-none: #9E9E9E; --st-contract: #F2AC57;
+    --err-ink: #C62828; --ok-ink: #1B5E20; --switch-off: #8A8C9E;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Noto Sans KR', sans-serif; overflow: hidden; }
   #app { width: 100vw; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
-  #loginScreen { position: fixed; inset: 0; z-index: 9999; background: #363859; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  #loginScreen { position: fixed; inset: 0; z-index: 9999; background: var(--navy); display: flex; align-items: center; justify-content: center; padding: 20px; }
   .login-box { background: white; border-radius: 16px; padding: 36px 28px; max-width: 380px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.15); }
-  .login-box h1 { font-size: 22px; color: #363859; margin-bottom: 6px; text-align: center; }
-  .login-box p { font-size: 13px; color: #888; text-align: center; margin-bottom: 24px; }
-  .login-box input { width: 100%; padding: 12px 14px; border: 1px solid #DDD; border-radius: 8px; font-size: 14px; margin-bottom: 12px; font-family: inherit; }
-  .login-box input:focus { outline: none; border-color: #F2AC57; }
-  .login-box button { width: 100%; padding: 13px; border: none; border-radius: 8px; background: #363859; color: white; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; }
-  .login-error { color: #E53935; font-size: 12px; margin-top: 8px; text-align: center; }
-  #header { background: #363859; color: white; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
+  .login-box h1 { font-size: 22px; color: var(--navy); margin-bottom: 6px; text-align: center; }
+  .login-box p { font-size: 13px; color: var(--text-sub); text-align: center; margin-bottom: 24px; }
+  .login-box input { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; margin-bottom: 12px; font-family: inherit; }
+  .login-box input:focus { border-color: var(--amber); }
+  .login-box button { width: 100%; padding: 13px; border: none; border-radius: 8px; background: var(--navy); color: white; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+  .login-error { color: var(--st-fail); font-size: 12px; margin-top: 8px; text-align: center; }
+  #header { background: var(--navy); color: white; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
   #header .title { font-size: 15px; font-weight: 700; flex: 1; display: flex; align-items: center; gap: 6px; }
-  #header .admin-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #F2AC57; color: white; font-size: 10px; font-weight: 700; }
-  #header .external-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: #43A047; color: white; font-size: 10px; font-weight: 700; }
-  #header .user { font-size: 11px; color: #CCC; }
-  #header .header-btn { background: none; border: 1px solid #666; color: #CCC; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: inherit; }
+  #header .admin-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: var(--amber); color: white; font-size: 12px; font-weight: 700; }
+  #header .external-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; background: var(--st-lead); color: white; font-size: 12px; font-weight: 700; }
+  #header .user { font-size: 12px; color: #CCC; }
+  #header .header-btn { background: none; border: 1px solid #666; color: #CCC; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; font-family: inherit; }
   #header .header-btn:hover { background: rgba(255,255,255,0.1); }
-  #searchBar { padding: 8px 10px; background: white; border-bottom: 1px solid #EEE; position: relative; }
-  #searchInput { width: 100%; padding: 10px 12px; border: 1px solid #DDD; border-radius: 8px; font-size: 14px; font-family: inherit; }
-  #searchInput:focus { outline: none; border-color: #F2AC57; }
-  #searchResults { position: absolute; top: 100%; left: 10px; right: 10px; background: white; border: 1px solid #DDD; border-radius: 8px; max-height: 300px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-  .search-item { padding: 10px 12px; border-bottom: 1px solid #EEE; cursor: pointer; }
+  #searchBar { padding: 8px 10px; background: white; border-bottom: 1px solid var(--line-2); position: relative; }
+  #searchInput { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; font-family: inherit; }
+  #searchInput:focus { border-color: var(--amber); }
+  #searchResults { position: absolute; top: 100%; left: 10px; right: 10px; background: white; border: 1px solid var(--line); border-radius: 8px; max-height: 300px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .search-item { padding: 10px 12px; border-bottom: 1px solid var(--line-2); cursor: pointer; }
   .search-item:hover { background: #F5F5F5; }
   .search-item:last-child { border-bottom: none; }
   .search-name-row { display: flex; align-items: center; gap: 6px; }
   .search-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .search-name { font-size: 13px; color: #333; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .search-status-label { font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex-shrink: 0; color: white; }
-  .search-project-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 3px; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; font-size: 10px; font-weight: 600; flex-shrink: 0; }
-  .search-address { font-size: 11px; color: #999; margin-top: 3px; margin-left: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #filterBar { background: white; border-bottom: 1px solid #EEE; }
+  .search-name { font-size: 13px; color: var(--ink-2); font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .search-status-label { font-size: 12px; padding: 2px 6px; border-radius: 3px; font-weight: 600; flex-shrink: 0; color: white; }
+  .search-project-tag { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px; border-radius: 3px; background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%); color: white; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .search-address { font-size: 12px; color: var(--text-sub); margin-top: 3px; margin-left: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #filterBar { background: white; border-bottom: 1px solid var(--line-2); }
   #quickChipRow { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; white-space: nowrap; }
-  .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
-  .filter-chip.active { color: white; background: #363859; border-color: #363859; }
+  .filter-chip { padding: 6px 12px; border-radius: 16px; border: 1px solid var(--line); font-size: 12px; background: white; cursor: pointer; color: #666; font-family: inherit; flex-shrink: 0; }
+  .filter-chip.active { color: white; background: var(--navy); border-color: var(--navy); }
   /* ★ v68: 구분 칩을 패널에서 바로 꺼냈다. 라벨은 칩 앞에 작게. */
-  .quick-group-label { font-size: 11px; color: #999; align-self: center; flex-shrink: 0; padding-right: 2px; }
+  .quick-group-label { font-size: 12px; color: var(--text-sub); align-self: center; flex-shrink: 0; padding-right: 2px; }
   .filter-icon-btn svg { width: 17px; height: 17px; display: block; }
   .filter-icon-btn.active svg { stroke: white; }
   .filter-chip-project { display: none; align-items: center; gap: 3px; }
   .filter-chip-project.visible { display: inline-flex; }
-  .filter-chip-project.active { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%) !important; }
+  .filter-chip-project.active { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%) !important; }
   /* ★ v62: 구분1(카테고리) 필터 — 프로젝트 pill은 배정이 있을 때만 노출 */
   .cf-pill-project { display: none; }
   .cf-pill-project.visible { display: inline-block; }
   /* ★ 조합필터 (3단계: 네이버지도 스타일 1행 배치 + 하단 바텀시트 모달) */
-  .filter-icon-btn { display: flex; align-items: center; justify-content: center; gap: 2px; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #363859; color: #363859; font-size: 15px; background: white; font-family: inherit; cursor: pointer; flex-shrink: 0; padding: 0; position: relative; }
-  .filter-icon-btn.active { background: #363859; }
-  #comboFilterBadge { position: absolute; top: -4px; right: -4px; background: #E53935; color: white; border-radius: 8px; min-width: 15px; height: 15px; font-size: 9px; line-height: 15px; text-align: center; padding: 0 3px; }
+  .filter-icon-btn { display: flex; align-items: center; justify-content: center; gap: 2px; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--navy); color: var(--navy); font-size: 15px; background: white; font-family: inherit; cursor: pointer; flex-shrink: 0; padding: 0; position: relative; }
+  .filter-icon-btn.active { background: var(--navy); }
+  #comboFilterBadge { position: absolute; top: -4px; right: -4px; background: var(--st-fail); color: white; border-radius: 8px; min-width: 15px; height: 15px; font-size: 12px; line-height: 15px; text-align: center; padding: 0 3px; }
   #comboFilterBadge:empty { display: none; }
   #appliedChipsRow { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 8px; }
   #appliedChipsRow:empty { display: none; padding: 0; }
-  .applied-chip { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 14px; background: #F0F0F5; font-size: 11px; color: #444; cursor: pointer; font-family: inherit; border: none; }
-  .applied-chip .x { color: #999; font-weight: 700; }
+  .applied-chip { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 14px; background: #F0F0F5; font-size: 12px; color: #444; cursor: pointer; font-family: inherit; border: none; }
+  .applied-chip .x { color: var(--text-sub); font-weight: 700; }
   /* 바텀시트 모달 */
   #comboFilterBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 500; }
   #comboFilterBackdrop.open { display: block; }
   #comboFilterPanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 82vh; background: white; border-radius: 18px 18px 0 0; box-shadow: 0 -4px 24px rgba(0,0,0,0.2); z-index: 501; display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.25s ease; }
   #comboFilterPanel.open { transform: translateY(0); }
-  #comboFilterPanelHandle { width: 40px; height: 4px; border-radius: 2px; background: #DDD; margin: 10px auto 4px; flex-shrink: 0; }
-  #comboFilterPanelHeader { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 14px; border-bottom: 1px solid #EEE; font-size: 17px; font-weight: 700; color: #222; flex-shrink: 0; }
-  #comboFilterCloseBtn { border: none; background: none; font-size: 18px; color: #888; cursor: pointer; padding: 4px; font-family: inherit; }
+  #comboFilterPanelHandle { width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 10px auto 4px; flex-shrink: 0; }
+  #comboFilterPanelHeader { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 14px; border-bottom: 1px solid var(--line-2); font-size: 17px; font-weight: 700; color: var(--ink); flex-shrink: 0; }
+  #comboFilterCloseBtn { border: none; background: none; font-size: 18px; color: var(--text-sub); cursor: pointer; padding: 4px; font-family: inherit; }
   #comboFilterPanelBody { padding: 16px; overflow-y: auto; flex: 1 1 auto; }
   .cf-facet { margin-bottom: 18px; }
-  .cf-facet-title { font-size: 13px; font-weight: 700; color: #333; margin-bottom: 8px; display: flex; justify-content: space-between; }
-  .cf-facet-desc { font-weight: 400; color: #aaa; font-size: 10px; }
+  .cf-facet-title { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .cf-facet-desc { font-weight: 400; color: var(--text-sub); font-size: 12px; }
   .cf-pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
-  .cf-pill { padding: 8px 14px; border-radius: 16px; border: 1px solid #DDD; font-size: 12px; color: #555; background: white; font-family: inherit; cursor: pointer; }
-  .cf-pill.sel { background: #363859; color: white; border-color: #363859; }
-  .cf-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; font-size: 13px; color: #333; border-top: 1px solid #ECECF2; }
+  .cf-pill { padding: 8px 14px; border-radius: 16px; border: 1px solid var(--line); font-size: 12px; color: #555; background: white; font-family: inherit; cursor: pointer; }
+  .cf-pill.sel { background: var(--navy); color: white; border-color: var(--navy); }
+  .cf-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; font-size: 13px; color: var(--ink-2); border-top: 1px solid #ECECF2; }
   .cf-switch { width: 34px; height: 18px; border-radius: 10px; background: #CCC; position: relative; border: none; cursor: pointer; flex-shrink: 0; }
-  .cf-switch.on { background: #43A047; }
+  .cf-switch.on { background: var(--st-lead); }
   .cf-switch::after { content: ""; position: absolute; width: 14px; height: 14px; background: white; border-radius: 50%; top: 2px; left: 2px; }
   .cf-switch.on::after { left: auto; right: 2px; }
-  .cf-panel-actions { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #EEE; flex-shrink: 0; background: white; }
+  .cf-panel-actions { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line-2); flex-shrink: 0; background: white; }
   .cf-panel-actions button { padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; font-family: inherit; border: none; cursor: pointer; }
   #cfResetBtn { background: white; border: 1px solid #CCC !important; color: #666; flex: 0 0 auto; padding: 13px 18px; }
-  #cfApplyBtn { background: #363859; color: white; flex: 1; }
+  #cfApplyBtn { background: var(--navy); color: white; flex: 1; }
   .chip-count { margin-left: 3px; font-weight: 600; opacity: 0.9; }
   .chip-count:empty { display: none; }
   #adminStatsBar {
     display: none;
     padding: 8px 10px;
-    background: linear-gradient(90deg, #363859 0%, #5c5e8a 100%);
+    background: linear-gradient(90deg, var(--navy) 0%, var(--navy-2) 100%);
     color: white;
     font-size: 12px;
-    border-bottom: 1px solid #DDD;
+    border-bottom: 1px solid var(--line);
     flex-wrap: wrap;
     gap: 6px;
     align-items: center;
   }
   #adminStatsBar.visible { display: flex; }
-  .admin-stats-label { font-weight: 700; color: #F2AC57; flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
-  .admin-stats-version { font-size: 10px; color: #BBB; flex-shrink: 0; margin-left: auto; }
+  .admin-stats-label { font-weight: 700; color: var(--amber); flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+  .admin-stats-version { font-size: 12px; color: #BBB; flex-shrink: 0; margin-left: auto; }
   .admin-stat-item { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; background: rgba(255,255,255,0.15); flex-shrink: 0; cursor: pointer; border: 1.5px solid transparent; transition: all 0.15s; user-select: none; }
   .admin-stat-item:hover { background: rgba(255,255,255,0.25); }
   .admin-stat-item.active { background: rgba(255,255,255,0.35); border-color: white; box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.4); }
-  .admin-stat-all { background: rgba(242, 172, 87, 0.2); font-weight: 700; color: #F2AC57; }
-  .admin-stat-all .admin-stat-name { color: #F2AC57; font-weight: 700; }
-  .admin-stat-all.active { background: rgba(242, 172, 87, 0.45); border-color: #F2AC57; box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5); }
+  .admin-stat-all { background: rgba(242, 172, 87, 0.2); font-weight: 700; color: var(--amber); }
+  .admin-stat-all .admin-stat-name { color: var(--amber); font-weight: 700; }
+  .admin-stat-all.active { background: rgba(242, 172, 87, 0.45); border-color: var(--amber); box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5); }
   .admin-stat-all.active .admin-stat-name { color: white; }
   .admin-stats-label-icon { font-size: 13px; }
   .admin-stat-dot { width: 7px; height: 7px; border-radius: 50%; }
-  .admin-stat-name { font-size: 11px; color: #EEE; }
+  .admin-stat-name { font-size: 12px; color: var(--line-2); }
   .admin-stat-value { font-size: 12px; font-weight: 700; color: white; }
   .admin-partner-selector { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; background: rgba(255,255,255,0.2); border: 1.5px solid transparent; flex-shrink: 0; cursor: pointer; transition: all 0.15s; position: relative; user-select: none; }
   .admin-partner-selector:hover { background: rgba(255,255,255,0.3); }
-  .admin-partner-selector.active { background: rgba(242, 172, 87, 0.45); border-color: #F2AC57; box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5); }
-  .admin-partner-selector .admin-partner-arrow { font-size: 9px; color: #FFF; margin-left: 2px; }
+  .admin-partner-selector.active { background: rgba(242, 172, 87, 0.45); border-color: var(--amber); box-shadow: 0 0 0 2px rgba(242, 172, 87, 0.5); }
+  .admin-partner-selector .admin-partner-arrow { font-size: 12px; color: #FFF; margin-left: 2px; }
   .admin-partner-dropdown { display: none; position: absolute; top: 100%; left: 0; margin-top: 4px; background: white; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); min-width: 160px; max-height: 300px; overflow-y: auto; z-index: 200; }
   .admin-partner-dropdown.show { display: block; }
-  .admin-partner-option { padding: 8px 12px; color: #333; font-size: 12px; cursor: pointer; border-bottom: 1px solid #F2F2F7; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .admin-partner-option { padding: 8px 12px; color: var(--ink-2); font-size: 12px; cursor: pointer; border-bottom: 1px solid #F2F2F7; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .admin-partner-option:last-child { border-bottom: none; }
   .admin-partner-option:hover { background: #F5F5F7; }
-  .admin-partner-option.selected { background: #FFF3E0; color: #F2AC57; font-weight: 600; }
-  .admin-partner-option .partner-record-count { color: #888; font-size: 10px; }
-  .admin-partner-option.selected .partner-record-count { color: #F2AC57; }
-  .admin-stats-contract-hint { font-size: 11px; color: #F2AC57; flex-shrink: 0; padding: 3px 8px; border-radius: 12px; background: rgba(242, 172, 87, 0.15); border: 1px solid rgba(242, 172, 87, 0.3); }
+  .admin-partner-option.selected { background: #FFF3E0; color: var(--amber); font-weight: 600; }
+  .admin-partner-option .partner-record-count { color: var(--text-sub); font-size: 12px; }
+  .admin-partner-option.selected .partner-record-count { color: var(--amber); }
+  .admin-stats-contract-hint { font-size: 12px; color: var(--amber); flex-shrink: 0; padding: 3px 8px; border-radius: 12px; background: rgba(242, 172, 87, 0.15); border: 1px solid rgba(242, 172, 87, 0.3); }
   #map { flex: 1; position: relative; }
   #statusBar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(54, 56, 89, 0.9); color: white; padding: 6px 14px; border-radius: 16px; font-size: 12px; text-align: center; z-index: 50; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-  #addBtn { position: absolute; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; height: 44px; padding: 0 18px; border: none; border-radius: 22px; background: #F2AC57; color: white; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 4px; font-family: inherit; }
+  #addBtn { position: absolute; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; height: 44px; padding: 0 18px; border: none; border-radius: 22px; background: var(--amber); color: white; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 4px; font-family: inherit; }
   #addBtn:hover { background: #e89a3e; }
   #locBtn { position: absolute; bottom: calc(126px + env(safe-area-inset-bottom, 0px)); right: 14px; z-index: 60; width: 48px; height: 48px; border-radius: 50%; border: none; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   #storePanel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 67vh; height: 67vh; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.15); transform: translateY(100%); transition: transform 0.3s; z-index: 200; overflow-y: auto; overscroll-behavior: contain; }
   #storePanel.open { transform: translateY(0); }
   #panelDrag { width: 40px; height: 4px; background: #CCC; border-radius: 2px; margin: 8px auto; cursor: pointer; }
   #panelClose { position: sticky; top: 0; float: right; margin-top: -4px; margin-right: 4px; width: 32px; height: 32px; border: none; background: rgba(255,255,255,0.95); border-radius: 50%; font-size: 16px; color: #666; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-  #panelClose:hover { background: #F5F5F5; color: #333; }
+  #panelClose:hover { background: #F5F5F5; color: var(--ink-2); }
   #panelContent { padding: 4px 18px 20px; clear: both; }
-  #panelContent h2 { font-size: 18px; color: #222; margin-bottom: 8px; line-height: 1.3; }
+  #panelContent h2 { font-size: 18px; color: var(--ink); margin-bottom: 8px; line-height: 1.3; }
   #panelContent .addr { font-size: 13px; color: #666; margin-bottom: 10px; }
   #panelContent .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  #panelContent .badge { display: inline-block; padding: 4px 9px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-  #panelContent .badge-admin { background: #ECEEF3; color: #363859; }
+  #panelContent .badge { display: inline-block; padding: 4px 9px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+  #panelContent .badge-admin { background: #ECEEF3; color: var(--navy); }
   #panelContent .badge-grade { background: #F5F5F5; color: #666; }
-  #panelContent .badge-contract { background: #FFF3E0; color: #F2AC57; font-weight: 700; }
+  #panelContent .badge-contract { background: #FFF3E0; color: var(--amber); font-weight: 700; }
   #panelContent .badge-closed { background: #E0E0E0; color: #424242; font-weight: 600; }
-  .admin-info-box { background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 12px; line-height: 1.6; }
-  .admin-info-box .admin-info-label { color: #F2AC57; font-weight: 700; margin-right: 6px; }
+  .admin-info-box { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%); color: white; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 12px; line-height: 1.6; }
+  .admin-info-box .admin-info-label { color: var(--amber); font-weight: 700; margin-right: 6px; }
   .multi-projects { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; margin-bottom: 10px; }
-  .project-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: linear-gradient(135deg, #363859 0%, #5c5e8a 100%); color: white; box-shadow: 0 1px 3px rgba(54, 56, 89, 0.3); }
+  .project-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%); color: white; box-shadow: 0 1px 3px rgba(54, 56, 89, 0.3); }
   .project-badge-icon { font-size: 13px; }
-  .contact-info { font-size: 12px; color: #888; margin-bottom: 10px; padding: 6px 10px; background: #FAFAFA; border-radius: 6px; }
+  .contact-info { font-size: 12px; color: var(--text-sub); margin-bottom: 10px; padding: 6px 10px; background: #FAFAFA; border-radius: 6px; }
   .service { display: flex; gap: 8px; margin-bottom: 14px; }
-  .service-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: #F5F5F5; color: #666; }
-  .service-badge.on { background: #E8F5E9; color: #43A047; }
+  .service-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; background: #F5F5F5; color: #666; }
+  .service-badge.on { background: #E8F5E9; color: var(--st-lead); }
   /* ★ v55: 영업중인 폐기물 배지 (2안) */
   .waste-badges-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-  .waste-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px 5px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .waste-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px 5px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
   .waste-badge-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .roadview-section { border: 1px solid #EEE; border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
+  .roadview-section { border: 1px solid var(--line-2); border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
   .roadview-header { padding: 10px 14px; background: #F8F8F8; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; color: #555; font-weight: 500; }
   .roadview-header:hover { background: #F0F0F0; }
-  .roadview-header-toggle { font-size: 10px; color: #999; }
-  .roadview-body { display: none; position: relative; height: 220px; background: #EEE; }
+  .roadview-header-toggle { font-size: 12px; color: var(--text-sub); }
+  .roadview-body { display: none; position: relative; height: 220px; background: var(--line-2); }
   .roadview-body.expanded { display: block; }
   #roadview { width: 100%; height: 100%; }
-  .rv-loading, .rv-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #888; font-size: 13px; background: #F5F5F5; }
-  .rv-external { position: absolute; bottom: 8px; right: 8px; background: rgba(54,56,89,0.9); color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 11px; z-index: 10; }
-  .info-table { border-top: 1px solid #EEE; padding-top: 12px; margin-bottom: 14px; }
+  .rv-loading, .rv-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-sub); font-size: 13px; background: #F5F5F5; }
+  .rv-external { position: absolute; bottom: 8px; right: 8px; background: rgba(54,56,89,0.9); color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; z-index: 10; }
+  .info-table { border-top: 1px solid var(--line-2); padding-top: 12px; margin-bottom: 14px; }
   .info-row { display: flex; gap: 10px; font-size: 13px; padding: 4px 0; }
-  .info-key { color: #999; min-width: 80px; }
-  .info-value { color: #333; flex: 1; }
-  .memo { background: #FFF9E6; border-left: 3px solid #F5B800; padding: 8px 12px; font-size: 12px; color: #8C6900; border-radius: 4px; margin-bottom: 14px; line-height: 1.5; }
-  .priceGuideBtn { display: block; width: 100%; padding: 11px; border: none; border-radius: 8px; background: #363859; color: white; font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; margin-bottom: 8px; font-family: inherit; }
-  .navBtn { display: block; width: 100%; padding: 11px; border: 1px solid #363859; border-radius: 8px; background: white; color: #363859; font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; margin-bottom: 14px; font-family: inherit; }
-  .visit-form { border-top: 1px solid #EEE; padding-top: 14px; margin-top: 4px; }
-  .visit-form h3 { font-size: 14px; color: #363859; margin-bottom: 4px; }
-  .visit-dates { font-size: 11px; color: #999; margin-bottom: 12px; }
+  .info-key { color: var(--text-sub); min-width: 80px; }
+  .info-value { color: var(--ink-2); flex: 1; }
+  .memo { background: #FFF9E6; border-left: 3px solid var(--st-success); padding: 8px 12px; font-size: 12px; color: #8C6900; border-radius: 4px; margin-bottom: 14px; line-height: 1.5; }
+  .priceGuideBtn { display: block; width: 100%; padding: 11px; border: none; border-radius: 8px; background: var(--navy); color: white; font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; margin-bottom: 8px; font-family: inherit; }
+  .navBtn { display: block; width: 100%; padding: 11px; border: 1px solid var(--navy); border-radius: 8px; background: white; color: var(--navy); font-size: 13px; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; margin-bottom: 14px; font-family: inherit; }
+  .visit-form { border-top: 1px solid var(--line-2); padding-top: 14px; margin-top: 4px; }
+  .visit-form h3 { font-size: 14px; color: var(--navy); margin-bottom: 4px; }
+  .visit-dates { font-size: 12px; color: var(--text-sub); margin-bottom: 12px; }
   .visit-form label { display: block; font-size: 12px; color: #666; margin: 10px 0 4px 0; }
-  .visit-form input, .visit-form select, .visit-form textarea { width: 100%; padding: 8px 10px; border: 1px solid #DDD; border-radius: 6px; font-size: 13px; font-family: inherit; }
+  .visit-form input, .visit-form select, .visit-form textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-family: inherit; }
   .visit-form textarea { min-height: 60px; resize: vertical; }
-  .visit-form input:focus, .visit-form select:focus, .visit-form textarea:focus { outline: none; border-color: #F2AC57; }
+  .visit-form input:focus, .visit-form select:focus, .visit-form textarea:focus { border-color: var(--amber); }
   /* ★ v56/v57: 입력값 경고 (입력은 막지 않고 경고만) */
-  .num-warn-msg { display: none; color: #E53935; font-size: 11px; font-weight: 600; line-height: 1.45; margin-top: 3px; }
+  .num-warn-msg { display: none; color: var(--st-fail); font-size: 12px; font-weight: 600; line-height: 1.45; margin-top: 3px; }
   label.num-invalid .num-warn-msg { display: block; }
   .num-warn-msg:empty { display: none !important; }
-  input.num-invalid { border-color: #E53935 !important; background: #FFF6F6; }
+  input.num-invalid { border-color: var(--st-fail) !important; background: #FFF6F6; }
   /* ★ v56: 예상계약일자 년/월/일 드롭다운 */
   .date-select-row { display: flex; gap: 6px; }
   .date-select-row select { flex: 1; min-width: 0; }
   /* ★ v61: 저장 실패 시 임시보관된 입력 안내 */
   .draft-notice { display: none; align-items: flex-start; gap: 8px; flex-wrap: wrap;
-    background: #FFF4E5; border: 1px solid #F2AC57; border-radius: 8px;
+    background: #FFF4E5; border: 1px solid var(--amber); border-radius: 8px;
     padding: 9px 11px; margin-bottom: 10px; font-size: 12px; color: #8A5A00; line-height: 1.5; }
   .draft-notice.show { display: flex; }
   .draft-notice .draft-actions { display: flex; gap: 6px; margin-left: auto; }
   .draft-notice button { border: none; border-radius: 6px; padding: 6px 10px;
-    font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; }
-  #v_draftRestore { background: #F2AC57; color: #fff; }
-  #v_draftDiscard { background: #EEE; color: #666; }
-  .save-btn { width: 100%; padding: 12px; margin-top: 14px; border: none; border-radius: 8px; background: #F2AC57; color: white; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  #v_draftRestore { background: var(--amber); color: #fff; }
+  #v_draftDiscard { background: var(--line-2); color: #666; }
+  .save-btn { width: 100%; padding: 12px; margin-top: 14px; border: none; border-radius: 8px; background: var(--amber); color: white; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   /* ★ 재탭핑우선순위 토글 */
   .repriority-toggle { display: flex; gap: 6px; }
-  .repriority-toggle button { flex: 1; padding: 8px 0; border: 1.5px solid #DDD; border-radius: 8px; background: white; font-size: 13px; font-weight: 700; color: #666; cursor: pointer; font-family: inherit; }
-  .repriority-toggle button.sel { border-color: #E53935; color: #E53935; background: #FDECEA; }
+  .repriority-toggle button { flex: 1; padding: 8px 0; border: 1.5px solid var(--line); border-radius: 8px; background: white; font-size: 13px; font-weight: 700; color: #666; cursor: pointer; font-family: inherit; }
+  .repriority-toggle button.sel { border-color: var(--st-fail); color: var(--st-fail); background: #FDECEA; }
   /* ★ 타파트너영업중 태그 */
-  .other-active-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; background: #E0F7FA; color: #00838F; font-size: 11px; font-weight: 700; border: 1px solid #00838F; }
+  .other-active-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; background: #E0F7FA; color: #00838F; font-size: 12px; font-weight: 700; border: 1px solid #00838F; }
   #noticeModal { position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; padding: 20px; }
   #noticeModal.show { display: flex; }
   .notice-box { background: white; border-radius: 16px; padding: 28px 24px; max-width: 360px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: noticePopup 0.3s ease-out; }
   @keyframes noticePopup { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   .notice-icon { font-size: 36px; text-align: center; margin-bottom: 12px; }
-  .notice-title { font-size: 17px; font-weight: 700; color: #363859; text-align: center; margin-bottom: 12px; }
+  .notice-title { font-size: 17px; font-weight: 700; color: var(--navy); text-align: center; margin-bottom: 12px; }
   .notice-message { font-size: 14px; color: #555; text-align: center; line-height: 1.5; margin-bottom: 20px; padding: 12px; background: #FAFAFA; border-radius: 8px; }
   .notice-buttons { display: flex; gap: 8px; }
   .notice-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
-  .notice-btn-primary { background: #F2AC57; color: white; }
+  .notice-btn-primary { background: var(--amber); color: white; }
   .notice-btn-primary:hover { background: #e89a3e; }
-  .notice-btn-secondary { background: #EEE; color: #555; }
-  .notice-btn-secondary:hover { background: #DDD; }
+  .notice-btn-secondary { background: var(--line-2); color: #555; }
+  .notice-btn-secondary:hover { background: var(--line); }
   .new-store-modal { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 10000; justify-content: center; align-items: flex-start; overflow-y: auto; padding: 20px 0; -webkit-overflow-scrolling: touch; }
   .new-store-modal.open { display: flex; }
   .new-store-content { background: #fff; width: 100%; max-width: 480px; border-radius: 16px; margin: 20px; padding: 0; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-  .new-store-header { background: #363859; color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+  .new-store-header { background: var(--navy); color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
   .new-store-header h2 { margin: 0; font-size: 17px; font-weight: 700; }
   .new-store-close { background: transparent; border: none; color: #fff; font-size: 22px; cursor: pointer; padding: 0 4px; line-height: 1; font-family: inherit; }
   .new-store-body { padding: 14px 18px 18px; max-height: 75vh; overflow-y: auto; }
   .new-store-hint { background: #F8F8F8; color: #666; padding: 9px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; border-left: 3px solid #9E9E9E; }
   .ns-search-wrapper { position: relative; margin-bottom: 6px; }
   .ns-search-wrapper input { width: 100%; padding: 11px 13px; border: 2px solid #E5E5E7; border-radius: 8px; font-size: 14px; font-family: inherit; }
-  .ns-search-wrapper input:focus { outline: none; border-color: #F2AC57; }
-  .ns-search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #DDD; border-radius: 8px; margin-top: 4px; max-height: 240px; overflow-y: auto; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.12); display: none; }
+  .ns-search-wrapper input:focus { border-color: var(--amber); }
+  .ns-search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; margin-top: 4px; max-height: 240px; overflow-y: auto; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.12); display: none; }
   .ns-search-results.open { display: block; }
   .ns-search-result-item { padding: 9px 12px; cursor: pointer; border-bottom: 1px solid #F2F2F7; }
   .ns-search-result-item:last-child { border-bottom: none; }
   .ns-search-result-item:hover { background: #F5F5F7; }
   .ns-search-result-item .ns-place-name { font-weight: 600; font-size: 13px; color: #1C1C1E; }
-  .ns-search-result-item .ns-place-address { font-size: 11px; color: #888; margin-top: 2px; }
-  .ns-search-results-empty { padding: 14px; text-align: center; color: #888; font-size: 12px; }
+  .ns-search-result-item .ns-place-address { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+  .ns-search-results-empty { padding: 14px; text-align: center; color: var(--text-sub); font-size: 12px; }
   .ns-form-group { margin-bottom: 11px; }
-  .ns-form-group label { display: block; font-size: 12px; font-weight: 600; color: #363859; margin-bottom: 4px; }
-  .ns-form-group label .required { color: #E53935; margin-left: 2px; }
-  .ns-form-group input, .ns-form-group select, .ns-form-group textarea { width: 100%; padding: 9px 11px; border: 1px solid #DDD; border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff; }
-  .ns-form-group input:focus, .ns-form-group select:focus, .ns-form-group textarea:focus { outline: none; border-color: #F2AC57; }
+  .ns-form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+  .ns-form-group label .required { color: var(--st-fail); margin-left: 2px; }
+  .ns-form-group input, .ns-form-group select, .ns-form-group textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff; }
+  .ns-form-group input:focus, .ns-form-group select:focus, .ns-form-group textarea:focus { border-color: var(--amber); }
   .ns-form-group textarea { resize: vertical; min-height: 56px; }
-  .ns-form-group .ns-helper { font-size: 11px; color: #888; margin-top: 3px; }
+  .ns-form-group .ns-helper { font-size: 12px; color: var(--text-sub); margin-top: 3px; }
   .ns-form-row { display: flex; gap: 8px; }
   .ns-form-row .ns-form-group { flex: 1; }
   .ns-admin-type-buttons { display: flex; gap: 6px; }
-  .ns-admin-type-buttons button { flex: 1; padding: 9px; border: 1px solid #DDD; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; }
-  .ns-admin-type-buttons button.active { background: #363859; color: #fff; border-color: #363859; font-weight: 700; }
+  .ns-admin-type-buttons button { flex: 1; padding: 9px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; }
+  .ns-admin-type-buttons button.active { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 700; }
   .ns-outcome-buttons { display: flex; gap: 6px; }
-  .ns-outcome-buttons button { flex: 1; padding: 9px; border: 1px solid #DDD; background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; }
-  .ns-outcome-buttons button.active.default { background: #363859; color: #fff; border-color: #363859; font-weight: 700; }
-  .ns-outcome-buttons button.active.success { background: #F5B800; color: #fff; border-color: #F5B800; font-weight: 700; }
-  .ns-outcome-buttons button.active.fail { background: #E53935; color: #fff; border-color: #E53935; font-weight: 700; }
+  .ns-outcome-buttons button { flex: 1; padding: 9px; border: 1px solid var(--line); background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit; }
+  .ns-outcome-buttons button.active.default { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 700; }
+  .ns-outcome-buttons button.active.success { background: var(--st-success); color: #fff; border-color: var(--st-success); font-weight: 700; }
+  .ns-outcome-buttons button.active.fail { background: var(--st-fail); color: #fff; border-color: var(--st-fail); font-weight: 700; }
   .ns-submit-row { display: flex; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #F2F2F7; }
   .ns-submit-row button { flex: 1; padding: 13px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; }
   .ns-btn-cancel { background: #F2F2F7; color: #1C1C1E; }
-  .ns-btn-submit { background: #F2AC57; color: #fff; }
+  .ns-btn-submit { background: var(--amber); color: #fff; }
   .ns-btn-submit:disabled { background: #E0BC9C; cursor: not-allowed; }
-  .ns-selected-place { background: #FFF3E0; border: 1px solid #F2AC57; border-radius: 6px; padding: 9px 11px; margin-bottom: 11px; font-size: 12px; display: none; position: relative; }
+  .ns-selected-place { background: #FFF3E0; border: 1px solid var(--amber); border-radius: 6px; padding: 9px 11px; margin-bottom: 11px; font-size: 12px; display: none; position: relative; }
   .ns-selected-place.show { display: block; }
-  .ns-selected-place .ns-sp-label { color: #F2AC57; font-weight: 700; font-size: 10px; margin-bottom: 3px; }
+  .ns-selected-place .ns-sp-label { color: var(--amber); font-weight: 700; font-size: 12px; margin-bottom: 3px; }
   .ns-selected-place .ns-sp-name { font-weight: 700; color: #1C1C1E; font-size: 13px; }
-  .ns-selected-place .ns-sp-addr { color: #666; font-size: 11px; margin-top: 2px; }
-  .ns-selected-place .ns-sp-clear { position: absolute; top: 8px; right: 10px; background: transparent; border: none; color: #F2AC57; cursor: pointer; font-size: 11px; text-decoration: underline; font-family: inherit; }
+  .ns-selected-place .ns-sp-addr { color: #666; font-size: 12px; margin-top: 2px; }
+  .ns-selected-place .ns-sp-clear { position: absolute; top: 8px; right: 10px; background: transparent; border: none; color: var(--amber); cursor: pointer; font-size: 12px; text-decoration: underline; font-family: inherit; }
   .ns-toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1C1C1E; color: #fff; padding: 13px 22px; border-radius: 12px; font-size: 13px; z-index: 20000; box-shadow: 0 8px 24px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s; max-width: 90%; text-align: center; font-family: inherit; }
   .ns-toast.show { opacity: 1; }
   /* ★ v70: 같은 건물(좌표 8m 이내) 묶음 목록 · 관리자 파트너별 기록 목록.
      행 높이 44px 이상, 키보드 포커스 표시, 상태는 색+기호+글자로 같이 보여준다(색만으로 구분 금지). */
   .v70-list-head { font-size: 13px; color: #555; margin: 4px 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .v70-list { list-style: none; border: 1px solid #E6E6EE; border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
-  .v70-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 12px; border: none; border-bottom: 1px solid #EEEEF3; background: #fff; text-align: left; font-family: inherit; cursor: pointer; color: #222; }
+  .v70-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 12px; border: none; border-bottom: 1px solid #EEEEF3; background: #fff; text-align: left; font-family: inherit; cursor: pointer; color: var(--ink); }
   .v70-list li:last-child .v70-row { border-bottom: none; }
   .v70-row:hover { background: #F7F7FA; }
-  .v70-row:focus-visible, .v70-back:focus-visible { outline: 3px solid #F2AC57; outline-offset: -3px; }
+  .v70-row:focus-visible, .v70-back:focus-visible { outline: 3px solid var(--amber); outline-offset: -3px; }
   .v70-row-main { flex: 1; min-width: 0; }
-  .v70-row-title { font-size: 14px; font-weight: 600; color: #222; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v70-row-title { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .v70-row-sub { font-size: 12px; color: #666; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .v70-row-arrow { color: #888; font-size: 14px; flex-shrink: 0; }
+  .v70-row-arrow { color: var(--text-sub); font-size: 14px; flex-shrink: 0; }
   .v70-status { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; white-space: nowrap; }
-  .v70-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; margin: 0 0 8px; border: 1px solid #CCC; border-radius: 8px; background: #fff; color: #363859; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
-  .v70-rec-table { border-top: 1px solid #EEE; padding-top: 8px; margin-bottom: 12px; }
+  .v70-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 12px; margin: 0 0 8px; border: 1px solid #CCC; border-radius: 8px; background: #fff; color: var(--navy); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .v70-rec-table { border-top: 1px solid var(--line-2); padding-top: 8px; margin-bottom: 12px; }
   .v70-rec-table .info-row { padding: 5px 0; }
   .v70-hist { margin: 6px 0 14px; font-size: 12px; color: #555; }
-  .v70-hist summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; color: #363859; }
-  .v70-hist-item { border-left: 3px solid #DDD; padding: 4px 10px; margin: 6px 0; line-height: 1.5; }
+  .v70-hist summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; color: var(--navy); }
+  .v70-hist-item { border-left: 3px solid var(--line); padding: 4px 10px; margin: 6px 0; line-height: 1.5; }
+  /* ════ ★ v71 UX 덮어쓰기 (승인된 목업 기준, 모양 구분 핀은 넣지 않음) ════
+     되돌리기 쉽게 한 블록에 모았다. 같은 선택자를 뒤에서 다시 써서 이기게 했다(!important 최소화). */
+  [hidden] { display: none !important; }
+  body { font-size: 14px; color: var(--ink); background: var(--surface); }
+  .ic { width: 1.15em; height: 1.15em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+        vertical-align: -0.2em; flex-shrink: 0; pointer-events: none; display: inline-block; }
+  /* 숫자 열은 자릿수 정렬 */
+  .admin-stat-value, .partner-record-count, #cfApplyBtn, #comboFilterBadge, .v70-row-sub, .visit-dates, #statusBar { font-variant-numeric: tabular-nums; }
+
+  /* ── 포커스: 키보드 포커스는 3px 앰버 링 하나로 통일 ── */
+  :focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+  .v70-row:focus-visible, .v70-back:focus-visible { outline-offset: -3px; }
+
+  /* ── 대비: 앰버 바탕 주 버튼은 남색 글자(5.79:1) ── */
+  .save-btn, #addBtn, .notice-btn-primary, .ns-btn-submit, #header .admin-badge, #v_draftRestore { color: var(--navy); }
+  .ns-outcome-buttons button.active.success { color: var(--navy); }
+  #panelContent .badge-contract { color: var(--amber-ink); }
+  .service-badge.on { color: var(--ok-ink); }
+  .num-warn-msg, .login-error { color: var(--err-ink); }
+
+  /* ── 입력칸 16px: iOS 가 포커스 때 화면을 확대하지 않게 ── */
+  .visit-form input, .visit-form select, .visit-form textarea,
+  .ns-form-group input, .ns-form-group select, .ns-form-group textarea,
+  .ns-search-wrapper input, #searchInput, .login-box input { font-size: 16px; }
+  .visit-form input, .visit-form select, .visit-form textarea { min-height: 44px; }
+  .visit-form label { font-size: 13px; }
+
+  /* ── 글자 크기 단계: 본문 14 · 보조 13 · 입력 16 · 제목 18 ── */
+  .new-store-header h2, #comboFilterPanelHeader, .notice-title { font-size: 18px; }
+  .search-name { font-size: 14px; }
+  .search-address, .ns-search-result-item .ns-place-address, .ns-form-group .ns-helper, .contact-info { font-size: 13px; }
+
+  /* ── 터치 영역 44px 이상 ── */
+  #header { padding: 2px 6px 2px 14px; min-height: 48px; }
+  #header .user { font-size: 12px; }
+  #header .header-btn { min-height: 44px; min-width: 44px; padding: 0 12px; font-size: 13px; border-color: #8A8CA6; color: #E6E6EE; border-radius: 8px; }
+  .filter-icon-btn { width: auto; min-width: 44px; height: 44px; padding: 0 14px 0 12px; border-radius: 22px; gap: 6px; font-size: 14px; font-weight: 700; color: var(--navy); }
+  .filter-icon-btn.active { color: #fff; }
+  .filter-trigger-label { line-height: 1; }
+  #comboFilterBadge { position: static; min-width: 20px; height: 20px; line-height: 20px; font-size: 12px; font-weight: 700; border-radius: 10px;
+                      background: var(--amber); color: var(--navy); padding: 0 6px; }
+  .filter-chip { min-height: 44px; padding: 0 14px; font-size: 13px; }
+  .quick-group-label { font-size: 12px; }
+  .applied-chip { min-height: 44px; padding: 0 14px; font-size: 13px; color: var(--ink-2); }
+  .applied-chip .x { display: inline-flex; color: var(--text-sub); }
+  .cf-pill { min-height: 44px; padding: 0 16px; font-size: 13px; }
+  .cf-pill.sel::before { content: "✓ "; }
+  #comboFilterCloseBtn, .new-store-close { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; }
+  #panelClose { width: 44px; height: 44px; font-size: 18px; color: var(--ink-2); }
+  .admin-stat-item, .admin-partner-selector { min-height: 36px; }
+  .ns-admin-type-buttons button, .ns-outcome-buttons button { min-height: 44px; font-size: 13px; }
+  .draft-notice button { min-height: 36px; font-size: 13px; }
+  .roadview-header { min-height: 44px; }
+  .roadview-header-toggle { display: inline-flex; transition: transform .15s; }
+  .roadview-header-toggle.up { transform: rotate(180deg); }
+  .rv-title { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* 스위치: 손가락 닿는 곳은 56×44, 보이는 막대는 44×24 */
+  .cf-switch, .cf-switch.on { width: 56px; height: 44px; background: transparent; border-radius: 22px; padding: 0; }
+  .cf-switch::before { content: ""; position: absolute; left: 6px; top: 10px; width: 44px; height: 24px; border-radius: 12px; background: var(--switch-off); transition: background .15s; }
+  .cf-switch.on::before { background: var(--st-lead); }
+  .cf-switch::after { width: 20px; height: 20px; top: 12px; left: 8px; right: auto; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+  .cf-switch.on::after { left: 28px; right: auto; }
+  .cf-toggle-row span span { font-size: 12px; }
+
+  /* ── 업장 패널: 보조 버튼 2개 + 아래 고정 저장 바 ── */
+  .priceGuideBtn, .navBtn { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px;
+                            background: var(--surface); color: var(--navy); border: 1px solid var(--navy); }
+  .navBtn { margin-bottom: 14px; }
+  .save-bar { position: sticky; bottom: 0; z-index: 5; background: var(--surface); margin: 14px -18px -20px;
+              padding: 8px 18px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line-2);
+              box-shadow: 0 -4px 12px rgba(0,0,0,.06); }
+  .save-bar .save-btn { margin-top: 6px; min-height: 48px; font-size: 15px; }
+  .lead-hint { font-size: 13px; color: var(--text-sub); line-height: 1.45; }
+  .lead-hint:empty { display: none; }
+  .lead-hint-now { font-weight: 700; color: var(--navy); }
+  .lead-hint-line::before { content: " · "; }
+  #locBtn { color: var(--navy); }
+  #locBtn .ic { width: 24px; height: 24px; }
+  #addBtn .ic { width: 18px; height: 18px; }
+  .notice-icon { color: var(--navy); line-height: 1; }
+  .memo .ic { color: #8C6900; }
+
+  /* ── 신규업장 등록 3단계 ── */
+  .new-store-content { display: flex; flex-direction: column; max-height: calc(100vh - 80px); max-height: calc(100dvh - 80px); }
+  .new-store-header .ic { width: 20px; height: 20px; }
+  .new-store-body { max-height: none; flex: 1 1 auto; min-height: 0; }
+  .ns-stepper { display: flex; list-style: none; margin: 0; padding: 12px 16px 4px; border-bottom: 1px solid var(--line-2); }
+  .ns-stepper li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 13px; color: var(--text-sub); padding-bottom: 8px; }
+  .ns-step-num { width: 24px; height: 24px; border-radius: 50%; background: #E3E4EC; color: var(--ink-2); font-weight: 700; font-size: 13px;
+                 display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+  .ns-stepper li[aria-current="step"] { color: var(--ink); font-weight: 700; }
+  .ns-stepper li[aria-current="step"] .ns-step-num { background: var(--navy); color: #fff; }
+  .ns-stepper li.done .ns-step-num { background: var(--st-lead); color: #fff; }
+  .ns-hint-ic { display: inline-flex; color: var(--text-sub); }
+  .ns-field-err { display: none; color: var(--err-ink); font-size: 13px; font-weight: 600; margin-top: 4px; }
+  .ns-invalid .ns-field-err { display: block; }
+  .ns-invalid input { border-color: var(--err-ink); background: #FFF6F6; }
+  .ns-submit-row { margin-top: 0; padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px)); background: var(--surface); flex-shrink: 0; }
+  .ns-submit-row button { min-height: 48px; }
+  .ns-btn-next { background: var(--navy); color: #fff; }
+  .ns-btn-cancel:disabled { opacity: .5; cursor: not-allowed; }
+  .ns-outcome-buttons button.active.closed { background: var(--st-closed); color: #fff; border-color: var(--st-closed); font-weight: 700; }
+
+  /* ── 움직임 줄이기 설정을 존중 ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+                             transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  }
 </style>
 </head>
 <body>
@@ -311,61 +430,67 @@
     <div id="searchResults"></div>
   </div>
   <div id="adminStatsBar">
-    <span class="admin-partner-selector" id="adminPartnerSelector">
-      <span class="admin-stats-label-icon">📊</span>
+    <span class="admin-partner-selector" id="adminPartnerSelector" role="button" tabindex="0" aria-haspopup="true" aria-label="파트너 선택">
+      <span class="admin-stats-label-icon"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20V11M10 20V5M16 20v-6M21 20H3"/></svg></span>
       <span class="admin-stat-name" id="adminPartnerLabel">전체</span>
-      <span class="admin-partner-arrow">▼</span>
+      <span class="admin-partner-arrow"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></span>
       <div class="admin-partner-dropdown" id="adminPartnerDropdown"></div>
     </span>
-    <span class="admin-stat-item" data-admin-filter="visit">
+    <!-- ★ v71: 단순접촉 — 서버 집계 summary.simpleContact 가 있을 때만 보인다 -->
+    <span class="admin-stat-item" data-admin-filter="simpleContact" role="button" tabindex="0" aria-pressed="false" style="display:none;">
+      <span class="admin-stat-dot" style="background:#A79FD1;"></span>
+      <span class="admin-stat-name">단순접촉</span>
+      <span class="admin-stat-value" id="adminStat-simpleContact">0</span>
+    </span>
+    <span class="admin-stat-item" data-admin-filter="visit" role="button" tabindex="0" aria-pressed="false">
       <span class="admin-stat-dot" style="background:#4d4678;"></span>
       <span class="admin-stat-name">단순방문</span>
       <span class="admin-stat-value" id="adminStat-visit">0</span>
     </span>
-    <span class="admin-stat-item" data-admin-filter="lead">
+    <span class="admin-stat-item" data-admin-filter="lead" role="button" tabindex="0" aria-pressed="false">
       <span class="admin-stat-dot" style="background:#43A047;"></span>
       <span class="admin-stat-name">유효리드</span>
       <span class="admin-stat-value" id="adminStat-lead">0</span>
     </span>
-    <span class="admin-stat-item" data-admin-filter="success">
+    <span class="admin-stat-item" data-admin-filter="success" role="button" tabindex="0" aria-pressed="false">
       <span class="admin-stat-dot" style="background:#F5B800;"></span>
       <span class="admin-stat-name">계약성사</span>
       <span class="admin-stat-value" id="adminStat-success">0</span>
     </span>
-    <span class="admin-stat-item" data-admin-filter="fail">
+    <span class="admin-stat-item" data-admin-filter="fail" role="button" tabindex="0" aria-pressed="false">
       <span class="admin-stat-dot" style="background:#E53935;"></span>
       <span class="admin-stat-name">최종불발</span>
       <span class="admin-stat-value" id="adminStat-fail">0</span>
     </span>
-    <span class="admin-stats-contract-hint">★ 기계약업장 줌인 시 노출</span>
+    <span class="admin-stats-contract-hint"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg> 기계약업장 줌인 시 노출</span>
     <span class="admin-stats-version" id="adminStatsVersion"></span>
   </div>
   <div id="filterBar">
     <div id="quickChipRow">
-      <button id="comboFilterTrigger" class="filter-icon-btn" title="조회필터" aria-label="조회필터 열기">
+      <button id="comboFilterTrigger" class="filter-icon-btn" type="button" aria-haspopup="dialog" aria-controls="comboFilterPanel" aria-label="조회필터 열기">
         <svg viewBox="0 0 24 24" fill="none" stroke="#363859" stroke-width="2.1" stroke-linecap="round" aria-hidden="true">
           <path d="M3 6h3M10 6h11M3 12h11M18 12h3M3 18h3M10 18h11"/>
           <rect x="6" y="3.6" width="4" height="4.8" rx="1.3" fill="none"/>
           <rect x="14" y="9.6" width="4" height="4.8" rx="1.3" fill="none"/>
           <rect x="6" y="15.6" width="4" height="4.8" rx="1.3" fill="none"/>
-        </svg><span id="comboFilterBadge"></span>
+        </svg><span class="filter-trigger-label">필터</span><span id="comboFilterBadge"></span>
       </button>
       <!-- ★ v68: 구분(타겟/리드/기계약/프로젝트)은 가장 자주 바꾸는 축이라 바로 꺼냈다.
            ⚠️ 패널에는 두지 않는다 — 같은 값을 두 군데서 고치면 반드시 어긋난다. -->
       <span class="quick-group-label">상세구분</span>
       <button type="button" class="filter-chip quick-cat" data-val="target">타겟업장</button>
       <button type="button" class="filter-chip quick-cat" data-val="lead">리드건</button>
-      <button type="button" class="filter-chip quick-cat" data-val="contract">⭐ 기계약</button>
-      <button type="button" class="filter-chip quick-cat filter-chip-project" data-val="project" id="cfCategoryProjectPill">🎯 프로젝트영업</button>
+      <button type="button" class="filter-chip quick-cat" data-val="contract"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg> 기계약</button>
+      <button type="button" class="filter-chip quick-cat filter-chip-project" data-val="project" id="cfCategoryProjectPill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg> 프로젝트영업</button>
     </div>
     <div id="appliedChipsRow"></div>
   </div>
   <div id="comboFilterBackdrop"></div>
-  <div id="comboFilterPanel">
+  <div id="comboFilterPanel" role="dialog" aria-modal="true" aria-labelledby="comboFilterTitle">
     <div id="comboFilterPanelHandle"></div>
     <div id="comboFilterPanelHeader">
-      <span>조회필터</span>
-      <button type="button" id="comboFilterCloseBtn">✕</button>
+      <span id="comboFilterTitle">조회필터</span>
+      <button type="button" id="comboFilterCloseBtn" aria-label="조회필터 닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="comboFilterPanelBody">
       <!-- ★ v68: 구분 facet 은 상단 바로 옮겼다(quickChipRow). 여기 두지 말 것. -->
@@ -410,16 +535,16 @@
         <div class="cf-pill-group" data-facet="areaBand" id="cfAreaBandGroup"></div>
       </div>
       <div class="cf-toggle-row">
-        <span>면적 미기재 업장도 표시<br><span style="font-size:11px;color:#aaa;">끄면 23,579곳이 지도에서 빠집니다</span></span>
-        <button type="button" id="cfToggleAreaBlank" class="cf-switch on"></button>
+        <span>면적 미기재 업장도 표시<br><span style="font-size:12px;color:var(--text-sub);">끄면 23,579곳이 지도에서 빠집니다</span></span>
+        <button type="button" id="cfToggleAreaBlank" class="cf-switch on" role="switch" aria-checked="true" aria-label="면적 미기재 업장도 표시"></button>
       </div>
       <div class="cf-toggle-row">
         <span>타파트너영업중 표시</span>
-        <button type="button" id="cfToggleOtherActive" class="cf-switch on"></button>
+        <button type="button" id="cfToggleOtherActive" class="cf-switch on" role="switch" aria-checked="true" aria-label="타파트너영업중 표시"></button>
       </div>
       <div class="cf-toggle-row">
         <span>베이직 ON 업장만 보기</span>
-        <button type="button" id="cfToggleBasicOnly" class="cf-switch off"></button>
+        <button type="button" id="cfToggleBasicOnly" class="cf-switch off" role="switch" aria-checked="false" aria-label="베이직 ON 업장만 보기"></button>
       </div>
     </div>
       <div class="cf-panel-actions">
@@ -431,8 +556,8 @@
     <!-- ★ v68: 초기 텍스트를 비웠다. 예전엔 "업장 로딩 중..."이 하드코딩돼 있어서
          스크립트가 죽어도 로딩 중처럼 보였고, 2026-09-28 백지 사고 때 원인 추적이 늦어졌다. -->
     <div id="statusBar"></div>
-    <button id="locBtn" title="현재 위치">📍</button>
-    <button id="addBtn" title="업장 추가">＋ 업장추가</button>
+    <button id="locBtn" type="button" aria-label="현재 위치로 이동"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+    <button id="addBtn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> 업장추가</button>
   </div>
 </div>
 <div id="loginScreen" style="display:none;">
@@ -447,12 +572,12 @@
 </div>
 <div id="storePanel">
   <div id="panelDrag"></div>
-  <button id="panelClose" type="button" aria-label="닫기">✕</button>
+  <button id="panelClose" type="button" aria-label="업장 정보 닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   <div id="panelContent"></div>
 </div>
 <div id="noticeModal">
   <div class="notice-box">
-    <div class="notice-icon" id="noticeIcon">📢</div>
+    <div class="notice-icon" id="noticeIcon"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10v4h3l7 4V6l-7 4z"/><path d="M18 9.5a4 4 0 0 1 0 5"/></svg></div>
     <div class="notice-title" id="noticeTitle">새로운 안내사항이 있습니다</div>
     <div class="notice-message" id="noticeMessage"></div>
     <div class="notice-buttons">
@@ -461,151 +586,176 @@
     </div>
   </div>
 </div>
-<div id="newStoreModal" class="new-store-modal">
+<!-- ★ v71: 신규업장 등록을 3단계(장소 / 영업 정보 / 상담 결과)로 나눴다.
+     ⚠️ 모든 입력 id·onclick·submitNewStore()의 페이로드는 v70 그대로다(서버 Web App 계약 불변).
+     단계는 보이기만 나눈 것이라 어느 단계에 있든 모든 값이 한 폼에 남아 있다. -->
+<div id="newStoreModal" class="new-store-modal" role="dialog" aria-modal="true" aria-labelledby="nsModalTitle">
   <div class="new-store-content">
     <div class="new-store-header">
-      <h2>＋ 신규업장 등록</h2>
-      <button class="new-store-close" onclick="closeNewStoreModal()" type="button">✕</button>
+      <h2 id="nsModalTitle"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> 신규업장 등록</h2>
+      <button class="new-store-close" onclick="closeNewStoreModal()" type="button" aria-label="신규업장 등록 닫기"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
-    <div class="new-store-body">
-      <div class="new-store-hint">
-        <span>📍</span>
-        <span>업장 검색 후에 나오지 않는 곳만 등록해주세요!<br>(사업자명 변경은 상담내용에 기입)</span>
-      </div>
-      <div class="ns-form-group">
-        <label>사업장명 / 주소 검색 <span class="required">*</span></label>
-        <div class="ns-search-wrapper">
-          <input type="text" id="nsSearchInput" placeholder="사업장명 또는 주소를 검색하세요" autocomplete="off" oninput="onNsSearchInput()">
-          <div id="nsSearchResults" class="ns-search-results"></div>
-        </div>
-        <div class="ns-helper">검색 결과가 없으면 아래 사업장명/주소를 직접 입력하세요</div>
-      </div>
-      <div id="nsSelectedPlace" class="ns-selected-place">
-        <button class="ns-sp-clear" onclick="clearSelectedPlace()" type="button">변경</button>
-        <div class="ns-sp-label">선택된 장소</div>
-        <div class="ns-sp-name" id="nsSelectedName"></div>
-        <div class="ns-sp-addr" id="nsSelectedAddr"></div>
-      </div>
-      <div class="ns-form-group">
-        <label>사업장명 <span class="required">*</span></label>
-        <input type="text" id="nsStoreName" placeholder="검색 시 자동 입력 / 직접 입력 가능">
-      </div>
-      <div class="ns-form-group">
-        <label>주소 <span class="required">*</span></label>
-        <input type="text" id="nsAddress" placeholder="검색 시 자동 입력 / 직접 입력 가능">
-      </div>
-     <div class="ns-form-group">
-        <label>영업구분</label>
-        <div class="ns-admin-type-buttons">
-          <button type="button" data-salestype="인바운드" onclick="selectSalesType(this)">인바운드</button>
-          <button type="button" data-salestype="아웃바운드" onclick="selectSalesType(this)">아웃바운드</button>
-        </div>
-      </div>
-      <!-- ★ v56: 접촉방식 — 영업구분 바로 아래 -->
-      <div class="ns-form-group">
-        <label>접촉방식</label>
-        <select id="nsContactMethod"></select>
-      </div>
-      <div class="ns-form-group">
-        <label>폐기물 선택</label>
-        <select id="nsWasteType" onchange="applyNsWasteTypeUI(this.value)"></select>
-      </div>
-      <div class="ns-form-group">
-        <label>행정신고구분</label>
-        <div class="ns-admin-type-buttons">
-          <button type="button" data-admintype="다량배출사업장" onclick="selectAdminType(this)">다량배출사업장</button>
-          <button type="button" data-admintype="올바로사업장" onclick="selectAdminType(this)">올바로사업장</button>
-          <button type="button" data-admintype="일반사업장" onclick="selectAdminType(this)">일반사업장</button>
-        </div>
-      </div>
-      <div class="ns-form-group">
-        <label>현재 수거·운반 업체명</label>
-        <input type="text" id="nsCurrentStoreName" placeholder="예: ㅇㅇ환경 — 지금 폐기물을 가져가는 업체">
-        <div class="ns-helper">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 업장명이 다르면 상담내용에 적어주세요.</div>
-      </div>
-      <div class="ns-form-group">
-        <label for="nsContact">담당자 연락처<span class="num-warn-msg"></span></label>
-        <input type="tel" id="nsContact" inputmode="numeric" placeholder="010-0000-0000" maxlength="13">
-      </div>
-      <div class="ns-form-row">
-        <div class="ns-form-group">
-          <label for="nsAmount"><span id="lbl_nsAmount">월 예상배출량 (L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
-          <input type="text" id="nsAmount" inputmode="numeric" placeholder="예: 500">
+    <ol class="ns-stepper" id="nsStepper" aria-label="등록 단계">
+      <li data-n="1" aria-current="step"><span class="ns-step-num">1</span>장소</li>
+      <li data-n="2"><span class="ns-step-num">2</span>영업 정보</li>
+      <li data-n="3"><span class="ns-step-num">3</span>상담 결과</li>
+    </ol>
+    <div class="new-store-body" id="nsBody">
+      <!-- ── 1단계: 장소 ── -->
+      <div class="ns-step" data-step="1">
+        <div class="new-store-hint">
+          <span class="ns-hint-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+          <span>업장 검색 후에 나오지 않는 곳만 등록해주세요!<br>(사업자명 변경은 상담내용에 기입)</span>
         </div>
         <div class="ns-form-group">
-          <label for="nsFreq">주 수거횟수<span class="num-warn-msg">숫자만 기재해주세요</span></label>
-          <input type="text" id="nsFreq" inputmode="numeric" placeholder="예: 3">
+          <label for="nsSearchInput">사업장명 / 주소 검색 <span class="required" aria-hidden="true">*</span></label>
+          <div class="ns-search-wrapper">
+            <input type="text" id="nsSearchInput" placeholder="사업장명 또는 주소를 검색하세요" autocomplete="off" oninput="onNsSearchInput()">
+            <div id="nsSearchResults" class="ns-search-results"></div>
+          </div>
+          <div class="ns-helper">검색 결과가 없으면 아래 사업장명/주소를 직접 입력하세요</div>
+        </div>
+        <div id="nsSelectedPlace" class="ns-selected-place">
+          <button class="ns-sp-clear" onclick="clearSelectedPlace()" type="button">변경</button>
+          <div class="ns-sp-label">선택된 장소</div>
+          <div class="ns-sp-name" id="nsSelectedName"></div>
+          <div class="ns-sp-addr" id="nsSelectedAddr"></div>
+        </div>
+        <div class="ns-form-group" id="grp_nsStoreName">
+          <label for="nsStoreName">사업장명 <span class="required" aria-hidden="true">*</span></label>
+          <input type="text" id="nsStoreName" placeholder="검색 시 자동 입력 / 직접 입력 가능" aria-required="true" aria-describedby="nsErrStoreName">
+          <div class="ns-field-err" id="nsErrStoreName">사업장명을 입력해주세요.</div>
+        </div>
+        <div class="ns-form-group" id="grp_nsAddress">
+          <label for="nsAddress">주소 <span class="required" aria-hidden="true">*</span></label>
+          <input type="text" id="nsAddress" placeholder="검색 시 자동 입력 / 직접 입력 가능" aria-required="true" aria-describedby="nsErrAddress">
+          <div class="ns-field-err" id="nsErrAddress">주소를 입력해주세요.</div>
+        </div>
+        <div class="ns-form-group">
+          <label id="nsLblAdminType">행정신고구분</label>
+          <div class="ns-admin-type-buttons" role="group" aria-labelledby="nsLblAdminType">
+            <button type="button" data-admintype="다량배출사업장" onclick="selectAdminType(this)">다량배출사업장</button>
+            <button type="button" data-admintype="올바로사업장" onclick="selectAdminType(this)">올바로사업장</button>
+            <button type="button" data-admintype="일반사업장" onclick="selectAdminType(this)">일반사업장</button>
+          </div>
         </div>
       </div>
-      <div class="ns-form-row">
+      <!-- ── 2단계: 영업 정보 ── -->
+      <div class="ns-step" data-step="2" hidden>
         <div class="ns-form-group">
-          <label for="nsPrice"><span id="lbl_nsPrice">현재 단가 (원/L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
-          <input type="text" id="nsPrice" inputmode="numeric" placeholder="예: 180">
+          <label id="nsLblSalesType">영업구분</label>
+          <div class="ns-admin-type-buttons" role="group" aria-labelledby="nsLblSalesType">
+            <button type="button" data-salestype="인바운드" onclick="selectSalesType(this)">인바운드</button>
+            <button type="button" data-salestype="아웃바운드" onclick="selectSalesType(this)">아웃바운드</button>
+          </div>
+        </div>
+        <!-- ★ v56: 접촉방식 — 영업구분 바로 아래 -->
+        <div class="ns-form-group">
+          <label for="nsContactMethod">접촉방식</label>
+          <select id="nsContactMethod"></select>
         </div>
         <div class="ns-form-group">
-          <label for="nsSuggestedPrice"><span id="lbl_nsSuggestedPrice">제안 단가 (원/L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
-          <input type="text" id="nsSuggestedPrice" inputmode="numeric" placeholder="예: 170">
+          <label for="nsWasteType">폐기물 선택</label>
+          <select id="nsWasteType" onchange="applyNsWasteTypeUI(this.value)"></select>
         </div>
-      </div>
-      <div class="ns-form-row">
-        <div class="ns-form-group" id="grp_nsBins">
-          <label for="nsBins">현재 통 갯수<span class="num-warn-msg">숫자만 기재해주세요</span></label>
-          <input type="text" id="nsBins" inputmode="numeric" placeholder="예: 4">
+        <div class="ns-form-group">
+          <label for="nsCurrentStoreName">현재 수거·운반 업체명</label>
+          <input type="text" id="nsCurrentStoreName" placeholder="예: ㅇㅇ환경 — 지금 폐기물을 가져가는 업체">
+          <div class="ns-helper">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 업장명이 다르면 상담내용에 적어주세요.</div>
         </div>
-        <div class="ns-form-group" id="grp_nsVinyl">
-          <label>비닐 사용여부</label>
-          <select id="nsVinyl">
+        <div class="ns-form-group">
+          <label for="nsContact">담당자 연락처<span class="num-warn-msg"></span></label>
+          <input type="tel" id="nsContact" inputmode="numeric" placeholder="010-0000-0000" maxlength="13">
+        </div>
+        <div class="ns-form-row">
+          <div class="ns-form-group">
+            <label for="nsAmount"><span id="lbl_nsAmount">월 예상배출량 (L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
+            <input type="text" id="nsAmount" inputmode="numeric" placeholder="예: 500">
+          </div>
+          <div class="ns-form-group">
+            <label for="nsFreq">주 수거횟수<span class="num-warn-msg">숫자만 기재해주세요</span></label>
+            <input type="text" id="nsFreq" inputmode="numeric" placeholder="예: 3">
+          </div>
+        </div>
+        <div class="ns-form-row">
+          <div class="ns-form-group">
+            <label for="nsPrice"><span id="lbl_nsPrice">현재 단가 (원/L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
+            <input type="text" id="nsPrice" inputmode="numeric" placeholder="예: 180">
+          </div>
+          <div class="ns-form-group">
+            <label for="nsSuggestedPrice"><span id="lbl_nsSuggestedPrice">제안 단가 (원/L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
+            <input type="text" id="nsSuggestedPrice" inputmode="numeric" placeholder="예: 170">
+          </div>
+        </div>
+        <div class="ns-form-row">
+          <div class="ns-form-group" id="grp_nsBins">
+            <label for="nsBins">현재 통 갯수<span class="num-warn-msg">숫자만 기재해주세요</span></label>
+            <input type="text" id="nsBins" inputmode="numeric" placeholder="예: 4">
+          </div>
+          <div class="ns-form-group" id="grp_nsVinyl">
+            <label for="nsVinyl">비닐 사용여부</label>
+            <select id="nsVinyl">
+              <option value="">선택</option>
+              <option value="사용">사용</option>
+              <option value="미사용">미사용</option>
+              <option value="지자체">지자체</option>
+              <option value="처리기">처리기</option>
+            </select>
+          </div>
+        </div>
+        <div class="ns-form-group">
+          <label for="nsTruck">5톤 차량 진입 가능여부</label>
+          <select id="nsTruck">
             <option value="">선택</option>
-            <option value="사용">사용</option>
-            <option value="미사용">미사용</option>
-            <option value="지자체">지자체</option>
-            <option value="처리기">처리기</option>
+            <option value="가능">가능</option>
+            <option value="불가능">불가능</option>
           </select>
         </div>
       </div>
-      <div class="ns-form-group">
-        <label>5톤 차량 진입 가능여부</label>
-        <select id="nsTruck">
-          <option value="">선택</option>
-          <option value="가능">가능</option>
-          <option value="불가능">불가능</option>
-        </select>
-      </div>
-      <!-- ★ v56: 예상계약일자 — 상세 상담내용 바로 위 -->
-      <div class="ns-form-group">
-        <label>예상계약일자</label>
-        <div class="date-select-row">
-          <select id="nsEcdY"></select><select id="nsEcdM"></select><select id="nsEcdD"></select>
+      <!-- ── 3단계: 상담 결과 ── -->
+      <div class="ns-step" data-step="3" hidden>
+        <!-- ★ v56: 예상계약일자 — 상세 상담내용 바로 위 -->
+        <div class="ns-form-group">
+          <label for="nsEcdY">예상계약일자</label>
+          <div class="date-select-row">
+            <select id="nsEcdY" aria-label="예상계약 연도"></select><select id="nsEcdM" aria-label="예상계약 월"></select><select id="nsEcdD" aria-label="예상계약 일"></select>
+          </div>
+        </div>
+        <div class="ns-form-group">
+          <label for="nsNote">상세 상담내용</label>
+          <textarea id="nsNote" placeholder="상담 내용을 기록하세요"></textarea>
+        </div>
+        <div class="ns-form-group">
+          <label id="nsLblOutcome">최종영업결과</label>
+          <!-- ★ v71: '폐업' 추가 — 서버는 outcome 문자열을 그대로 적재한다(방문기록 폼은 이미 폐업을 보낸다) -->
+          <div class="ns-outcome-buttons" role="group" aria-labelledby="nsLblOutcome">
+            <button type="button" data-outcome="" class="default active" onclick="selectOutcome(this)">기록만</button>
+            <button type="button" data-outcome="성사" class="success" onclick="selectOutcome(this)">성사</button>
+            <button type="button" data-outcome="실패" class="fail" onclick="selectOutcome(this)">실패</button>
+            <button type="button" data-outcome="폐업" class="closed" onclick="selectOutcome(this)">폐업</button>
+          </div>
+        </div>
+        <!-- ★ v60: 불발사유 (AD열) / 기타불발사유 (AE열) — '실패' 선택 시에만 노출 -->
+        <div class="ns-form-group" id="ns_grp_failReason" style="display:none;">
+          <label for="ns_failReason">불발사유</label>
+          <select id="ns_failReason"></select>
+        </div>
+        <div class="ns-form-group" id="ns_grp_failReasonEtc" style="display:none;">
+          <label for="ns_failReasonEtc">기타 불발사유</label>
+          <input type="text" id="ns_failReasonEtc" placeholder="사유를 직접 입력해주세요">
         </div>
       </div>
-      <div class="ns-form-group">
-        <label>상세 상담내용</label>
-        <textarea id="nsNote" placeholder="상담 내용을 기록하세요"></textarea>
-      </div>
-      <div class="ns-form-group">
-        <label>최종영업결과</label>
-        <div class="ns-outcome-buttons">
-          <button type="button" data-outcome="" class="default active" onclick="selectOutcome(this)">기록만</button>
-          <button type="button" data-outcome="성사" class="success" onclick="selectOutcome(this)">성사</button>
-          <button type="button" data-outcome="실패" class="fail" onclick="selectOutcome(this)">실패</button>
-        </div>
-      </div>
-      <!-- ★ v60: 불발사유 (AD열) / 기타불발사유 (AE열) — '실패' 선택 시에만 노출 -->
-      <div class="ns-form-group" id="ns_grp_failReason" style="display:none;">
-        <label>불발사유</label>
-        <select id="ns_failReason"></select>
-      </div>
-      <div class="ns-form-group" id="ns_grp_failReasonEtc" style="display:none;">
-        <label>기타 불발사유</label>
-        <input type="text" id="ns_failReasonEtc" placeholder="사유를 직접 입력해주세요">
-      </div>
-      <div class="ns-submit-row">
-        <button class="ns-btn-cancel" onclick="closeNewStoreModal()" type="button">취소</button>
-        <button class="ns-btn-submit" id="nsSubmitBtn" onclick="submitNewStore()" type="button">등록</button>
-      </div>
+    </div>
+    <div class="ns-submit-row">
+      <button class="ns-btn-cancel" id="nsCancelBtn" onclick="closeNewStoreModal()" type="button">취소</button>
+      <button class="ns-btn-cancel" id="nsPrevBtn" onclick="nsPrevStep_()" type="button" hidden>이전</button>
+      <button class="ns-btn-next" id="nsNextBtn" onclick="nsNextStep_()" type="button">다음</button>
+      <button class="ns-btn-submit" id="nsSubmitBtn" onclick="submitNewStore()" type="button" hidden>등록</button>
     </div>
   </div>
 </div>
+<!-- ★ v71: 토스트는 처음부터 있는 live region 이어야 화면낭독기가 읽는다 -->
+<div id="nsToast" class="ns-toast" role="status" aria-live="polite"></div>
 <script>
 /* ★ v68: 초기화 실패를 화면에 드러낸다.
    2026-09-28 에 const 선언 순서(TDZ) 한 줄 때문에 <script> 전체가 죽었는데,
@@ -653,7 +803,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v70';
+const APP_VERSION = 'v71';   // ★ v71
 const PARTNER_FETCH_MAX_LEVEL = 7;        // 파트너: 이 레벨보다 넓게 보면 업장을 새로 받지 않는다(전국 범위 질의 방지)
 const PARTNER_CLUSTER_MIN_LEVEL = 5;      // 파트너: 이 레벨부터 클러스터로 묶는다(가까이선 지금처럼 낱개 핀)
 const PARTNER_FETCH_PAD_RATIO = 0.5;      // 위도 띠를 화면 높이의 50%(최대 0.03°)씩 위아래로 넉넉히 받아 작은 이동엔 재조회 안 함
@@ -668,6 +818,33 @@ const SEARCH_DEDUP_TOP_N = 200;
    리드 상태 재정의가 오면 이 배열과 highestPriorityStatus_() 만 고치면 된다.
    기계약(contract)은 영업 진행 상태보다 낮고 불발·폐업보다 높게 뒀다. */
 const PIN_STATUS_PRIORITY = ['success', 'lead', 'visit', 'simpleContact', 'contract', 'fail', 'closedByMe', 'none'];
+/* ★ v71: 리드 상태 v2 — 판정 함수는 classifyVisitCurrent() 하나. 서버 집계도 같은 규칙(같은 버전 문자열)을 쓴다.
+   각 조건은 최소 기준: 유효리드 = 연락처·제안단가·배출량 / 단순방문 = 수거업체·통갯수·비닐·5톤차량. */
+const LEAD_RULE_VERSION = 'v2-20261013';
+const LEAD_V2_LEAD_FIELDS = ['contact', 'suggestedPrice', 'amount'];
+const LEAD_V2_VISIT_FIELDS = ['currentStoreName', 'bins', 'vinyl', 'truck'];
+const LEAD_V2_CONTACT_FIELDS = ['currentStoreName', 'contact', 'amount', 'price', 'suggestedPrice', 'freq',
+                                'bins', 'vinyl', 'truck', 'note', 'repriority'];
+const LEAD_V2_FIELD_NAMES = { contact: '연락처', suggestedPrice: '제안단가', amount: '배출량',
+                              currentStoreName: '수거업체', bins: '통 갯수', vinyl: '비닐', truck: '5톤차량' };
+// ★ v71: UI 아이콘(이모지 대신 선 아이콘 SVG). 빌드가 정적 HTML 과 같은 원본에서 만든다(_test/build_v71.py ICON_PATHS).
+const IC_ = {
+  x: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  chev: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>',
+  pin: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+  locate: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
+  chart: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20V11M10 20V5M16 20v-6M21 20H3"/></svg>',
+  star: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
+  target: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>',
+  plus: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>',
+  user: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>',
+  notice: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 10v4h3l7 4V6l-7 4z"/><path d="M18 9.5a4 4 0 0 1 0 5"/></svg>',
+  alert: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>',
+  note: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h9l4 4v14H6z"/><path d="M9.5 12h6M9.5 16h6"/></svg>',
+  nav: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 11l16-7-7 16-2-7z"/></svg>',
+  camera: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13.5" r="3.5"/></svg>'
+};
+const NS_STEP_COUNT_ = 3;   // ★ v71: 신규업장 등록 단계 수
 function isAdmin(code) {
   return code && ADMIN_CODES.indexOf(String(code).trim()) !== -1;
 }
@@ -763,10 +940,11 @@ function clearAllCaches() {
     try { if (localStorage.getItem(k)) localStorage.removeItem(k); } catch(e) {}
   });
 })();
+// ★ v71: icon 은 IC_ 의 SVG 이름이다(이모지 대신)
 const NOTICE_TYPES = {
-  projectAssignments: { icon: '🎯', title: '프로젝트 배정 변경', cacheKeysToClear: ['cache_my_projects_v3'] },
-  contractStores: { icon: '⭐', title: '기계약 업장 변경', cacheKeysToClear: [] },
-  general: { icon: '📢', title: '공지사항', cacheKeysToClear: [] }
+  projectAssignments: { icon: 'target', title: '프로젝트 배정 변경', cacheKeysToClear: ['cache_my_projects_v3'] },
+  contractStores: { icon: 'star', title: '기계약 업장 변경', cacheKeysToClear: [] },
+  general: { icon: 'notice', title: '공지사항', cacheKeysToClear: [] }
 };
 const NOTICE_SEEN_PREFIX = 'notice_seen_';
 async function checkNotices() {
@@ -790,9 +968,9 @@ function showNoticesSequentially(queue) {
   showNoticeModal(item.type, item.notice, function() { showNoticesSequentially(queue); });
 }
 function showNoticeModal(type, notice, onClose) {
-  const meta = NOTICE_TYPES[type] || { icon: '📢', title: '안내', cacheKeysToClear: [] };
+  const meta = NOTICE_TYPES[type] || { icon: 'notice', title: '안내', cacheKeysToClear: [] };
   const modal = document.getElementById('noticeModal');
-  document.getElementById('noticeIcon').textContent = meta.icon;
+  document.getElementById('noticeIcon').innerHTML = IC_[meta.icon] || IC_.notice;   // ★ v71: 고정 SVG(사용자 입력 아님)
   const displayTitle = (type === 'general' && notice.title) ? notice.title : meta.title;
   document.getElementById('noticeTitle').textContent = displayTitle;
   const messageEl = document.getElementById('noticeMessage');
@@ -847,7 +1025,7 @@ let currentFilter = "all";
  *     "지도 흰 화면 + 로그아웃 버튼 무반응" 증상이 났습니다.
  *   ⚠️ 이 선언을 partnerComboFilter 아래로 다시 옮기지 마세요. */
 const CATEGORY_DEFAULT_ = ['target', 'lead'];
-const CATEGORY_LABELS_ = { target: '타겟업장', lead: '리드건', contract: '⭐ 기계약', project: '🎯 프로젝트영업' };
+const CATEGORY_LABELS_ = { target: '타겟업장', lead: '리드건', contract: '기계약', project: '프로젝트영업' };   // ★ v71: 이모지 제거
 // ★ 파트너 조합필터 상태 (currentFilter === 'all' + 파트너 화면일 때만 적용됨. 관리자/외주는 무관)
 // ★ v68: bizType(업종) · areaBand(면적) facet 추가.
 //   areaIncludeBlank 기본 true — 면적은 41%가 공백이라 끄면 23,579곳이 한꺼번에 사라진다.
@@ -918,6 +1096,7 @@ let _nsSelectedPlace = null;
 let _nsSelectedAdminType = '';
 let _nsSelectedSalesType = '';
 let _nsSelectedOutcome = '';
+let _nsStep = 1;   // ★ v71: 신규업장 등록 현재 단계
 // ★ v70 전역 — 속도·비용 개선 + 다중 파트너 + 같은 건물 묶음
 let _storesBand = null;          // 파트너: 마지막으로 받은 위도 띠 { latMin, latMax, raw:{k:store} } — 띠 안 이동은 재조회 없음
 let _storesReqSeq = 0;           // 파트너: 늦게 온 옛 응답 버리기용 순번
@@ -1190,6 +1369,10 @@ async function startApp() {
 }
 function bindAdminStatsFilters() {
   document.querySelectorAll('.admin-stat-item[data-admin-filter]').forEach(function(el) {
+    // ★ v71: span 이라 키보드로 못 눌렀다 → Enter/Space 를 클릭으로
+    el.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+    });
     el.addEventListener('click', function() {
       const filter = el.dataset.adminFilter;
       if (currentFilter === filter) {
@@ -1200,6 +1383,9 @@ function bindAdminStatsFilters() {
         document.querySelectorAll('.admin-stat-item').forEach(o => o.classList.remove('active'));
         el.classList.add('active');
       }
+      document.querySelectorAll('.admin-stat-item[data-admin-filter]').forEach(function(o) {   // ★ v71
+        o.setAttribute('aria-pressed', o.classList.contains('active') ? 'true' : 'false');
+      });
       console.log('[관리자 필터]', currentFilter);
       resetAdminViewZoom();
       renderAdminView();
@@ -1214,6 +1400,9 @@ function bindAdminStatsFilters() {
   });
   const selectorEl = document.getElementById('adminPartnerSelector');
   if (selectorEl) {
+    selectorEl.addEventListener('keydown', function(e) {   // ★ v71: 키보드로 파트너 목록 열기
+      if ((e.key === 'Enter' || e.key === ' ') && e.target === selectorEl) { e.preventDefault(); selectorEl.click(); }
+    });
     selectorEl.addEventListener('click', function(e) {
       e.stopPropagation();
       const dropdown = document.getElementById('adminPartnerDropdown');
@@ -1235,14 +1424,14 @@ function buildAdminPartnerDropdown() {
     };
   }).sort(function(a, b) { return b.count - a.count; });
   let html = '<div class="admin-partner-option ' + (selectedAdminPartner === 'all' ? 'selected' : '') + '" data-partner="all">';
-  html += '<span>📊 전체</span>';
+  html += '<span>' + IC_.chart + ' 전체</span>';
   if (visitsAggregate.summary && visitsAggregate.summary.totalUniqueStores) {
     html += '<span class="partner-record-count">' + visitsAggregate.summary.totalUniqueStores + '</span>';
   }
   html += '</div>';
   partnerList.forEach(function(p) {
     html += '<div class="admin-partner-option ' + (selectedAdminPartner === p.key ? 'selected' : '') + '" data-partner="' + escapeHtml(p.key) + '">';
-    html += '<span>👤 ' + escapeHtml(p.name) + '</span>';
+    html += '<span>' + IC_.user + ' ' + escapeHtml(p.name) + '</span>';
     html += '<span class="partner-record-count">' + p.count + '</span>';
     html += '</div>';
   });
@@ -1472,7 +1661,7 @@ async function loadAdminMasterStores() {
     validStores = validStores.filter(function(s) {
       if (!isClosed(s)) return true;
       const aggData = targetStoresMap[s._key];
-      return aggData && aggData.lastStatus === 'lead';
+      return aggData && (aggData.topStatus || aggData.lastStatus) === 'lead';   // ★ v71: topStatus 우선
     });
     adminMasterStores = validStores;
     console.log('[관리자 마스터] 적재 완료: ' + adminMasterStores.length + '개');
@@ -1498,6 +1687,14 @@ function updateAdminStatsBar() {
   document.getElementById('adminStat-lead').textContent = summary.lead || 0;
   document.getElementById('adminStat-success').textContent = summary.success || 0;
   document.getElementById('adminStat-fail').textContent = summary.fail || 0;
+  // ★ v71: 단순접촉 — 서버 summary 에 simpleContact 가 있을 때만 보인다(없으면 숨김, 오류 없음)
+  const scEl = document.getElementById('adminStat-simpleContact');
+  if (scEl) {
+    const hasSc = summary.simpleContact !== undefined && summary.simpleContact !== null;
+    scEl.textContent = hasSc ? summary.simpleContact : 0;
+    const scItem = scEl.closest ? scEl.closest('.admin-stat-item') : null;
+    if (scItem) scItem.style.display = hasSc ? '' : 'none';
+  }
   const v = visitsAggregate.version || '미집계';
   const ts = visitsAggregate.updatedAt;
   let versionText = 'v' + v;
@@ -1837,14 +2034,14 @@ function moveToMyLocation() {
     map.setLevel(4);
     return;
   }
-  if (!navigator.geolocation) { alert("위치 기능을 지원하지 않는 브라우저입니다."); return; }
+  if (!navigator.geolocation) { showNsToast("위치 기능을 지원하지 않는 브라우저입니다.", 4000); return; }   // ★ v71: alert → 토스트
   navigator.geolocation.getCurrentPosition(function(pos) {
     currentUserLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
     updateMyLocationMarker(pos.coords.latitude, pos.coords.longitude);
     map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
     map.setLevel(4);
   }, function(err) {
-    alert("현재 위치를 가져올 수 없습니다.\n위치 권한을 허용해주세요.");
+    showNsToast("현재 위치를 가져올 수 없습니다. 위치 권한을 허용해주세요.", 4000);   // ★ v71: alert → 토스트
   });
 }
 /* ★ v70: 파트너 업장 불러오기 — 비용·속도 개선
@@ -1873,7 +2070,7 @@ async function loadStoresInView(opts) {
       // 프로젝트 업장은 내 배정 인덱스(partner_projects)를 이미 들고 있으므로 추가 조회 없이 띄운다
       allStoresInView = buildProjectOnlyStores_();
       renderMarkers();
-      statusBar.textContent = '🎯 내 프로젝트 업장 ' + allStoresInView.length + '곳 · 다른 업장은 지도를 확대해 주세요';
+      statusBar.textContent = '내 프로젝트 업장 ' + allStoresInView.length + '곳 · 다른 업장은 지도를 확대해 주세요';
     } else {
       allStoresInView = [];
       renderMarkers();
@@ -2153,11 +2350,12 @@ function getEffectiveStatus(store) {
       targetStoresMap = (pData && pData.stores) || {};
     }
     const aggData = targetStoresMap[store._key];
-    if (aggData && aggData.lastStatus) {
+    if (aggData && (aggData.lastStatus || aggData.topStatus)) {
       if (isContractGrade(store.grade)) return "contract";
       // ★ v70: '전체' 보기에선 마지막 파트너가 아니라 파트너들 중 가장 높은 상태로 칠한다
-      if (selectedAdminPartner === 'all') return adminPinStatusForStore_(store._key, aggData.lastStatus);
-      return aggData.lastStatus;
+      // ★ v71: 서버 집계가 topStatus(같은 v2 규칙의 최고 상태)를 주면 그걸 쓰고, 없으면 v70 처럼 여기서 계산한다
+      if (selectedAdminPartner === 'all') return aggData.topStatus || adminPinStatusForStore_(store._key, aggData.lastStatus);
+      return aggData.lastStatus || aggData.topStatus;
     }
   }
   return getVisitStatus(store);
@@ -2288,7 +2486,8 @@ function renderAppliedChipsRow() {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'applied-chip';
-    el.innerHTML = escapeHtml(c.label) + ' <span class="x">✕</span>';
+    el.innerHTML = escapeHtml(c.label) + ' <span class="x">' + IC_.x + '</span>';   // ★ v71
+    el.setAttribute('aria-label', c.label + ' 조건 해제');
     el.onclick = function() { removeComboFilterChip(c.key); };
     row.appendChild(el);
   });
@@ -2321,7 +2520,20 @@ function updateComboFilterBadgeAndChips() {
   const trigger = document.getElementById('comboFilterTrigger');
   badge.textContent = n > 0 ? String(n) : '';
   trigger.classList.toggle('active', n > 0);
+  trigger.setAttribute('aria-label', n > 0 ? '조회필터 열기 (적용 ' + n + '개)' : '조회필터 열기');   // ★ v71
   renderAppliedChipsRow();
+  syncFilterAria_();
+}
+/* ★ v71: 선택 상태를 색으로만 알리지 않게 pill 은 aria-pressed, 스위치는 aria-checked 로 맞춘다.
+   클래스(sel/on)가 진실이고 이 함수는 따라가기만 한다 — 상태가 바뀌는 길목마다 부른다. */
+function syncFilterAria_() {
+  document.querySelectorAll('.cf-pill').forEach(function(b) {
+    b.setAttribute('aria-pressed', b.classList.contains('sel') ? 'true' : 'false');
+  });
+  ['cfToggleAreaBlank', 'cfToggleOtherActive', 'cfToggleBasicOnly'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute('aria-checked', el.classList.contains('on') ? 'true' : 'false');
+  });
 }
 // ★ 패널의 선택 상태를 마지막 적용값(partnerComboFilter) 기준으로 되돌림 (X/배경 클릭으로 닫을 때 사용)
 function syncPanelDOMFromState() {
@@ -2334,6 +2546,7 @@ function syncPanelDOMFromState() {
   document.getElementById('cfToggleOtherActive').classList.toggle('on', f.otherActive);
   document.getElementById('cfToggleBasicOnly').classList.toggle('on', f.basicOnly);
   document.getElementById('cfToggleAreaBlank').classList.toggle('on', f.areaIncludeBlank !== false); // ★ v68
+  syncFilterAria_();   // ★ v71
 }
 // ★ 중복그룹 내 특정 UID에 "기록"이 있는지 판단 (나 또는 타파트너, 단순접촉 이상만 인정)
 //   완전히 빈 값으로 저장된 기록(status===none)은 기록으로 안 침
@@ -2410,17 +2623,23 @@ function updateApplyButtonCount() {
   const draft = readComboFilterFromDOM();
   const n = computeComboFilterMatchCount(draft);
   document.getElementById('cfApplyBtn').textContent = n + '개 업장 보기';
+  syncFilterAria_();   // ★ v71
 }
 function openComboFilterPanel() {
   syncPanelDOMFromState();
   updateApplyButtonCount();
   document.getElementById('comboFilterBackdrop').classList.add('open');
   document.getElementById('comboFilterPanel').classList.add('open');
+  // ★ v71: 대화상자가 열리면 포커스를 안으로(닫기 버튼) 옮긴다
+  try { document.getElementById('comboFilterCloseBtn').focus(); } catch(e) {}
 }
 function closeComboFilterPanel(shouldRevert) {
   if (shouldRevert) syncPanelDOMFromState();
+  const panel = document.getElementById('comboFilterPanel');
+  const wasOpen = panel.classList.contains('open');
   document.getElementById('comboFilterBackdrop').classList.remove('open');
-  document.getElementById('comboFilterPanel').classList.remove('open');
+  panel.classList.remove('open');
+  if (wasOpen) { try { document.getElementById('comboFilterTrigger').focus(); } catch(e) {} }   // ★ v71: 연 버튼으로 포커스 복귀
 }
 // ★ v54: 폐기물 종류 필터 팩셋 옵션을 WASTE_TYPES 배열로 자동 채움 (라벨 중복 관리 방지)
 function populateWasteTypeFilterPills_() {
@@ -2487,6 +2706,17 @@ function bindComboFilterUI() {
   document.getElementById('comboFilterTrigger').onclick = function() { openComboFilterPanel(); };
   document.getElementById('comboFilterCloseBtn').onclick = function() { closeComboFilterPanel(true); };
   document.getElementById('comboFilterBackdrop').onclick = function() { closeComboFilterPanel(true); };
+  // ★ v71: Esc 로 조회필터 시트 · 신규업장 등록 창을 닫는다 (한 번만 바인딩)
+  if (!document._v71EscBound) {
+    document._v71EscBound = true;
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape' && e.key !== 'Esc') return;
+      const cf = document.getElementById('comboFilterPanel');
+      if (cf && cf.classList.contains('open')) { closeComboFilterPanel(true); return; }
+      const ns = document.getElementById('newStoreModal');
+      if (ns && ns.classList.contains('open')) { closeNewStoreModal(); }
+    });
+  }
   document.getElementById('cfResetBtn').onclick = function() {
     document.querySelectorAll('.cf-pill.sel').forEach(function(b) { b.classList.remove('sel'); });
     document.getElementById('cfToggleOtherActive').classList.add('on');
@@ -2841,32 +3071,81 @@ function effectiveVisitValues_(cur) {
     suggestedPrice: keep(cur.suggestedPrice, isValidPrice_(cur.suggestedPrice))
   };
 }
+/* ★ v71: 리드 상태 v2 (LEAD_RULE_VERSION = 'v2-20261013', 2026-10-13 사용자 결정).
+   상태 판정은 이 함수 하나뿐이다 — 핀 색·조회필터(리드상태 pill·상세구분 칩·"N개 업장 보기")·
+   대표 기록 고르기·타파트너 보호·검색 배지·저장 토스트가 전부 여기(또는 getVisitStatus → 여기)를 탄다.
+   서버(visits_sync 집계)도 같은 규칙·같은 키를 쓴다(success/fail/closedByMe/lead/visit/simpleContact/none).
+   각 조건은 '최소 기준'이다(나머지 필드는 선택). 위에서부터 처음 맞는 것 하나:
+     1 최종결과 '성사' → success   2 '실패' → fail   3 '폐업' → closedByMe   (명시 선택이 필드보다 우선)
+     4 연락처·제안단가·월배출량 (유효값) → lead      ← v70 까지는 단순방문 4필드 + 상담내용까지 필요했다
+     5 수거업체·통갯수(유효)·비닐·5톤차량 → visit    (그대로)
+     6 접촉 필드 하나라도 → simpleContact            (그대로)
+     7 그 밖 → none
+   '유효값'은 effectiveVisitValues_() 가 정한다(연락처 형식 · 배출량 > 0 · 제안단가 ≥ 100 · 통갯수/비닐 규칙).
+   필드 목록 상수(LEAD_V2_*)는 TDZ 를 피하려고 스크립트 위쪽 상수 블록에 있다. */
+function hasValue_(v) { return String(v == null ? '' : v).trim().length > 0; }
 function classifyVisitCurrent(cur) {
   cur = cur || {};
-  const outcome = String(cur.outcome || "").trim();
-  if (outcome === "성사") return "success";
-  if (outcome === "실패") return "fail";
-  const eff = effectiveVisitValues_(cur);   // ★ v57
-  const visitFields = [eff.currentStoreName, eff.bins, eff.vinyl, eff.truck];
-  const leadAdditionalFields = [eff.contact, eff.amount, eff.suggestedPrice, eff.note];
-  const allVisitFilled = visitFields.every(v => String(v || "").trim().length > 0);
-  const allLeadAdditionalFilled = leadAdditionalFields.every(v => String(v || "").trim().length > 0);
-  if (allVisitFilled && allLeadAdditionalFilled) return "lead";
-  if (allVisitFilled) return "visit";
-  if (outcome === "폐업") return "closedByMe";
-  // ★ 단순접촉: 위 조건 미달이지만 접촉내용 필드가 하나라도 채워진 경우
-  //   (재탭핑우선순위 포함 / 영업구분은 제외)
-  // ★ v57: 검증 대상 4개는 임의값을 걸러낸 값으로, 나머지는 기존 그대로.
-  //   (현재단가·주수거횟수는 판정에 반영하지 않기로 한 항목이라 원값 유지)
-  // ★ v57: 검증 대상 4개는 임의값을 걸러낸 값으로, 나머지는 기존 그대로.
-  //   (현재단가·주수거횟수는 판정에 반영하지 않기로 한 항목이라 원값 유지)
-  const contactFields = [
-    eff.currentStoreName, eff.contact, eff.amount, cur.price,
-    eff.suggestedPrice, cur.freq, eff.bins, eff.vinyl, eff.truck, eff.note,
-    cur.repriority
-  ];
-  if (contactFields.some(v => String(v || "").trim().length > 0)) return "simpleContact";
-  return "none";
+  const outcome = String(cur.outcome || '').trim();
+  if (outcome === '성사') return 'success';
+  if (outcome === '실패') return 'fail';
+  if (outcome === '폐업') return 'closedByMe';
+  const eff = effectiveVisitValues_(cur);
+  if (LEAD_V2_LEAD_FIELDS.every(function(k) { return hasValue_(eff[k]); })) return 'lead';
+  if (LEAD_V2_VISIT_FIELDS.every(function(k) { return hasValue_(eff[k]); })) return 'visit';
+  // 현재단가·주수거횟수·성사가능성은 검증 대상이 아니라 원값으로 본다(v57 과 같음)
+  const src = Object.assign({}, cur, eff);
+  if (LEAD_V2_CONTACT_FIELDS.some(function(k) { return hasValue_(src[k]); })) return 'simpleContact';
+  return 'none';
+}
+/* ★ v71: 방문기록 폼의 "리드 기준" 안내 — 다음 단계까지 무엇이 남았는지 짧게.
+   cur 는 저장될 모양 그대로(숨긴 필드는 ''), hidden 은 이 폐기물 유형에서 숨긴 필드 목록.
+   판정은 classifyVisitCurrent 를 그대로 부른다(규칙을 두 군데 쓰지 않는다). 반환: { status, lines:[...] } */
+function leadHintFor_(cur, hidden) {
+  cur = cur || {};
+  hidden = hidden || [];
+  const status = classifyVisitCurrent(cur);
+  const label = getStatusLabel(status);
+  if (status === 'success' || status === 'fail' || status === 'closedByMe') {
+    return { status: status, lines: ['최종결과를 골라 ' + label + '(으)로 저장됩니다'] };
+  }
+  if (status === 'lead') {
+    return { status: status, lines: ['유효리드 기준 충족 (연락처·제안단가·배출량)'] };
+  }
+  const eff = effectiveVisitValues_(cur);
+  const nameOf = function(k) {
+    // 값은 있는데 기준 미달(형식 오류·0·100원 미만)이면 그렇다고 알려준다
+    return LEAD_V2_FIELD_NAMES[k] + (hasValue_(cur[k]) && !hasValue_(eff[k]) ? '(값 확인)' : '');
+  };
+  const lines = [];
+  const leadMiss = LEAD_V2_LEAD_FIELDS.filter(function(k) { return !hasValue_(eff[k]); });
+  lines.push('유효리드까지: ' + leadMiss.map(nameOf).join('·') + ' 남음');
+  const visitPossible = LEAD_V2_VISIT_FIELDS.every(function(k) { return hidden.indexOf(k) === -1; });
+  if (status !== 'visit' && visitPossible) {
+    const visitMiss = LEAD_V2_VISIT_FIELDS.filter(function(k) { return !hasValue_(eff[k]); });
+    lines.push('단순방문까지: ' + visitMiss.map(nameOf).join('·') + ' 남음');
+  }
+  return { status: status, lines: lines };
+}
+// 폼 값 → 저장될 current 모양 (saveVisit 과 같은 키·같은 숨김 규칙)
+function readVisitFormCurrent_() {
+  const wasteType = getVal('v_wasteType') || WASTE_TYPE_DEFAULT;
+  const hidden = WASTE_HIDDEN_FIELDS[wasteType] || [];
+  const cur = {};
+  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','repriority'].forEach(function(k) {
+    cur[k] = hidden.indexOf(k) !== -1 ? '' : getVal('v_' + k);
+  });
+  return { cur: cur, hidden: hidden };
+}
+function updateLeadHint_() {
+  const el = document.getElementById('v_leadHint');
+  if (!el) return;
+  try {
+    const f = readVisitFormCurrent_();
+    const h = leadHintFor_(f.cur, f.hidden);
+    el.innerHTML = '<span class="lead-hint-now">지금: ' + escapeHtml(getStatusLabel(h.status)) + '</span>' +
+      h.lines.map(function(l) { return '<span class="lead-hint-line">' + escapeHtml(l) + '</span>'; }).join('');
+  } catch (e) { el.textContent = ''; }
 }
 function getVisitStatus(store) {
   if (isContractGrade(store.grade)) return "contract";
@@ -2919,7 +3198,7 @@ async function openPanel(store, opts) {
   }
   const panel = document.getElementById("storePanel");
   const content = document.getElementById("panelContent");
-  content.innerHTML = '<h2 style="color:#999;">업장 정보 불러오는 중...</h2>';
+  content.innerHTML = '<h2 style="color:var(--text-sub);">업장 정보 불러오는 중...</h2>';
   panel.classList.add("open");
   const detail = await getStoreDetail_(store._key);   // ★ v70: 세션 메모
   if (mySeq !== _panelSeq) return;                     // 그 사이 다른 업장/목록을 열었다
@@ -2930,14 +3209,14 @@ async function openPanel(store, opts) {
   const adminBadge = store.adminType ? '<span class="badge badge-admin">' + escapeHtml(store.adminType) + '</span>' : '';
   // ★ v55: 등급 공백 시 미노출 (adminBadge와 동일한 방식으로 통일)
   const gradeBadge = isContract
-    ? '<span class="badge badge-contract">★ 기계약</span>'
+    ? '<span class="badge badge-contract">' + IC_.star + ' 기계약</span>'
     : (store.grade ? '<span class="badge badge-grade">' + escapeHtml(store.grade) + '</span>' : '');
-  const closedBadge = closedFlag ? '<span class="badge badge-closed">⚠️ 폐업</span>' : '';
+  const closedBadge = closedFlag ? '<span class="badge badge-closed">' + IC_.alert + ' 폐업</span>' : '';
   let projectsBadgeHtml = '';
   if (!isExternalUser && amIAssignedToProject(store, currentUser.key)) {
     const projectNames = Object.keys(store.projects);
     projectsBadgeHtml = '<div class="multi-projects">' + projectNames.map(name => {
-      return '<div class="project-badge"><span class="project-badge-icon">🎯</span><span>' + escapeHtml(name) + '</span></div>';
+      return '<div class="project-badge"><span class="project-badge-icon">' + IC_.target + '</span><span>' + escapeHtml(name) + '</span></div>';
     }).join('') + '</div>';
   }
   // ★ v51.7: 외주는 관리자 정보 숨김
@@ -2962,7 +3241,7 @@ async function openPanel(store, opts) {
     // ★ v68: 보장기간이 코드에만 있어 팀이 모르고 있었다. 상태별 일수를 그대로 화면에 적는다.
     const guardDays = otherActiveDaysFor_(otherInfo.status);
     const guardNote = isOtherPartnerActive(store)
-      ? '<div style="font-size:11px;color:#00838F;margin-top:3px;">' +
+      ? '<div style="font-size:12px;color:#00838F;margin-top:3px;">' +
         getStatusLabel(otherInfo.status) + ' 건은 마지막 접촉 후 ' + guardDays +
         '일간 타파트너 영업중으로 표시됩니다</div>'
       : '';
@@ -2976,16 +3255,17 @@ async function openPanel(store, opts) {
     const plusText = store.plus && store.plus !== '' ? store.plus : '-';
     serviceHtml = '<div class="service"><span class="' + basicClass + '">베이직 ' + escapeHtml(basicText) + '</span><span class="' + plusClass + '">플러스 ' + escapeHtml(plusText) + '</span></div>';
   }
-  const roadviewHtml = isContract ? '' : '<div class="roadview-section"><div class="roadview-header" onclick="toggleRoadview()"><span id="rvHeaderText">🌆 현장 로드뷰 (클릭하여 보기)</span><span class="roadview-header-toggle" id="rvToggleArrow">▼</span></div><div class="roadview-body" id="rvBody"><div class="rv-loading" id="rvLoading" style="display:none;">로드 중...</div><div id="roadview"></div><div class="rv-empty" id="rvEmpty" style="display:none;">로드뷰 없음</div><a href="https://map.kakao.com/link/roadview/' + store.lat + ',' + store.lng + '" target="_blank" class="rv-external">카카오맵에서 보기 →</a></div></div>';
+  const roadviewHtml = isContract ? '' : '<div class="roadview-section"><div class="roadview-header" onclick="toggleRoadview()"><span class="rv-title">' + IC_.camera + '<span id="rvHeaderText">현장 로드뷰 (눌러서 보기)</span></span><span class="roadview-header-toggle" id="rvToggleArrow">' + IC_.chev + '</span></div><div class="roadview-body" id="rvBody"><div class="rv-loading" id="rvLoading" style="display:none;">로드 중...</div><div id="roadview"></div><div class="rv-empty" id="rvEmpty" style="display:none;">로드뷰 없음</div><a href="https://map.kakao.com/link/roadview/' + store.lat + ',' + store.lng + '" target="_blank" class="rv-external">카카오맵에서 보기 →</a></div></div>';
   const infoRows = [];
   if (store.bizType) infoRows.push({k:"업종", v:store.bizType});
   if (store.area) infoRows.push({k:"면적", v:store.area});
   if (store.phone) infoRows.push({k:"전화번호", v:store.phone});
   if (store.volume) infoRows.push({k:"예상배출량", v:store.volume});
   const infoHtml = infoRows.length === 0 ? '' : '<div class="info-table">' + infoRows.map(r => '<div class="info-row"><span class="info-key">' + r.k + '</span><span class="info-value">' + escapeHtml(r.v) + '</span></div>').join('') + '</div>';
-  const memoHtml = store.memo ? '<div class="memo">📝 ' + escapeHtml(store.memo) + '</div>' : '';
-  const priceGuideBtnHtml = isContract ? '' : '<button class="priceGuideBtn" onclick="openPriceGuide()">📊 영업기준표 확인</button>';
-  const navBtnHtml = isContract ? '' : '<button class="navBtn" type="button" onclick="openKakaoNav(selectedStore)">🧭 카카오맵 길찾기</button>';
+  const memoHtml = store.memo ? '<div class="memo">' + IC_.note + ' ' + escapeHtml(store.memo) + '</div>' : '';
+  // ★ v71: 단가 가이드 · 길안내는 보조 버튼(외곽선). 주 버튼은 아래 고정 바의 '저장' 하나다.
+  const priceGuideBtnHtml = isContract ? '' : '<button class="priceGuideBtn" type="button" onclick="openPriceGuide()">' + IC_.chart + ' 영업기준표 확인</button>';
+  const navBtnHtml = isContract ? '' : '<button class="navBtn" type="button" onclick="openKakaoNav(selectedStore)">' + IC_.nav + ' 카카오맵 길찾기</button>';
   const visitFormHtml = isContract ? '' : buildVisitForm();
   // ★ v55: 순서 재배치 — 업장명 → 주소 → 폐기물배지 → 로드뷰 → 배지/서비스 → 정보테이블(회색라인 포함)
   const wasteBadgesHtml = buildWasteBadgesHtml_(store);
@@ -3186,7 +3466,7 @@ async function openPartnerRecordView_(store, pk, fromGroup) {
     return '<div class="visit-form" style="margin-top:6px;">' +
       '<h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + escapeHtml(wLabel(r.wasteType)) + ' ' + statusBadgeHtml_(status) + '</h3>' +
       '<div class="visit-dates">최초 방문: ' + escapeHtml(first) + ' · 마지막 수정: ' + escapeHtml(last) + '</div>' +
-      '<div class="v70-rec-table">' + (rows || '<div class="info-row"><span class="info-value" style="color:#999;">입력된 항목 없음</span></div>') + '</div>' +
+      '<div class="v70-rec-table">' + (rows || '<div class="info-row"><span class="info-value" style="color:var(--text-sub);">입력된 항목 없음</span></div>') + '</div>' +
       histHtml + '</div>';
   }).join('');
   content.innerHTML = back + head + blocks;
@@ -3199,14 +3479,14 @@ function toggleRoadview() {
   if (!body) return;
   if (currentRvState === 'collapsed') {
     body.classList.add("expanded");
-    arrow.textContent = "▲";
-    headerText.textContent = "🌆 현장 로드뷰";
+    arrow.classList.add("up");                 // ★ v71: 화살표는 SVG 회전
+    headerText.textContent = "현장 로드뷰";
     currentRvState = 'expanded';
     loadRoadviewForCurrentStore();
   } else {
     body.classList.remove("expanded");
-    arrow.textContent = "▼";
-    headerText.textContent = "🌆 현장 로드뷰 (클릭하여 보기)";
+    arrow.classList.remove("up");
+    headerText.textContent = "현장 로드뷰 (눌러서 보기)";
     currentRvState = 'collapsed';
   }
 }
@@ -3277,7 +3557,7 @@ async function openPriceGuide() {
     params.append('service', '베이직');
     window.open(PRICE_GUIDE_URL + '?' + params.toString(), '_blank');
   } catch(err) {
-    alert('영업기준표를 여는 중 오류가 발생했습니다.');
+    showNsToast('영업기준표를 여는 중 오류가 발생했습니다. 잠시 후 다시 눌러주세요.', 4000);   // ★ v71: alert → 토스트
   }
 }
 // ============================================================
@@ -3652,7 +3932,7 @@ function buildVisitForm() {
     '<div class="visit-dates" id="visitDates"></div>' +
     '<label><span style="color:#E53935;">*</span> 현재 수거·운반 업체명</label>' +
     '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 — 지금 폐기물을 가져가는 업체">' +
-    '<div style="font-size:11px;color:#888;margin-top:3px;">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 없으면 사유를 적어주세요.</div>' +
+    '<div style="font-size:12px;color:var(--text-sub);margin-top:3px;">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 없으면 사유를 적어주세요.</div>' +
     '<label for="v_contact">담당자 연락처' + NUM_WARN_HTML_ + '</label>' +
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
     // ★ v56: 라벨 텍스트를 내부 span(lbl_*)으로 감쌈 — applyWasteTypeUI의 textContent 치환이
@@ -3688,7 +3968,10 @@ function buildVisitForm() {
       '<label>기타 불발사유</label>' +
       '<input id="v_failReasonEtc" type="text" placeholder="사유를 직접 입력해주세요">' +
     '</div>' +
-    '<button class="save-btn" id="saveVisitBtn">저장</button></div>';
+    '</div>' +
+    // ★ v71: 저장은 패널 아래에 붙어 있는 바의 유일한 주 버튼. 바로 위에 '리드 기준' 안내(다음 단계까지 남은 항목)
+    '<div class="save-bar"><div class="lead-hint" id="v_leadHint"></div>' +
+    '<button type="button" class="save-btn" id="saveVisitBtn">저장</button></div>';
 }
 // ★ v53: 선택된 폐기물 종류에 맞춰 라벨 텍스트/필드 숨김 적용
 function applyWasteTypeUI(wasteType) {
@@ -3726,6 +4009,7 @@ function loadMyVisit(store, wasteType) {
     applySalesTypeDefault_();                                 // ★ v56: 아웃바운드 기본선택
     refreshNumericWarnings_(NUMERIC_FIELD_IDS_);              // ★ v56: 빈 값이므로 경고 해제
     applyDraftNotice_(store, wasteType);                      // ★ v61
+    updateLeadHint_();                                        // ★ v71
     const dateEl = document.getElementById("visitDates");
     if (dateEl) dateEl.textContent = "";
     return;
@@ -3753,6 +4037,7 @@ function fillVisitFormFromCurrent_(cur) {
   setRepriorityValue_(cur.repriority);                              // ★ v58
   applySalesTypeDefault_();                                          // ★ v56
   refreshNumericWarnings_(NUMERIC_FIELD_IDS_);                      // ★ v57
+  updateLeadHint_();                                                 // ★ v71
 }
 /* ★ v61: 저장 실패로 남은 초안이 있으면 배너로 알리고, 복원/삭제를 고르게 합니다.
    자동으로 덮어쓰지 않습니다 — 파트너가 의도적으로 고른 경우에만 복원합니다. */
@@ -3819,7 +4104,10 @@ function bindVisitForm(store) {
     if (!el) return;
     el.addEventListener('input', resetSaveBtn);
     el.addEventListener('change', resetSaveBtn);
+    el.addEventListener('input', updateLeadHint_);    // ★ v71: 리드 기준 안내 실시간 갱신
+    el.addEventListener('change', updateLeadHint_);
   });
+  updateLeadHint_();   // ★ v71
   // ★ v58: 성사가능성이 드롭다운으로 바뀌어 토글 핸들러는 불필요 (formFieldIds가 처리)
   const contactInput = document.getElementById("v_contact");
   if (contactInput) {
@@ -3854,7 +4142,7 @@ async function saveVisit(store) {
        TypeError가 catch를 그냥 통과했고 버튼이 '저장 중...'에서 영구히 잠겼습니다.
        토스트도 안 떠서 파트너 눈엔 "눌렀는데 아무 일도 안 일어남"으로 보였습니다. */
     if (!currentUser || !currentUser.key) {
-      showNsToast('⚠️ 로그인 정보가 없습니다. 새로고침 후 다시 로그인해주세요.', 5000);
+      showNsToast('로그인 정보가 없습니다. 새로고침 후 다시 로그인해주세요.', 5000);
       return;
     }
 
@@ -3889,8 +4177,8 @@ async function saveVisit(store) {
     if (navigator.onLine === false) {
       const kept = saveDraft_(store._key, wasteType, currentData);
       showNsToast(kept
-        ? '📴 인터넷이 끊겨 저장하지 못했습니다. 입력 내용은 7일간 보관되니, 연결 후 이 업장을 다시 열어 "이어서 작성"을 눌러주세요.'
-        : '📴 인터넷이 끊겨 저장하지 못했습니다. 연결 후 다시 시도해주세요.', 6000);
+        ? '인터넷이 끊겨 저장하지 못했습니다. 입력 내용은 7일간 보관되니, 연결 후 이 업장을 다시 열어 "이어서 작성"을 눌러주세요.'
+        : '인터넷이 끊겨 저장하지 못했습니다. 연결 후 다시 시도해주세요.', 6000);
       return;
     }
 
@@ -3956,8 +4244,8 @@ async function saveVisit(store) {
     if (currentData) kept = saveDraft_(store._key, wasteType, currentData);
     console.error('[저장 실패]', e);
     showNsToast(kept
-      ? '⚠️ 저장 실패: ' + e.message + ' — 입력 내용은 7일간 보관됩니다. 이 업장을 다시 열면 불러올 수 있어요.'
-      : '⚠️ 저장 실패: ' + e.message, 6000);
+      ? '저장 실패: ' + e.message + ' — 입력 내용은 7일간 보관됩니다. 이 업장을 다시 열면 불러올 수 있어요.'
+      : '저장 실패: ' + e.message, 6000);
 
   } finally {
     /* ★ v61 ⑥: 어떤 경로로 끝나든 버튼을 반드시 되살립니다.
@@ -4225,7 +4513,7 @@ async function searchStores(q) {
     return;
   }
   if (isNumericOnlyQuery(q)) {
-    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px; line-height:1.5;">숫자만으로는 검색할 수 없어요.<br>도로명을 함께 입력해주세요. (예: 대덕대로394)</div>';
+    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:var(--text-sub); padding:14px 12px; line-height:1.5;">숫자만으로는 검색할 수 없어요.<br>도로명을 함께 입력해주세요. (예: 대덕대로394)</div>';
     resultsEl.style.display = 'block';
     return;
   }
@@ -4236,13 +4524,13 @@ async function searchStores(q) {
   } catch(e) {
     console.error('[검색] 인덱스 로드 실패', e);
     if (mySeq !== _searchSeq) return;
-    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px;">검색 인덱스 로드 실패. 잠시 후 다시 시도해주세요.</div>';
+    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:var(--text-sub); padding:14px 12px;">검색 인덱스 로드 실패. 잠시 후 다시 시도해주세요.</div>';
     resultsEl.style.display = 'block';
     return;
   }
   if (mySeq !== _searchSeq) return;
   if (!indexData || Object.keys(indexData).length === 0) {
-    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px;">검색 인덱스가 비어있습니다. 관리자에게 문의해주세요.</div>';
+    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:var(--text-sub); padding:14px 12px;">검색 인덱스가 비어있습니다. 관리자에게 문의해주세요.</div>';
     resultsEl.style.display = 'block';
     return;
   }
@@ -4306,7 +4594,7 @@ async function searchStores(q) {
 function renderSearchResults(list) {
   const resultsEl = document.getElementById("searchResults");
   if (list.length === 0) {
-    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:#999; padding:14px 12px; line-height:1.5;">검색 결과가 없습니다.<br><span style="color:#F2AC57; font-weight:600;">＋ 업장추가</span> 버튼으로 추가해주세요.</div>';
+    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:var(--text-sub); padding:14px 12px; line-height:1.5;">검색 결과가 없습니다.<br><span style="color:#8A5A00; font-weight:700;">+ 업장추가</span> 버튼으로 추가해주세요.</div>';
     resultsEl.style.display = "block";
     return;
   }
@@ -4314,7 +4602,7 @@ function renderSearchResults(list) {
     const status = getEffectiveStatus(s);
     const statusColor = getStatusColor(status);
     const statusLabel = getStatusLabel(status);
-    const projectTag = s._isMyProject ? '<span class="search-project-tag">🎯</span>' : '';
+    const projectTag = s._isMyProject ? '<span class="search-project-tag" aria-label="프로젝트 업장">' + IC_.target + '</span>' : '';
     // ★ 도로명으로 검색해서 걸린 건은 도로명주소를 보여줌 (지번으로 걸리면 지번 그대로)
     const shownAddr = (s._matchedRoad && s.roadAddress) ? s.roadAddress : (s.address || s.roadAddress || '');
     const addressLine = shownAddr
@@ -4325,7 +4613,7 @@ function renderSearchResults(list) {
       const distText = s._distKm < 1
         ? Math.round(s._distKm * 1000) + 'm'
         : s._distKm.toFixed(1) + 'km';
-      distLabel = '<span style="font-size:10px; color:#888; margin-left:6px;">📍' + distText + '</span>';
+      distLabel = '<span style="font-size:12px; color:var(--text-sub); margin-left:6px;">' + IC_.pin + distText + '</span>';
     }
     return '<div class="search-item" data-idx="' + idx + '">' +
       '<div class="search-name-row">' +
@@ -4441,6 +4729,7 @@ function resetNewStoreForm() {
     btn.disabled = false;
     btn.textContent = '등록';
   }
+  nsResetSteps_();   // ★ v71: 1단계로, 칸 오류 지우기
 }
 function onNsSearchInput() {
   const query = document.getElementById('nsSearchInput').value.trim();
@@ -4504,6 +4793,8 @@ function selectKakaoPlace(idx) {
 
   document.getElementById('nsStoreName').value = p.place_name;
   document.getElementById('nsAddress').value = addr;
+  nsShowFieldErr_('nsStoreName', false);   // ★ v71
+  nsShowFieldErr_('nsAddress', false);
 
   document.getElementById('nsSearchInput').value = '';
   document.getElementById('nsSearchResults').classList.remove('open');
@@ -4544,6 +4835,69 @@ function selectSalesType(btn) {
   btn.classList.add('active');
   _nsSelectedSalesType = btn.dataset.salestype;
 }
+/* ★ v71: 신규업장 등록 3단계 (장소 / 영업 정보 / 상담 결과).
+   단계는 보이기만 나눈다 — 입력칸은 전부 한 모달에 그대로 있고, submitNewStore() 는 v70 과 같은 페이로드를 보낸다.
+   1단계에서 사업장명·주소가 비면 '다음'이 막히고 칸 바로 아래에 오류가 뜬다. */
+function nsShowFieldErr_(id, show) {
+  const input = document.getElementById(id);
+  const grp = document.getElementById('grp_' + id);
+  if (grp) grp.classList.toggle('ns-invalid', !!show);
+  if (input) input.setAttribute('aria-invalid', show ? 'true' : 'false');
+}
+function nsValidateStep1_() {
+  const nameEl = document.getElementById('nsStoreName');
+  const addrEl = document.getElementById('nsAddress');
+  const nameOk = !!(nameEl && String(nameEl.value || '').trim());
+  const addrOk = !!(addrEl && String(addrEl.value || '').trim());
+  nsShowFieldErr_('nsStoreName', !nameOk);
+  nsShowFieldErr_('nsAddress', !addrOk);
+  try {
+    if (!nameOk) nameEl.focus();
+    else if (!addrOk) addrEl.focus();
+  } catch (e) {}
+  return nameOk && addrOk;
+}
+function nsGoStep_(n) {
+  _nsStep = Math.min(Math.max(Number(n) || 1, 1), NS_STEP_COUNT_);
+  document.querySelectorAll('#newStoreModal .ns-step').forEach(function(s) {
+    s.hidden = Number(s.dataset.step) !== _nsStep;
+  });
+  document.querySelectorAll('#nsStepper li').forEach(function(li, i) {
+    li.classList.toggle('done', i < _nsStep - 1);
+    if (i === _nsStep - 1) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+  });
+  const show = function(id, on) { const el = document.getElementById(id); if (el) el.hidden = !on; };
+  show('nsCancelBtn', _nsStep === 1);
+  show('nsPrevBtn', _nsStep > 1);
+  show('nsNextBtn', _nsStep < NS_STEP_COUNT_);
+  show('nsSubmitBtn', _nsStep === NS_STEP_COUNT_);
+  const body = document.getElementById('nsBody');
+  if (body) body.scrollTop = 0;
+}
+function nsNextStep_() {
+  if (_nsStep === 1 && !nsValidateStep1_()) return;
+  nsGoStep_(_nsStep + 1);
+}
+function nsPrevStep_() { nsGoStep_(_nsStep - 1); }
+function nsSetNavDisabled_(on) {
+  ['nsPrevBtn', 'nsCancelBtn'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !!on;
+  });
+}
+function nsResetSteps_() {
+  nsShowFieldErr_('nsStoreName', false);
+  nsShowFieldErr_('nsAddress', false);
+  nsSetNavDisabled_(false);
+  ['nsStoreName', 'nsAddress'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el && !el._v71ErrBound) {
+      el._v71ErrBound = true;
+      el.addEventListener('input', function() { if (String(el.value || '').trim()) nsShowFieldErr_(id, false); });
+    }
+  });
+  nsGoStep_(1);
+}
 function selectOutcome(btn) {
   document.querySelectorAll('.ns-outcome-buttons button').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
@@ -4553,14 +4907,10 @@ function selectOutcome(btn) {
 async function submitNewStore() {
   const storeName = document.getElementById('nsStoreName').value.trim();
   const address = document.getElementById('nsAddress').value.trim();
-  if (!storeName) {
-    showNsToast('사업장명을 입력해주세요');
-    document.getElementById('nsStoreName').focus();
-    return;
-  }
-  if (!address) {
-    showNsToast('주소를 입력해주세요');
-    document.getElementById('nsAddress').focus();
+  // ★ v71: 필수값이 비면 1단계로 돌아가 칸 바로 아래에 오류를 보여준다(토스트 대신)
+  if (!storeName || !address) {
+    nsGoStep_(1);
+    nsValidateStep1_();
     return;
   }
   if (!currentUser || !currentUser.code) {
@@ -4608,6 +4958,7 @@ async function submitNewStore() {
   };
   const btn = document.getElementById('nsSubmitBtn');
   btn.disabled = true;
+  nsSetNavDisabled_(true);   // ★ v71: 등록 중엔 이전/취소 잠금
   /* ★ v68: 등록은 6~10초 걸리는데(대부분 지도용DB 59,000행 append) 그동안 피드백이
      버튼 글자 하나뿐이라 멈춘 것처럼 보였다. 경과에 따라 문구를 바꿔 진행 중임을 알린다. */
   btn.textContent = '등록 중...';
@@ -4649,6 +5000,7 @@ async function submitNewStore() {
       showNsToast('등록 실패: ' + (result.error || '알 수 없는 오류'));
       btn.disabled = false;
       btn.textContent = '등록';
+      nsSetNavDisabled_(false);   // ★ v71
     }
   } catch(err) {
     clearNsProgress();          // ★ v68
@@ -4656,6 +5008,7 @@ async function submitNewStore() {
     showNsToast('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
     btn.disabled = false;
     btn.textContent = '등록';
+    nsSetNavDisabled_(false);   // ★ v71
   }
 }
 // ============================================================
@@ -4725,6 +5078,8 @@ function showNsToast(message, duration) {
     toast = document.createElement('div');
     toast.id = 'nsToast';
     toast.className = 'ns-toast';
+    toast.setAttribute('role', 'status');          // ★ v71
+    toast.setAttribute('aria-live', 'polite');
     document.body.appendChild(toast);
   }
   toast.textContent = message;
