@@ -471,6 +471,36 @@
   .new-store-modal.kb-open { padding: 0; }
   .new-store-modal.kb-open .new-store-content { margin: 8px; }
   .new-store-modal.kb-open .ns-submit-row { padding-bottom: 8px; }
+  /* ════ ★ v73: 오늘 갈 곳 — 담기 토글 · 필터 줄 칩 · 관리자 버튼 · 목록 ════
+     터치 대상 44px 이상, 포커스는 공통 앰버 링, 상태는 글자로도 보인다(색만으로 구분 금지). */
+  .plan-toggle { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px;
+                 margin: 0 0 10px; padding: 8px 12px; border: 1.5px solid var(--navy); border-radius: 8px;
+                 background: var(--surface, #fff); color: var(--navy); font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  .plan-toggle.on { border-color: var(--amber-ink); color: var(--amber-ink); background: #FFF4E5; }
+  .plan-toggle.on .ic { fill: var(--amber); stroke: var(--amber-ink); }
+  .plan-toggle:disabled { opacity: .6; cursor: progress; }
+  .plan-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 34px; padding: 6px 12px; border-radius: 16px;
+               border: 1.5px solid var(--amber-ink); background: #FFF4E5; color: var(--amber-ink); font-size: 13px; font-weight: 700;
+               font-family: inherit; cursor: pointer; flex-shrink: 0; }
+  .plan-chip-count, .admin-plan-count { font-variant-numeric: tabular-nums; }
+  .plan-chip-count:empty, .admin-plan-count:empty { display: none; }
+  .admin-plan-btn { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 3px 10px; border-radius: 12px;
+                    border: 1.5px solid var(--amber); background: rgba(255,255,255,0.15); color: #fff; font-size: 12px; font-weight: 700;
+                    font-family: inherit; cursor: pointer; flex-shrink: 0; }
+  .plan-carry-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; margin: 0 0 10px;
+                    padding: 8px 12px; border: 1.5px dashed var(--amber-ink); border-radius: 8px; background: #FFF4E5; color: var(--amber-ink);
+                    font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  .plan-empty { font-size: 13px; color: #555; padding: 14px 4px; }
+  .plan-list .plan-li { display: flex; align-items: stretch; border-bottom: 1px solid #EEEEF3; }
+  .plan-list .plan-li:last-child { border-bottom: none; }
+  .plan-list .plan-li .v70-row { border-bottom: none; flex: 1; min-width: 0; }
+  .plan-li.done .v70-row-title { color: #555; }
+  .plan-row-btn { flex: 0 0 44px; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+                  border: none; border-left: 1px solid #EEEEF3; background: #fff; color: var(--navy); font-size: 16px; cursor: pointer; padding: 0; }
+  .plan-row-btn:hover { background: #F7F7FA; }
+  .plan-row-btn:focus-visible { outline: 3px solid var(--amber); outline-offset: -3px; }
+  .plan-done-tag { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 10px; font-size: 12px; font-weight: 700;
+                   color: var(--ok-ink, #1B5E20); background: #E8F5E9; border: 1px solid currentColor; flex-shrink: 0; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -521,6 +551,8 @@
       <span class="admin-stat-value" id="adminStat-fail">0</span>
     </span>
     <span class="admin-stats-contract-hint"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg> 기계약업장 줌인 시 노출</span>
+    <!-- ★ v73: 관리자는 필터 줄이 없어 통계 바에 둔다 -->
+    <button type="button" class="admin-plan-btn" id="adminPlanBtn" aria-label="오늘 갈 곳 목록 열기" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg><span>갈 곳</span><span class="admin-plan-count" id="adminPlanCount"></span></button>
     <span class="admin-stats-version" id="adminStatsVersion"></span>
   </div>
   <div id="filterBar">
@@ -533,6 +565,8 @@
           <rect x="6" y="15.6" width="4" height="4.8" rx="1.3" fill="none"/>
         </svg><span class="filter-trigger-label">필터</span><span id="comboFilterBadge"></span>
       </button>
+      <!-- ★ v73: 오늘 갈 곳 칩(파트너). filter-chip/quick-cat 클래스를 쓰지 않는다 — 필터 적용·구분 칩 코드가 그 클래스를 일괄로 건드린다 -->
+      <button type="button" class="plan-chip" id="planChip" aria-label="오늘 갈 곳 목록 열기" hidden><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg><span>갈 곳</span><span class="plan-chip-count" id="planChipCount"></span></button>
       <!-- ★ v68: 구분(타겟/리드/기계약/프로젝트)은 가장 자주 바꾸는 축이라 바로 꺼냈다.
            ⚠️ 패널에는 두지 않는다 — 같은 값을 두 군데서 고치면 반드시 어긋난다. -->
       <span class="quick-group-label">상세구분</span>
@@ -886,7 +920,16 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v72.1';   // ★ v72.1
+const APP_VERSION = 'v73';   // ★ v73
+/* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. 읽기는 오늘·어제 두 노드만. ⚠️ 상수·상태는 여기(TDZ). */
+const PLAN_ROOT_ = 'plans';
+const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
+const PLAN_OUTLINE_COLOR_ = '#F2AC57';       // 계획에 담은 업장 핀 테두리(앰버, 실선)
+const PLAN_OUTLINE_ALT_COLOR_ = '#8A5A00';   // 핀 바탕이 앰버(기계약)면 테두리가 묻히므로 진한 앰버
+const PLAN_OUTLINE_WIDTH_ = 3;
+const PLAN_CARRY_TOAST_KEY_ = 'upbox_plan_carry_toast_v1';   // 이월 안내 토스트를 그날 이미 띄웠는지(KST 날짜)
+let _plan = { date: null, items: {}, yItems: {}, loaded: false, loading: null };   // 메모리 사본(오늘·어제)
+let _planListSeq = -1;                       // 갈 곳 목록을 연 순간의 _panelSeq (같으면 목록이 열려 있음)
 const PARTNER_FETCH_MAX_LEVEL = 7;        // 파트너: 이 레벨보다 넓게 보면 업장을 새로 받지 않는다(전국 범위 질의 방지)
 const PARTNER_CLUSTER_MIN_LEVEL = 5;      // 파트너: 이 레벨부터 클러스터로 묶는다(가까이선 지금처럼 낱개 핀)
 const PARTNER_FETCH_PAD_RATIO = 0.5;      // 위도 띠를 화면 높이의 50%(최대 0.03°)씩 위아래로 넉넉히 받아 작은 이동엔 재조회 안 함
@@ -1692,6 +1735,7 @@ async function startApp() {
   }
   // 방문기록·관리자 집계 캐시·카카오 SDK 를 동시에 받는다
   _myVisitsReady = loadMyVisits();
+  loadPlans_();   // ★ v73: 오늘 갈 곳(오늘·어제 노드만). 끝나면 칩 숫자·핀 테두리를 스스로 갱신한다
   const cachedAggPromise = isAdminUser ? loadAdminAggregateCache_() : Promise.resolve(null);
   try { await kakaoReady_(); }
   catch(e) { document.getElementById('statusBar').textContent = '지도를 불러오지 못했습니다 — 새로고침해주세요'; throw e; }
@@ -1702,6 +1746,7 @@ async function startApp() {
   }
   initMap();
   locationPromise.then(onLocation);
+  initPlanUI_();   // ★ v73: 파트너=필터 줄 칩, 관리자=통계 바 버튼
   purgeExpiredDrafts_();   // ★ v61: 7일 지난 초안 정리 (v70: TDZ 로 안 돌던 것을 await 뒤로 옮김)
   await _myVisitsReady;
   updateChipCounts();
@@ -3343,6 +3388,12 @@ function createMarker(store, status, isSelected) {
     strokeWidth = 3;
     strokeDash = '3,2';
   }
+  if (!isSelected && isPlanned_(store._key)) {   // ★ v73: 오늘 갈 곳 — 타파트너 점선보다 우선
+    strokeColor = color === PLAN_OUTLINE_COLOR_ ? PLAN_OUTLINE_ALT_COLOR_ : PLAN_OUTLINE_COLOR_;
+    strokeWidth = PLAN_OUTLINE_WIDTH_;
+    strokeDash = '';
+    zIdx = Math.max(zIdx, 3);
+  }
   const markerImage = getMarkerImage_(w, h, anchorX, anchorY, color, strokeColor, strokeWidth, labelLines, strokeDash);   // ★ v70: 메모
   const marker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: zIdx });
   marker._upboxStatus = status;
@@ -3386,8 +3437,14 @@ function createGroupMarker_(members, isSelected) {
     strokeWidth = 3;
     strokeDash = '3,2';
   }
+  if (!isSelected && members.some(function(e) { return isPlanned_(e.store._key); })) {   // ★ v73: 묶음에 갈 곳이 하나라도
+    strokeColor = color === PLAN_OUTLINE_COLOR_ ? PLAN_OUTLINE_ALT_COLOR_ : PLAN_OUTLINE_COLOR_;
+    strokeWidth = PLAN_OUTLINE_WIDTH_;
+    strokeDash = '';
+    zIdx = Math.max(zIdx, 3);
+  }
   const markerImage = getMarkerImage_(w, h, anchorX, anchorY, color, strokeColor, strokeWidth, labelLines, strokeDash);
-  const marker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: zIdx, title: '같은 위치 업장 ' + n + '곳' });
+  const marker = new kakao.maps.Marker({ position: position, image: markerImage, zIndex: zIdx, title: '같은 위치 업장 ' + n + '곳' + (strokeColor === PLAN_OUTLINE_COLOR_ || strokeColor === PLAN_OUTLINE_ALT_COLOR_ ? ' (갈 곳 포함)' : '') });
   marker._upboxStatus = status;
   marker._upboxStoreKey = first._key;
   marker._upboxIsContract = members.some(function(e) { return isContractGrade(e.store.grade); });
@@ -3598,6 +3655,7 @@ function getStoreDetail_(key) {
 async function openPanel(store, opts) {
   const mySeq = ++_panelSeq;   // ★ v70: 빠르게 연달아 누르면 마지막 것만 그린다
   const fromGroup = (opts && opts.fromGroup) ? opts.fromGroup : null;
+  const fromPlan = !!(opts && opts.fromPlan);   // ★ v73: 갈 곳 목록에서 들어왔나
   rvInstance = null;
   currentRvState = 'collapsed';
   const previousKey = selectedStore ? selectedStore._key : null;
@@ -3685,12 +3743,13 @@ async function openPanel(store, opts) {
   // ★ v70: 같은 건물 목록에서 왔으면 되돌아가기, 관리자는 접촉 파트너 목록을 맨 위에
   const backHtml = fromGroup
     ? '<button type="button" class="v70-back" id="v70BackToGroup">‹ 목록으로 (' + fromGroup.length + '곳)</button>'
-    : '';
+    : (fromPlan ? '<button type="button" class="v70-back" id="v73BackToPlan">‹ 갈 곳 목록</button>' : '');   // ★ v73
   const partnerListHtml = buildAdminPartnerListHtml_(store);
   content.innerHTML =
     backHtml +
     '<h2>' + escapeHtml(store.name || '(이름 없음)') + '</h2>' +
     '<div class="addr">' + escapeHtml(store.address || '') + '</div>' +
+    planToggleHtml_(store) +   // ★ v73: 외주면 빈 문자열
     partnerListHtml +
     wasteBadgesHtml +
     roadviewHtml +
@@ -3700,6 +3759,9 @@ async function openPanel(store, opts) {
   if (!isContract) { loadMyVisit(store); bindVisitForm(store); }
   const backBtn = document.getElementById('v70BackToGroup');
   if (backBtn) backBtn.onclick = function() { openSpotGroupPanel_(fromGroup); };
+  const planBack = fromPlan ? document.getElementById('v73BackToPlan') : null;   // ★ v73
+  if (planBack) planBack.onclick = openPlanListPanel_;
+  bindPlanToggle_(store);   // ★ v73
   content.querySelectorAll('.v70-row[data-pk]').forEach(function(btn) {
     btn.onclick = function() { openPartnerRecordView_(store, btn.dataset.pk, fromGroup); };
   });
@@ -4684,6 +4746,7 @@ async function saveVisit(store) {
     _visitsRev++;   // ★ v70: 검색 중복억제 캐시 무효화
     if (isAdminUser) renderAdminView(); else renderMarkers();
     updateChipCounts();
+    markPlanDone_(store._key);   // ★ v73: 오늘 갈 곳이면 done:true
 
     /* ★ v61 ④: 알림은 패널 상태와 무관하게 뜹니다.
        저장 도중 패널을 닫아도 토스트는 body에 붙으므로 결과를 놓치지 않습니다.
@@ -4715,6 +4778,339 @@ async function saveVisit(store) {
     btn.disabled = false;
   }
 }
+/* ════ ★ v73: 오늘 갈 곳(하루 방문 계획) ════
+   저장: plans/<내 키>/<YYYYMMDD(KST)>/<업장키> = { n: 이름, a: 주소(알 때만), lat, lng, at: 담은 시각, done?: true }
+   읽기: plans/<나>/<오늘> 과 plans/<나>/<어제>(이월용) 두 곳만. 노드 전체는 절대 읽지 않는다.
+   쓰기: 자식 하나씩 set/remove (withTimeout_ + 실패 토스트). 외주(기계약 열람)는 전부 숨김.
+   상수·상태(PLAN_*, _plan, _planListSeq)는 스크립트 위쪽 상수 블록에 있다(TDZ). */
+function planEnabled_() {
+  return !!(currentUser && currentUser.key) && !isExternalUser;
+}
+function planTodayKey_(d) { return kstDateStr_(d || new Date()); }
+function planYesterdayKey_(d) {
+  const now = d || new Date();
+  return kstDateStr_(new Date(now.getTime() - 24 * 60 * 60 * 1000));   // KST 는 서머타임이 없어 24시간 = 하루
+}
+function planPath_(date, storeKey) {
+  return PLAN_ROOT_ + '/' + currentUser.key + '/' + date + (storeKey ? '/' + storeKey : '');
+}
+function planCount_() { return Object.keys(_plan.items || {}).length; }
+function isPlanned_(key) { return !!(key && _plan.items && _plan.items[key]); }
+// 업장 → 저장할 계획 항목. undefined 값은 Firebase set 이 거부하므로 넣지 않는다.
+function buildPlanItem_(store, now) {
+  const item = { n: String((store && store.name) || ''), lat: Number(store.lat), lng: Number(store.lng), at: now || Date.now() };
+  let addr = store.address || store.roadAddress || '';
+  if (!addr && _searchIndexData && _searchIndexData[store._key]) {
+    const ie = _searchIndexData[store._key];
+    addr = ie.a || ie.r || '';
+  }
+  if (addr) item.a = String(addr);
+  if (!isFinite(item.lat)) delete item.lat;
+  if (!isFinite(item.lng)) delete item.lng;
+  return item;
+}
+// 목록 정렬: 내 위치를 알면 가까운 순(좌표 없는 항목은 맨 뒤), 모르면 담은 순
+function planSortedRows_(items, loc) {
+  const rows = Object.keys(items || {}).map(function(k) {
+    const it = items[k] || {};
+    let dist = null;
+    if (loc && isFinite(it.lat) && isFinite(it.lng)) dist = haversine(loc.lat, loc.lng, it.lat, it.lng) * 1000;   // haversine 은 km → m
+    return { key: k, item: it, dist: dist };
+  });
+  rows.sort(function(a, b) {
+    if (loc) {
+      const da = a.dist === null ? Infinity : a.dist, dbb = b.dist === null ? Infinity : b.dist;
+      if (da !== dbb) return da - dbb;
+    }
+    return (Number(a.item.at) || 0) - (Number(b.item.at) || 0);
+  });
+  return rows;
+}
+// 이월 후보: 오늘이 비어 있을 때만, 어제 항목 중 다녀오지 않은(done 아님) 것
+function planCarryCandidates_(yItems, todayItems) {
+  if (Object.keys(todayItems || {}).length) return [];
+  return Object.keys(yItems || {}).filter(function(k) {
+    const it = yItems[k];
+    return it && typeof it === 'object' && it.done !== true;
+  });
+}
+function formatPlanDist_(m) {
+  if (m === null || m === undefined || !isFinite(m)) return '';
+  return m < 1000 ? Math.round(m) + 'm' : (m / 1000).toFixed(1) + 'km';
+}
+async function loadPlans_() {
+  if (!planEnabled_()) return;
+  if (_plan.loading) return _plan.loading;
+  const today = planTodayKey_(), yday = planYesterdayKey_();
+  const oldKeys = Object.keys(_plan.items || {});
+  _plan.loading = (async function() {
+    try {
+      const snaps = await withTimeout_(Promise.all([
+        db.ref(planPath_(today)).once('value'),
+        db.ref(planPath_(yday)).once('value')
+      ]), PLAN_TIMEOUT_MS_, '갈 곳 불러오기');
+      const t = snaps[0].val(), y = snaps[1].val();
+      _plan.items = (t && typeof t === 'object') ? t : {};
+      _plan.yItems = (y && typeof y === 'object') ? y : {};
+      _plan.date = today;
+      _plan.loaded = true;
+    } catch (e) {
+      console.warn('[갈 곳] 불러오기 실패:', e && e.message);
+      return;
+    }
+    refreshPlanUI_();
+    refreshMarkersForKeys_(oldKeys.concat(Object.keys(_plan.items)));
+    maybeToastCarryOver_();
+  })();
+  try { await _plan.loading; } finally { _plan.loading = null; }
+}
+// 하루에 한 번만: 오늘 목록이 비어 있고 어제 못 간 곳이 있으면 알려 준다
+function maybeToastCarryOver_() {
+  const n = planCarryCandidates_(_plan.yItems, _plan.items).length;
+  if (!n) return;
+  let seen = null;
+  try { seen = localStorage.getItem(PLAN_CARRY_TOAST_KEY_); } catch (e) {}
+  if (seen === _plan.date) return;
+  try { localStorage.setItem(PLAN_CARRY_TOAST_KEY_, _plan.date); } catch (e) {}
+  showNsToast('어제 못 간 곳 ' + n + '곳이 있습니다 — "갈 곳" 목록에서 다시 담을 수 있어요', 4000);
+}
+// 앱으로 돌아올 때 날짜가 바뀌었으면 다시 읽는다(자정 넘김)
+function checkPlanDate_() {
+  if (!planEnabled_() || !_plan.loaded) return;
+  if (_plan.date !== planTodayKey_()) loadPlans_();
+}
+async function ensurePlanToday_() {
+  if (!_plan.loaded || _plan.date !== planTodayKey_()) await loadPlans_();
+  return _plan.loaded && _plan.date === planTodayKey_();
+}
+async function addPlan_(store) {
+  if (!planEnabled_() || !store || !store._key) return false;
+  if (!(await ensurePlanToday_())) { showNsToast('갈 곳 목록을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.', 4000); return false; }
+  const item = buildPlanItem_(store, Date.now());
+  const date = _plan.date;
+  try {
+    await withTimeout_(db.ref(planPath_(date, store._key)).set(item), PLAN_TIMEOUT_MS_, '갈 곳 담기');
+  } catch (e) {
+    showNsToast('갈 곳 담기 실패: ' + (e && e.message ? e.message : '알 수 없는 오류'), 5000);
+    return false;
+  }
+  if (_plan.date !== date) return false;
+  _plan.items[store._key] = item;
+  afterPlanChange_(store._key);
+  showNsToast('오늘 갈 곳에 담았습니다 (' + planCount_() + '곳)', 2000);
+  return true;
+}
+async function removePlan_(key) {
+  if (!planEnabled_() || !key || !isPlanned_(key)) return false;
+  const date = _plan.date;
+  try {
+    await withTimeout_(db.ref(planPath_(date, key)).remove(), PLAN_TIMEOUT_MS_, '갈 곳 빼기');
+  } catch (e) {
+    showNsToast('갈 곳 빼기 실패: ' + (e && e.message ? e.message : '알 수 없는 오류'), 5000);
+    return false;
+  }
+  if (_plan.date !== date) return false;
+  delete _plan.items[key];
+  afterPlanChange_(key);
+  showNsToast('갈 곳에서 뺐습니다 (' + planCount_() + '곳)', 2000);
+  return true;
+}
+async function togglePlan_(store) {
+  if (!store || !store._key) return false;
+  return isPlanned_(store._key) ? removePlan_(store._key) : addPlan_(store);
+}
+// 어제 못 간 곳을 오늘로 복사(자식 하나씩 set)
+async function carryOverPlans_() {
+  if (!planEnabled_()) return 0;
+  if (!(await ensurePlanToday_())) return 0;
+  const keys = planCarryCandidates_(_plan.yItems, _plan.items);
+  if (!keys.length) return 0;
+  const date = _plan.date, now = Date.now();
+  const results = await Promise.all(keys.map(function(k, i) {
+    const src = _plan.yItems[k] || {};
+    const item = { n: String(src.n || ''), at: now + i };
+    if (src.a) item.a = String(src.a);
+    if (isFinite(src.lat)) item.lat = Number(src.lat);
+    if (isFinite(src.lng)) item.lng = Number(src.lng);
+    return withTimeout_(db.ref(planPath_(date, k)).set(item), PLAN_TIMEOUT_MS_, '갈 곳 이월')
+      .then(function() { return { k: k, item: item }; }, function(e) { return { k: k, err: e }; });
+  }));
+  if (_plan.date !== date) return 0;
+  let ok = 0, fail = 0;
+  results.forEach(function(r) {
+    if (r.err) { fail++; return; }
+    _plan.items[r.k] = r.item; ok++;
+  });
+  refreshPlanUI_();
+  refreshMarkersForKeys_(results.filter(function(r) { return !r.err; }).map(function(r) { return r.k; }));
+  showNsToast(fail ? ('어제 못 간 곳 ' + ok + '곳을 담았고 ' + fail + '곳은 실패했습니다') : ('어제 못 간 곳 ' + ok + '곳을 다시 담았습니다'), fail ? 5000 : 2500);
+  return ok;
+}
+// 방문 저장이 끝난 업장이 오늘 계획에 있으면 '다녀옴' 표시(응답을 기다리지 않는다)
+function markPlanDone_(storeKey) {
+  if (!planEnabled_() || !_plan.loaded || _plan.date !== planTodayKey_()) return;
+  const it = _plan.items[storeKey];
+  if (!it || it.done === true) return;
+  const date = _plan.date;
+  withTimeout_(db.ref(planPath_(date, storeKey) + '/done').set(true), PLAN_TIMEOUT_MS_, '다녀옴 표시')
+    .then(function() {
+      if (_plan.date !== date || !_plan.items[storeKey]) return;
+      _plan.items[storeKey].done = true;
+      refreshPlanUI_();
+    })
+    .catch(function(e) { console.warn('[갈 곳] 다녀옴 표시 실패:', e && e.message); });
+}
+function afterPlanChange_(key) {
+  refreshPlanUI_();
+  refreshMarkersForKeys_([key]);
+}
+// 칩 숫자 · 관리자 버튼 · 패널 토글 버튼 · (열려 있으면) 목록을 다시 그린다
+function refreshPlanUI_() {
+  const n = planCount_();
+  const cnt = document.getElementById('planChipCount');
+  if (cnt) cnt.textContent = n ? String(n) : '';
+  const chip = document.getElementById('planChip');
+  if (chip) chip.setAttribute('aria-label', '오늘 갈 곳 목록 열기 (' + n + '곳)');
+  const acnt = document.getElementById('adminPlanCount');
+  if (acnt) acnt.textContent = n ? String(n) : '';
+  const abtn = document.getElementById('adminPlanBtn');
+  if (abtn) abtn.setAttribute('aria-label', '오늘 갈 곳 목록 열기 (' + n + '곳)');
+  syncPlanToggleBtn_();
+  if (isPlanListOpen_()) renderPlanList_();
+}
+function planToggleInner_(on) {
+  return IC_.star + '<span>' + (on ? '갈 곳에서 빼기' : '갈 곳 담기') + '</span>';
+}
+function planToggleHtml_(store) {
+  if (!planEnabled_() || !store || !store._key) return '';
+  const on = isPlanned_(store._key);
+  return '<button type="button" class="plan-toggle' + (on ? ' on' : '') + '" id="planToggleBtn" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+         planToggleInner_(on) + '</button>';
+}
+function syncPlanToggleBtn_() {
+  const btn = document.getElementById('planToggleBtn');
+  if (!btn || !selectedStore || !btn.classList) return;
+  const on = isPlanned_(selectedStore._key);
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.innerHTML = planToggleInner_(on);
+}
+function bindPlanToggle_(store) {
+  const btn = document.getElementById('planToggleBtn');
+  if (!btn || !planEnabled_()) return;
+  btn.onclick = async function() {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try { await togglePlan_(selectedStore && selectedStore._key === store._key ? selectedStore : store); }
+    finally { btn.disabled = false; }
+  };
+}
+// 시작 시 1회: 파트너는 필터 줄 칩, 관리자는 통계 바 버튼을 보인다. 외주는 아무것도 안 보인다.
+function initPlanUI_() {
+  if (!planEnabled_()) return;
+  const chip = document.getElementById('planChip');
+  const abtn = document.getElementById('adminPlanBtn');
+  if (isAdminUser) { if (abtn) { abtn.hidden = false; abtn.onclick = openPlanListPanel_; } }
+  else if (chip) { chip.hidden = false; chip.onclick = openPlanListPanel_; }
+  refreshPlanUI_();
+}
+function isPlanListOpen_() {
+  if (_planListSeq !== _panelSeq) return false;
+  const panel = document.getElementById('storePanel');
+  return !!(panel && panel.classList && panel.classList.contains('open'));
+}
+function planStoreForKey_(key) {
+  const it = _plan.items[key] || _plan.yItems[key] || {};
+  const inView = allStoresInView.find(function(s) { return s && s._key === key; });
+  if (inView) return inView;
+  const st = { _key: key, name: it.n || '' };
+  if (it.a) st.address = it.a;
+  if (isFinite(it.lat)) st.lat = Number(it.lat);
+  if (isFinite(it.lng)) st.lng = Number(it.lng);
+  return st;
+}
+function openPlanListPanel_() {
+  if (!planEnabled_()) return;
+  rvInstance = null;
+  currentRvState = 'collapsed';
+  const prevKey = selectedStore ? selectedStore._key : null;
+  const prevHighlight = _highlightGroupKeys;
+  selectedStore = null;
+  _highlightGroupKeys = null;
+  _currentSpotGroup = null;
+  _planListSeq = ++_panelSeq;
+  refreshMarkersForKeys_([prevKey].concat(prevHighlight ? Array.from(prevHighlight).slice(0, 1) : []));
+  document.getElementById('storePanel').classList.add('open');
+  renderPlanList_();
+  if (!_plan.loaded || _plan.date !== planTodayKey_()) loadPlans_();
+}
+function renderPlanList_() {
+  const content = document.getElementById('panelContent');
+  const rows = planSortedRows_(_plan.items, currentUserLocation);
+  const carry = planCarryCandidates_(_plan.yItems, _plan.items);
+  const sortNote = currentUserLocation ? '내 위치에서 가까운 순' : '담은 순 (내 위치를 모름)';
+  let html = '<h2>오늘 갈 곳 ' + rows.length + '곳</h2>' +
+    '<div class="addr">' + (_plan.loaded ? sortNote : '목록 불러오는 중…') + '</div>';
+  if (carry.length) {
+    html += '<button type="button" class="plan-carry-btn" id="planCarryBtn">' + IC_.plus +
+            '<span>어제 못 간 곳 ' + carry.length + '곳 다시 담기</span></button>';
+  }
+  if (!rows.length) {
+    html += '<div class="plan-empty">아직 담은 곳이 없습니다. 업장 정보에서 "갈 곳 담기"를 누르세요.</div>';
+  } else {
+    html += '<ul class="v70-list plan-list" aria-label="오늘 갈 곳 목록">' + rows.map(function(r, i) {
+      const it = r.item;
+      const name = it.n || '(이름 없음)';
+      const st = planStoreForKey_(r.key);
+      const status = getVisitStatus(st);
+      const sub = [it.a || '', formatPlanDist_(r.dist)].filter(Boolean).join(' · ') || '주소 정보 없음';
+      const doneTag = it.done === true ? '<span class="plan-done-tag">다녀옴</span>' : '';
+      return '<li class="plan-li' + (it.done === true ? ' done' : '') + '">' +
+        '<button type="button" class="v70-row" data-plan-i="' + i + '">' +
+          '<span class="v70-row-main">' +
+            '<span class="v70-row-title" style="display:block;">' + escapeHtml(name) + '</span>' +
+            '<span class="v70-row-sub" style="display:block;">' + escapeHtml(sub) + '</span>' +
+          '</span>' + doneTag + statusBadgeHtml_(status) +
+        '</button>' +
+        '<button type="button" class="plan-row-btn" data-plan-nav="' + i + '" aria-label="' + escapeHtml(name) + ' 길찾기">' + IC_.nav + '</button>' +
+        '<button type="button" class="plan-row-btn" data-plan-rm="' + i + '" aria-label="' + escapeHtml(name) + ' 갈 곳에서 빼기">' + IC_.x + '</button>' +
+        '</li>';
+    }).join('') + '</ul>';
+  }
+  content.innerHTML = html;
+  const carryBtn = document.getElementById('planCarryBtn');
+  if (carryBtn && carry.length) carryBtn.onclick = async function() {
+    carryBtn.disabled = true;
+    try { await carryOverPlans_(); } finally { carryBtn.disabled = false; }
+  };
+  content.querySelectorAll('[data-plan-i]').forEach(function(btn) {
+    const r = rows[Number(btn.dataset.planI)];
+    if (r) btn.onclick = function() { openPlanStore_(r.key); };
+  });
+  content.querySelectorAll('[data-plan-nav]').forEach(function(btn) {
+    const r = rows[Number(btn.dataset.planNav)];
+    if (r) btn.onclick = function() { openKakaoNav({ name: r.item.n, lat: r.item.lat, lng: r.item.lng }); };
+  });
+  content.querySelectorAll('[data-plan-rm]').forEach(function(btn) {
+    const r = rows[Number(btn.dataset.planRm)];
+    if (r) btn.onclick = function() { btn.disabled = true; removePlan_(r.key).finally(function() { btn.disabled = false; }); };
+  });
+}
+// 목록에서 업장 열기: 띠 밖(화면 밖)이어도 계획에 저장한 좌표·이름으로 연다(openPanel 이 stores/<key> 상세를 받는다)
+function openPlanStore_(key) {
+  const st = planStoreForKey_(key);
+  if (map && isFinite(st.lat) && isFinite(st.lng)) {
+    _userMovedMap = true;   // 위치가 늦게 와도 화면을 옮기지 않게
+    map.setCenter(new kakao.maps.LatLng(st.lat, st.lng));
+    map.setLevel(3);
+  }
+  return openPanel(st, { fromPlan: true });
+}
+// 앱으로 돌아올 때(백그라운드 → 앞) 자정이 지났는지 확인 — 최상위 바인딩 1회
+try {
+  document.addEventListener('visibilitychange', function() { if (!document.hidden) checkPlanDate_(); });
+  window.addEventListener('focus', checkPlanDate_);
+} catch (e) {}
 function getVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ""; }
 // ============================================================
 // v51.4: search_index 기반 통합 검색
