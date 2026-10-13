@@ -886,7 +886,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v72';   // ★ v72
+const APP_VERSION = 'v72.1';   // ★ v72.1
 const PARTNER_FETCH_MAX_LEVEL = 7;        // 파트너: 이 레벨보다 넓게 보면 업장을 새로 받지 않는다(전국 범위 질의 방지)
 const PARTNER_CLUSTER_MIN_LEVEL = 5;      // 파트너: 이 레벨부터 클러스터로 묶는다(가까이선 지금처럼 낱개 핀)
 const PARTNER_FETCH_PAD_RATIO = 0.5;      // 위도 띠를 화면 높이의 50%(최대 0.03°)씩 위아래로 넉넉히 받아 작은 이동엔 재조회 안 함
@@ -3710,6 +3710,11 @@ function refreshMarkerSelection(previousKey, newKey) {
 }
 function closePanel(clearSelection) {
   document.getElementById("storePanel").classList.remove("open");
+  try {   // ★ v72.1: 닫을 때 입력칸 포커스를 풀어 iOS 키보드를 내린다
+    const ae = document.activeElement;
+    if (ae && ae.blur && /^(INPUT|SELECT|TEXTAREA)$/.test(String(ae.tagName || ''))) ae.blur();
+    applyKeyboardLayout_();
+  } catch(e) {}
   rvInstance = null;
   currentRvState = 'collapsed';
   _panelSeq++;   // ★ v70: 닫은 뒤 늦게 도착한 상세가 패널을 다시 채우지 않게
@@ -5125,6 +5130,11 @@ function openNewStoreModal() {
 }
 function closeNewStoreModal() {
   document.getElementById('newStoreModal').classList.remove('open');
+  try {   // ★ v72.1: 닫을 때 입력칸 포커스를 풀어 iOS 키보드를 내린다
+    const ae = document.activeElement;
+    if (ae && ae.blur && /^(INPUT|SELECT|TEXTAREA)$/.test(String(ae.tagName || ''))) ae.blur();
+    applyKeyboardLayout_();
+  } catch(e) {}
   resetNewStoreForm();
 }
 function resetNewStoreForm() {
