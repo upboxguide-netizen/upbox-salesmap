@@ -984,7 +984,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v75';   // ★ v75
+const APP_VERSION = 'v76';   // ★ v76
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -1001,7 +1001,6 @@ let _planMode = false;                       // true = 지도에 오늘 갈 곳�
 const PLAN_RECENT_DAYS = 2;                  // 오늘 말고 목록이 있던 최근 날 수(주말처럼 빈 날은 건너뛴다) — 질의는 limitToLast(이 값 + 1)
 const PLAN_RECENT_TOAST_KEY_ = 'upbox_plan_recent_toast_v1';   // 최근 목록 안내 토스트를 그날 이미 띄웠는지(KST 날짜)
 const PLAN_RECENT_TOAST_ = '최근 목록에서 다시 담을 수 있어요 (갈 곳 → 최근 목록)';
-const CONTRACT_NOLOC_TOAST_ = '내 위치를 알 수 없어 기계약 업장을 거리 제한 없이 표시합니다';
 let _planRecentOpen = null;                  // 최근 목록 펼침: null = 기본(오늘이 비면 펼침), 불러온 뒤 그날 값으로 고정
 let _contractHintShown = false;              // 기계약 칩 거리 안내 토스트를 이번 세션에 띄웠는지
 const PARTNER_FETCH_MAX_LEVEL = 7;        // 파트너: 이 레벨보다 넓게 보면 업장을 새로 받지 않는다(전국 범위 질의 방지)
@@ -2650,13 +2649,13 @@ async function loadStoresInView(opts) {
     // ★ v52: 신규업장추가로 등록된 업장은 등록 파트너에게만 노출 (관리자는 전체 노출)
     list = list.filter(s => isVisibleForNewStoreOwner_(s));
     list = removeContractDuplicates(list);
-    if (currentUserLocation) {
-      list = list.filter(function(s) {
-        if (!isContractGrade(s.grade)) return true;
-        const dist = haversine(currentUserLocation.lat, currentUserLocation.lng, s.lat, s.lng);
-        return dist <= CONTRACT_RADIUS_KM;
-      });
-    }
+    /* ★ v76: 기계약은 지도 화면 가운데에서 CONTRACT_RADIUS_KM 안만. 위치 권한과 무관하게 항상 건다.
+       (v75 까지는 내 위치 기준이라, 위치를 모르면 제한이 빠져 기계약이 전부 보였다) */
+    const cLat = (latMin + latMax) / 2, cLng = (lngMin + lngMax) / 2;
+    list = list.filter(function(s) {
+      if (!isContractGrade(s.grade)) return true;
+      return haversine(cLat, cLng, s.lat, s.lng) <= CONTRACT_RADIUS_KM;
+    });
     allStoresInView = list;
     renderMarkers();
   } catch(e) {
@@ -3229,20 +3228,19 @@ function bindQuickCategoryChips_() {
   syncContractChipHint_();   // ★ v75
 }
 /* ════ ★ v75: 기계약 칩 안내 · 목록 줄 「타파트너영업중」 ════
-   기계약 칩: 파트너 화면은 기계약 업장을 내 위치 CONTRACT_RADIUS_KM 안만 보인다(loadStoresInView). 위치를 모르면 거리 제한이 없다.
-     휴대폰은 hover 가 없으므로 켤 때 토스트로 알린다(세션에 한 번. 위치를 모르면 켤 때마다 그 사실을 알린다).
+   기계약 칩: 파트너 화면은 기계약 업장을 ★ v76 지도 화면 가운데 CONTRACT_RADIUS_KM 안만 보인다(loadStoresInView, 위치 권한 무관).
+     휴대폰은 hover 가 없으므로 켤 때 토스트로 알린다(세션에 한 번).
      데스크톱은 title, 화면낭독기는 aria-describedby(#contractChipHint). 상태 바에도 짧게 붙인다.
    ⚠️ 문구는 함수로 만든다 — CONTRACT_RADIUS_KM 은 상수 블록보다 아래에 선언돼 있어 위쪽 const 에서 쓰면 TDZ. */
 function contractChipOn_() {
   return (partnerComboFilter.category || []).indexOf('contract') !== -1;
 }
 function contractHintText_() {
-  return '기계약 업장은 내 위치 ' + CONTRACT_RADIUS_KM + 'km 안만 표시됩니다. 더 먼 곳은 검색으로 찾을 수 있어요';
+  return '기계약 업장은 지도 화면 가운데에서 ' + CONTRACT_RADIUS_KM + 'km 안만 표시됩니다. 지도를 옮기거나 검색으로 찾을 수 있어요';   // ★ v76
 }
 // 기계약 칩을 켤 때 1회: 파트너만(관리자·외주는 반경 규칙이 다르다)
 function maybeContractHint_() {
   if (isAdminUser || isExternalUser) return false;
-  if (!currentUserLocation) { showNsToast(CONTRACT_NOLOC_TOAST_, 4000); return true; }   // 실제로 거리 제한을 건너뛴다(loadStoresInView)
   if (_contractHintShown) return false;
   _contractHintShown = true;
   showNsToast(contractHintText_(), 4000);
@@ -3258,7 +3256,7 @@ function syncContractChipHint_() {
 function partnerStatusText_(shown) {
   const base = shown + '개 업장 표시됨';
   if (isAdminUser || isExternalUser || !contractChipOn_()) return base;
-  return base + (currentUserLocation ? ' · 기계약은 내 위치 ' + CONTRACT_RADIUS_KM + 'km 안' : ' · 기계약 거리 제한 없음');
+  return base + ' · 기계약은 화면 가운데 ' + CONTRACT_RADIUS_KM + 'km 안';   // ★ v76
 }
 /* 타파트너영업중: 지도 핀 초록 점선과 같은 규칙(내 상태 미방문 + 타파트너 최근 접촉이 보호기간 안).
    줄 안 작은 칩(글자 + 테두리, 색만으로 구분하지 않음). 보호 일수·남은 날은 title 과 화면낭독기 글자로. */
