@@ -536,6 +536,35 @@
   .plan-mode-btn { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--navy); border-radius: 22px; background: #fff;
                    color: var(--navy); font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; }
   .plan-mode-btn.on { border-color: var(--amber-ink); color: var(--amber-ink); background: #FFF4E5; }
+  /* ════ ★ v75: 갈 곳 최근 목록 · 목록 줄 타파트너영업중 칩 · 상태 바 말줄임 ════ */
+  .plan-recent { margin: 6px 0 14px; }
+  .plan-recent-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 4px; border: none; border-top: 1px solid #E6E6EE;
+                        background: transparent; color: var(--navy); font-family: inherit; cursor: pointer; text-align: left; }
+  .plan-recent-title { font-size: 15px; font-weight: 700; }
+  .plan-recent-meta { flex: 1 1 auto; min-width: 0; font-size: 12px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .plan-recent-chev { flex: 0 0 auto; display: inline-flex; transition: transform .15s; }
+  .plan-recent-chev .ic { width: 18px; height: 18px; }
+  .plan-recent-toggle[aria-expanded="true"] .plan-recent-chev { transform: rotate(180deg); }
+  .plan-recent-toggle:focus-visible { outline: 3px solid var(--amber); outline-offset: -3px; border-radius: 8px; }
+  .plan-recent-body[hidden] { display: none; }
+  .plan-recent-day-head { display: flex; align-items: center; gap: 8px; margin: 6px 0 6px; }
+  .plan-recent-day-title { flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 700; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .plan-recent-all { flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--navy); border-radius: 22px; background: #fff;
+                     color: var(--navy); font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; }
+  .plan-recent-all:disabled { border-color: #C9C9D3; color: #666; background: #F5F5F8; cursor: default; }
+  .plan-recent-list { margin-bottom: 10px; }
+  .plan-recent-add { flex: 0 0 auto; min-width: 56px; min-height: 44px; padding: 0 10px; border: none; border-left: 1px solid #EEEEF3; background: #fff;
+                     color: var(--navy); font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; }
+  .plan-recent-add:hover { background: #F7F7FA; }
+  .plan-recent-add:disabled { color: #666; background: #F5F5F8; cursor: default; }
+  .plan-recent-all:focus-visible, .plan-recent-add:focus-visible { outline: 3px solid var(--amber); outline-offset: -3px; }
+  .plan-recent-list .plan-done-tag { margin-left: 4px; }
+  /* 목록 줄 「타파트너영업중」: .other-active-tag 모양 그대로, 줄 안에 맞게 작게. 둘째 줄(주소) 맨 앞에 둬서 이름을 자르지 않는다 */
+  .v75-oa-tag { margin: 0 6px 0 0; padding: 0 6px; font-size: 12px; line-height: 16px; vertical-align: 1px; }
+  .v75-oa-sum { font-size: 13px; font-weight: 700; color: #00838F; margin: 0 0 4px; }
+  .v75-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  /* 상태 바: 한 줄 · 화면 폭을 넘으면 말줄임(기계약 거리 문구가 붙어도 390pt 에서 넘치지 않게) */
+  #statusBar { max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
 </style>
 </head>
 <body>
@@ -607,7 +636,7 @@
       <span class="quick-group-label">상세구분</span>
       <button type="button" class="filter-chip quick-cat" data-val="target">타겟업장</button>
       <button type="button" class="filter-chip quick-cat" data-val="lead">리드건</button>
-      <button type="button" class="filter-chip quick-cat" data-val="contract"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg> 기계약</button>
+      <button type="button" class="filter-chip quick-cat" data-val="contract" id="quickCatContract" aria-describedby="contractChipHint"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg> 기계약</button><span id="contractChipHint" class="v75-sr-only"></span><!-- ★ v75: 기계약 거리 안내(글자는 syncContractChipHint_) -->
       <button type="button" class="filter-chip quick-cat filter-chip-project" data-val="project" id="cfCategoryProjectPill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg> 프로젝트영업</button>
     </div>
     <div id="appliedChipsRow"></div>
@@ -955,20 +984,26 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v74';   // ★ v74
-/* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. 읽기는 오늘·어제 두 노드만. ⚠️ 상수·상태는 여기(TDZ). */
+const APP_VERSION = 'v75';   // ★ v75
+/* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
 const PLAN_OUTLINE_COLOR_ = '#F2AC57';       // 계획에 담은 업장 핀 테두리(앰버, 실선)
 const PLAN_OUTLINE_ALT_COLOR_ = '#8A5A00';   // 핀 바탕이 앰버(기계약)면 테두리가 묻히므로 진한 앰버
 const PLAN_OUTLINE_WIDTH_ = 3;
-const PLAN_CARRY_TOAST_KEY_ = 'upbox_plan_carry_toast_v1';   // 이월 안내 토스트를 그날 이미 띄웠는지(KST 날짜)
-let _plan = { date: null, items: {}, yItems: {}, loaded: false, loading: null };   // 메모리 사본(오늘·어제)
+let _plan = { date: null, items: {}, recent: [], loaded: false, loading: null };   // 메모리 사본(오늘 · ★ v75 최근 목록 [{date, items}])
 let _planListSeq = -1;                       // 갈 곳 목록을 연 순간의 _panelSeq (같으면 목록이 열려 있음)
 /* ★ v74: 갈 곳만 보기(지도 필터) — 칩/관리자 버튼 토글. ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_EMPTY_TOAST_ = '담은 업장이 없습니다. 업장 패널의 ☆로 담아주세요';
 const PLAN_FIT_SINGLE_PAD_DEG_ = 0.002;      // 계획이 한 곳이면 그 둘레 약 200m 를 보이게 맞춘다
 let _planMode = false;                       // true = 지도에 오늘 갈 곳만 그린다(구분 칩·조합필터·통계 필터 무시)
+/* ★ v75: 갈 곳 최근 목록 · 기계약 칩 안내. ⚠️ 상수·상태는 여기(TDZ). 기계약 3km 문구는 CONTRACT_RADIUS_KM(아래 선언)을 쓰므로 함수로 만든다. */
+const PLAN_RECENT_DAYS = 2;                  // 오늘 말고 목록이 있던 최근 날 수(주말처럼 빈 날은 건너뛴다) — 질의는 limitToLast(이 값 + 1)
+const PLAN_RECENT_TOAST_KEY_ = 'upbox_plan_recent_toast_v1';   // 최근 목록 안내 토스트를 그날 이미 띄웠는지(KST 날짜)
+const PLAN_RECENT_TOAST_ = '최근 목록에서 다시 담을 수 있어요 (갈 곳 → 최근 목록)';
+const CONTRACT_NOLOC_TOAST_ = '내 위치를 알 수 없어 기계약 업장을 거리 제한 없이 표시합니다';
+let _planRecentOpen = null;                  // 최근 목록 펼침: null = 기본(오늘이 비면 펼침), 불러온 뒤 그날 값으로 고정
+let _contractHintShown = false;              // 기계약 칩 거리 안내 토스트를 이번 세션에 띄웠는지
 const PARTNER_FETCH_MAX_LEVEL = 7;        // 파트너: 이 레벨보다 넓게 보면 업장을 새로 받지 않는다(전국 범위 질의 방지)
 const PARTNER_CLUSTER_MIN_LEVEL = 5;      // 파트너: 이 레벨부터 클러스터로 묶는다(가까이선 지금처럼 낱개 핀)
 const PARTNER_FETCH_PAD_RATIO = 0.5;      // 위도 띠를 화면 높이의 50%(최대 0.03°)씩 위아래로 넉넉히 받아 작은 이동엔 재조회 안 함
@@ -3184,12 +3219,62 @@ function bindQuickCategoryChips_() {
       partnerComboFilter.category = arr;
       syncQuickCategoryChips_();
       updateComboFilterBadgeAndChips();
+      if (v === 'contract' && i === -1) maybeContractHint_();   // ★ v75: 휴대폰은 hover 가 없어 켤 때 토스트로
       // ★ v70: 넓은 화면(레벨 8+)에선 프로젝트 칩에 따라 보여줄 목록 자체가 달라지므로 다시 고른다(조회 없음)
       if (!isAdminUser && !isExternalUser && map && map.getLevel() > PARTNER_FETCH_MAX_LEVEL) { loadStoresInView(); return; }
       if (currentFilter === 'all') renderMarkers();   // 패널을 열 필요 없이 바로 반영
     };
   });
   syncQuickCategoryChips_();
+  syncContractChipHint_();   // ★ v75
+}
+/* ════ ★ v75: 기계약 칩 안내 · 목록 줄 「타파트너영업중」 ════
+   기계약 칩: 파트너 화면은 기계약 업장을 내 위치 CONTRACT_RADIUS_KM 안만 보인다(loadStoresInView). 위치를 모르면 거리 제한이 없다.
+     휴대폰은 hover 가 없으므로 켤 때 토스트로 알린다(세션에 한 번. 위치를 모르면 켤 때마다 그 사실을 알린다).
+     데스크톱은 title, 화면낭독기는 aria-describedby(#contractChipHint). 상태 바에도 짧게 붙인다.
+   ⚠️ 문구는 함수로 만든다 — CONTRACT_RADIUS_KM 은 상수 블록보다 아래에 선언돼 있어 위쪽 const 에서 쓰면 TDZ. */
+function contractChipOn_() {
+  return (partnerComboFilter.category || []).indexOf('contract') !== -1;
+}
+function contractHintText_() {
+  return '기계약 업장은 내 위치 ' + CONTRACT_RADIUS_KM + 'km 안만 표시됩니다. 더 먼 곳은 검색으로 찾을 수 있어요';
+}
+// 기계약 칩을 켤 때 1회: 파트너만(관리자·외주는 반경 규칙이 다르다)
+function maybeContractHint_() {
+  if (isAdminUser || isExternalUser) return false;
+  if (!currentUserLocation) { showNsToast(CONTRACT_NOLOC_TOAST_, 4000); return true; }   // 실제로 거리 제한을 건너뛴다(loadStoresInView)
+  if (_contractHintShown) return false;
+  _contractHintShown = true;
+  showNsToast(contractHintText_(), 4000);
+  return true;
+}
+function syncContractChipHint_() {
+  const hint = document.getElementById('contractChipHint');
+  if (hint) hint.textContent = contractHintText_();
+  const chip = document.getElementById('quickCatContract');
+  if (chip) chip.setAttribute('title', contractHintText_());
+}
+// 상태 바(평소 화면): 기계약 칩이 켜져 있으면 거리 규칙을 짧게 붙인다(390pt 한 줄 — 넘치면 말줄임)
+function partnerStatusText_(shown) {
+  const base = shown + '개 업장 표시됨';
+  if (isAdminUser || isExternalUser || !contractChipOn_()) return base;
+  return base + (currentUserLocation ? ' · 기계약은 내 위치 ' + CONTRACT_RADIUS_KM + 'km 안' : ' · 기계약 거리 제한 없음');
+}
+/* 타파트너영업중: 지도 핀 초록 점선과 같은 규칙(내 상태 미방문 + 타파트너 최근 접촉이 보호기간 안).
+   줄 안 작은 칩(글자 + 테두리, 색만으로 구분하지 않음). 보호 일수·남은 날은 title 과 화면낭독기 글자로. */
+function otherActiveRowInfo_(store, status) {
+  if (!store || !store._key || status !== 'none' || !isOtherPartnerActive(store)) return null;
+  const info = otherPartnerLastContactMap[store._key] || {};
+  const days = otherActiveDaysFor_(info.status);
+  const left = Math.max(0, Math.ceil((Number(info.ts) + days * 86400000 - Date.now()) / 86400000));
+  return { label: getStatusLabel(info.status), days: days, left: left };
+}
+function otherActiveRowTagHtml_(store, status) {
+  const oi = otherActiveRowInfo_(store, status);
+  if (!oi) return '';
+  const more = oi.label + ' ' + oi.days + '일 보호 · ' + oi.left + '일 남음';
+  return '<span class="other-active-tag v75-oa-tag" title="타파트너영업중 · ' + escapeHtml(more) + '">타파트너영업중' +
+         '<span class="v75-sr-only"> · ' + escapeHtml(more) + '</span></span>';
 }
 function bindComboFilterUI() {
   populateWasteTypeFilterPills_(); // ★ v54
@@ -3305,7 +3390,7 @@ function renderMarkers() {
     }, 100);
   }
   directMarkers.forEach(function(m) { m._upboxInClusterer = false; m.setMap(map); });
-  document.getElementById("statusBar").textContent = planMode ? ('오늘 갈 곳 ' + shown + '곳만 표시 중') : (shown + "개 업장 표시됨");   // ★ v74
+  document.getElementById("statusBar").textContent = planMode ? ('오늘 갈 곳 ' + shown + '곳만 표시 중') : partnerStatusText_(shown);   // ★ v74 · ★ v75 기계약 거리
 }
 // 선택된 핀(또는 선택 업장을 품은 묶음 핀)과 관리자 기계약 핀은 클러스터에 넣지 않는다(예전 규칙 그대로).
 function markerGoesDirect_(marker) {
@@ -3872,8 +3957,10 @@ function openSpotGroupPanel_(members) {
   });
   const idx = _searchIndexData || null;
   const content = document.getElementById("panelContent");
+  const oaCount = members.filter(function(e) { return !!otherActiveRowInfo_(e.store, e.status); }).length;   // ★ v75
   content.innerHTML =
     '<h2>같은 위치 업장 ' + members.length + '곳</h2>' +
+    (oaCount ? '<div class="v75-oa-sum">타파트너영업중 ' + oaCount + '곳 포함</div>' : '') +
     '<div class="addr">한 건물이거나 좌표가 ' + SPOT_GROUP_RADIUS_M + 'm 안으로 겹치는 업장입니다. 업장을 눌러 기록하세요.</div>' +
     '<ul class="v70-list" aria-label="같은 위치 업장 목록">' +
     rows.map(function(e, i) {
@@ -3883,7 +3970,8 @@ function openSpotGroupPanel_(members) {
       return '<li><button type="button" class="v70-row" data-i="' + i + '">' +
         '<span class="v70-row-main">' +
           '<span class="v70-row-title" style="display:block;">' + escapeHtml(s.name || '(이름 없음)') + '</span>' +
-          '<span class="v70-row-sub" style="display:block;" data-addr-i="' + i + '">' + escapeHtml(addr) + '</span>' +
+          '<span class="v70-row-sub" style="display:block;">' + otherActiveRowTagHtml_(s, e.status) +   // ★ v75: 타파트너영업중
+            '<span data-addr-i="' + i + '">' + escapeHtml(addr) + '</span></span>' +
         '</span>' + statusBadgeHtml_(e.status) +
         '<span class="v70-row-arrow" aria-hidden="true">›</span></button></li>';
     }).join('') +
@@ -4824,21 +4912,59 @@ async function saveVisit(store) {
 }
 /* ════ ★ v73: 오늘 갈 곳(하루 방문 계획) ════
    저장: plans/<내 키>/<YYYYMMDD(KST)>/<업장키> = { n: 이름, a: 주소(알 때만), lat, lng, at: 담은 시각, done?: true }
-   읽기: plans/<나>/<오늘> 과 plans/<나>/<어제>(이월용) 두 곳만. 노드 전체는 절대 읽지 않는다.
+   ★ v75 읽기: 질의 한 번 — plans/<나> 를 orderByKey().limitToLast(PLAN_RECENT_DAYS + 1).
+          = 오늘 + 목록이 있던 최근 날 최대 2개(주말처럼 빈 날은 건너뛴다). 그 밖에 plans/<나> 전체를 읽지 않는다.
    쓰기: 자식 하나씩 set/remove (withTimeout_ + 실패 토스트). 외주(기계약 열람)는 전부 숨김.
-   상수·상태(PLAN_*, _plan, _planListSeq, _planMode)는 스크립트 위쪽 상수 블록에 있다(TDZ).
+   상수·상태(PLAN_*, _plan, _planListSeq, _planMode, _planRecentOpen)는 스크립트 위쪽 상수 블록에 있다(TDZ).
    ★ v74: 「갈 곳」 칩 = 지도 필터 토글(_planMode). 켜면 지도에 오늘 갈 곳만, 끄면 평소 화면(renderAdminView/loadStoresInView).
-          업장 패널의 담기 버튼은 이름 줄 오른쪽 별 아이콘(44×44)으로 바뀌었다. */
+          업장 패널의 담기 버튼은 이름 줄 오른쪽 별 아이콘(44×44)으로 바뀌었다.
+   ★ v75: v73 어제 이월 버튼(어제만 · 오늘이 빌 때만 · 안 간 곳만) → 갈 곳 목록 아래 「최근 목록」.
+          최근 2일치(목록이 있던 날) 묶음마다 「전체 다시 담기」, 줄마다 「담기」. 다녀온 곳도 다시 담을 수 있다. */
 function planEnabled_() {
   return !!(currentUser && currentUser.key) && !isExternalUser;
 }
 function planTodayKey_(d) { return kstDateStr_(d || new Date()); }
-function planYesterdayKey_(d) {
-  const now = d || new Date();
-  return kstDateStr_(new Date(now.getTime() - 24 * 60 * 60 * 1000));   // KST 는 서머타임이 없어 24시간 = 하루
-}
+function planUserPath_() { return PLAN_ROOT_ + '/' + currentUser.key; }   // ★ v75: 최근 목록 질의 전용(orderByKey + limitToLast)
 function planPath_(date, storeKey) {
   return PLAN_ROOT_ + '/' + currentUser.key + '/' + date + (storeKey ? '/' + storeKey : '');
+}
+/* ★ v75: 질의 결과({ YYYYMMDD: { 업장키: 항목 } }) → 오늘 항목 + 최근 목록(오늘 이전 · 최신순 · 항목 있는 날만 · 최대 PLAN_RECENT_DAYS).
+   날짜 모양이 아닌 키·오늘 이후 키(기기 시계 어긋남)는 무시한다. */
+function planSplitRecent_(val, today) {
+  const out = { items: {}, recent: [] };
+  if (!val || typeof val !== 'object') return out;
+  const t = val[today];
+  if (t && typeof t === 'object') out.items = t;
+  out.recent = Object.keys(val).filter(function(k) {
+    if (!/^\d{8}$/.test(k) || k >= today) return false;
+    const g = val[k];
+    return !!(g && typeof g === 'object' && Object.keys(g).some(function(sk) { return g[sk] && typeof g[sk] === 'object'; }));
+  }).sort().reverse().slice(0, PLAN_RECENT_DAYS).map(function(k) {
+    const g = val[k], items = {};
+    Object.keys(g).forEach(function(sk) { if (g[sk] && typeof g[sk] === 'object') items[sk] = g[sk]; });
+    return { date: k, items: items };
+  });
+  return out;
+}
+// ★ v75: 20261013 → 「10월 13일 (월)」 (요일은 달력 날짜로 계산 — 시간대 무관)
+function planDayLabel_(ymd) {
+  const y = Number(String(ymd).slice(0, 4)), m = Number(String(ymd).slice(4, 6)), d = Number(String(ymd).slice(6, 8));
+  if (!y || !m || !d) return String(ymd || '');
+  const wd = '일월화수목금토'.charAt(new Date(Date.UTC(y, m - 1, d)).getUTCDay());
+  return m + '월 ' + d + '일 (' + wd + ')';
+}
+// ★ v75: 최근 묶음 중 오늘에 아직 없는 키(다녀온 곳 포함)
+function planRecentAddable_(group, todayItems) {
+  return Object.keys((group && group.items) || {}).filter(function(k) { return !(todayItems && todayItems[k]); });
+}
+// ★ v75: 옛 항목 → 오늘 항목(n·a·lat·lng 유지, at 새로, done 없음)
+function planItemFromOld_(src, now) {
+  src = src || {};
+  const item = { n: String(src.n || ''), at: now || Date.now() };
+  if (src.a) item.a = String(src.a);
+  if (isFinite(src.lat) && src.lat !== null && src.lat !== '') item.lat = Number(src.lat);
+  if (isFinite(src.lng) && src.lng !== null && src.lng !== '') item.lng = Number(src.lng);
+  return item;
 }
 function planCount_() { return Object.keys(_plan.items || {}).length; }
 function isPlanned_(key) { return !!(key && _plan.items && _plan.items[key]); }
@@ -4872,14 +4998,6 @@ function planSortedRows_(items, loc) {
   });
   return rows;
 }
-// 이월 후보: 오늘이 비어 있을 때만, 어제 항목 중 다녀오지 않은(done 아님) 것
-function planCarryCandidates_(yItems, todayItems) {
-  if (Object.keys(todayItems || {}).length) return [];
-  return Object.keys(yItems || {}).filter(function(k) {
-    const it = yItems[k];
-    return it && typeof it === 'object' && it.done !== true;
-  });
-}
 function formatPlanDist_(m) {
   if (m === null || m === undefined || !isFinite(m)) return '';
   return m < 1000 ? Math.round(m) + 'm' : (m / 1000).toFixed(1) + 'km';
@@ -4887,17 +5005,18 @@ function formatPlanDist_(m) {
 async function loadPlans_() {
   if (!planEnabled_()) return;
   if (_plan.loading) return _plan.loading;
-  const today = planTodayKey_(), yday = planYesterdayKey_();
+  const today = planTodayKey_();
   const oldKeys = Object.keys(_plan.items || {});
   _plan.loading = (async function() {
     try {
-      const snaps = await withTimeout_(Promise.all([
-        db.ref(planPath_(today)).once('value'),
-        db.ref(planPath_(yday)).once('value')
-      ]), PLAN_TIMEOUT_MS_, '갈 곳 불러오기');
-      const t = snaps[0].val(), y = snaps[1].val();
-      _plan.items = (t && typeof t === 'object') ? t : {};
-      _plan.yItems = (y && typeof y === 'object') ? y : {};
+      // ★ v75: 질의 한 번 — 오늘 + 목록이 있던 최근 날(최대 PLAN_RECENT_DAYS). 키 순서라 색인(.indexOn) 필요 없음.
+      const snap = await withTimeout_(
+        db.ref(planUserPath_()).orderByKey().limitToLast(PLAN_RECENT_DAYS + 1).once('value'),
+        PLAN_TIMEOUT_MS_, '갈 곳 불러오기');
+      const sp = planSplitRecent_(snap.val(), today);
+      if (_plan.date !== today) _planRecentOpen = null;   // 날짜가 바뀌면 최근 목록 펼침은 기본값으로
+      _plan.items = sp.items;
+      _plan.recent = sp.recent;
       _plan.date = today;
       _plan.loaded = true;
     } catch (e) {
@@ -4906,19 +5025,19 @@ async function loadPlans_() {
     }
     refreshPlanUI_();
     refreshPlanPins_(oldKeys.concat(Object.keys(_plan.items)));   // ★ v74: 갈 곳만 보기 중이면 전체 다시 그림
-    maybeToastCarryOver_();
+    maybeToastRecent_();
   })();
   try { await _plan.loading; } finally { _plan.loading = null; }
 }
-// 하루에 한 번만: 오늘 목록이 비어 있고 어제 못 간 곳이 있으면 알려 준다
-function maybeToastCarryOver_() {
-  const n = planCarryCandidates_(_plan.yItems, _plan.items).length;
-  if (!n) return;
+// ★ v75: 하루에 한 번만 — 오늘 목록이 비어 있고 최근 목록이 있으면 알려 준다
+function maybeToastRecent_() {
+  if (planCount_() || !(_plan.recent && _plan.recent.length)) return false;
   let seen = null;
-  try { seen = localStorage.getItem(PLAN_CARRY_TOAST_KEY_); } catch (e) {}
-  if (seen === _plan.date) return;
-  try { localStorage.setItem(PLAN_CARRY_TOAST_KEY_, _plan.date); } catch (e) {}
-  showNsToast('어제 못 간 곳 ' + n + '곳이 있습니다 — "갈 곳" 목록에서 다시 담을 수 있어요', 4000);
+  try { seen = localStorage.getItem(PLAN_RECENT_TOAST_KEY_); } catch (e) {}
+  if (seen === _plan.date) return false;
+  try { localStorage.setItem(PLAN_RECENT_TOAST_KEY_, _plan.date); } catch (e) {}
+  showNsToast(PLAN_RECENT_TOAST_, 4000);
+  return true;
 }
 // 앱으로 돌아올 때 날짜가 바뀌었으면 다시 읽는다(자정 넘김)
 function checkPlanDate_() {
@@ -4932,19 +5051,58 @@ async function ensurePlanToday_() {
 async function addPlan_(store) {
   if (!planEnabled_() || !store || !store._key) return false;
   if (!(await ensurePlanToday_())) { showNsToast('갈 곳 목록을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.', 4000); return false; }
-  const item = buildPlanItem_(store, Date.now());
+  return writePlanItem_(store._key, buildPlanItem_(store, Date.now()));
+}
+// ★ v75: 담기 공통 경로(별 · 최근 목록 「담기」) — 자식 하나 set + withTimeout_ + 실패 토스트
+async function writePlanItem_(key, item) {
   const date = _plan.date;
   try {
-    await withTimeout_(db.ref(planPath_(date, store._key)).set(item), PLAN_TIMEOUT_MS_, '갈 곳 담기');
+    await withTimeout_(db.ref(planPath_(date, key)).set(item), PLAN_TIMEOUT_MS_, '갈 곳 담기');
   } catch (e) {
     showNsToast('갈 곳 담기 실패: ' + (e && e.message ? e.message : '알 수 없는 오류'), 5000);
     return false;
   }
   if (_plan.date !== date) return false;
-  _plan.items[store._key] = item;
-  afterPlanChange_(store._key);
+  _plan.items[key] = item;
+  afterPlanChange_(key);
   showNsToast('오늘 갈 곳에 담았습니다 (' + planCount_() + '곳)', 2000);
   return true;
+}
+function planRecentGroup_(date) {
+  return (_plan.recent || []).find(function(g) { return g.date === date; }) || null;
+}
+// ★ v75: 최근 목록의 한 곳을 오늘로(다녀온 곳도 가능 — done 은 빼고 담는다)
+async function addPlanFromRecent_(date, key) {
+  if (!planEnabled_() || !key) return false;
+  if (!(await ensurePlanToday_())) { showNsToast('갈 곳 목록을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.', 4000); return false; }
+  const g = planRecentGroup_(date);
+  if (!g || !g.items[key] || isPlanned_(key)) return false;
+  return writePlanItem_(key, planItemFromOld_(g.items[key], Date.now()));
+}
+// ★ v75: 최근 목록 한 날을 통째로 — 오늘에 없는 곳만(자식 하나씩 set). 결과는 개수와 함께 토스트로.
+async function addPlanRecentAll_(date) {
+  if (!planEnabled_()) return 0;
+  if (!(await ensurePlanToday_())) { showNsToast('갈 곳 목록을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.', 4000); return 0; }
+  const g = planRecentGroup_(date);
+  const keys = planRecentAddable_(g, _plan.items);
+  if (!keys.length) return 0;
+  const today = _plan.date, now = Date.now();
+  const results = await Promise.all(keys.map(function(k, i) {
+    const item = planItemFromOld_(g.items[k], now + i);
+    return withTimeout_(db.ref(planPath_(today, k)).set(item), PLAN_TIMEOUT_MS_, '갈 곳 담기')
+      .then(function() { return { k: k, item: item }; }, function(e) { return { k: k, err: e }; });
+  }));
+  if (_plan.date !== today) return 0;
+  let ok = 0, fail = 0;
+  results.forEach(function(r) {
+    if (r.err) { fail++; return; }
+    _plan.items[r.k] = r.item; ok++;
+  });
+  refreshPlanUI_();
+  refreshPlanPins_(results.filter(function(r) { return !r.err; }).map(function(r) { return r.k; }));
+  showNsToast(fail ? (ok + '곳을 담았고 ' + fail + '곳은 실패했습니다 (오늘 ' + planCount_() + '곳)')
+                   : (planDayLabel_(date) + ' 목록에서 ' + ok + '곳을 다시 담았습니다 (오늘 ' + planCount_() + '곳)'), fail ? 5000 : 3000);
+  return ok;
 }
 async function removePlan_(key) {
   if (!planEnabled_() || !key || !isPlanned_(key)) return false;
@@ -4964,33 +5122,6 @@ async function removePlan_(key) {
 async function togglePlan_(store) {
   if (!store || !store._key) return false;
   return isPlanned_(store._key) ? removePlan_(store._key) : addPlan_(store);
-}
-// 어제 못 간 곳을 오늘로 복사(자식 하나씩 set)
-async function carryOverPlans_() {
-  if (!planEnabled_()) return 0;
-  if (!(await ensurePlanToday_())) return 0;
-  const keys = planCarryCandidates_(_plan.yItems, _plan.items);
-  if (!keys.length) return 0;
-  const date = _plan.date, now = Date.now();
-  const results = await Promise.all(keys.map(function(k, i) {
-    const src = _plan.yItems[k] || {};
-    const item = { n: String(src.n || ''), at: now + i };
-    if (src.a) item.a = String(src.a);
-    if (isFinite(src.lat)) item.lat = Number(src.lat);
-    if (isFinite(src.lng)) item.lng = Number(src.lng);
-    return withTimeout_(db.ref(planPath_(date, k)).set(item), PLAN_TIMEOUT_MS_, '갈 곳 이월')
-      .then(function() { return { k: k, item: item }; }, function(e) { return { k: k, err: e }; });
-  }));
-  if (_plan.date !== date) return 0;
-  let ok = 0, fail = 0;
-  results.forEach(function(r) {
-    if (r.err) { fail++; return; }
-    _plan.items[r.k] = r.item; ok++;
-  });
-  refreshPlanUI_();
-  refreshPlanPins_(results.filter(function(r) { return !r.err; }).map(function(r) { return r.k; }));   // ★ v74
-  showNsToast(fail ? ('어제 못 간 곳 ' + ok + '곳을 담았고 ' + fail + '곳은 실패했습니다') : ('어제 못 간 곳 ' + ok + '곳을 다시 담았습니다'), fail ? 5000 : 2500);
-  return ok;
 }
 // 방문 저장이 끝난 업장이 오늘 계획에 있으면 '다녀옴' 표시(응답을 기다리지 않는다)
 function markPlanDone_(storeKey) {
@@ -5151,8 +5282,13 @@ function isPlanListOpen_() {
   const panel = document.getElementById('storePanel');
   return !!(panel && panel.classList && panel.classList.contains('open'));
 }
-function planStoreForKey_(key) {
-  const it = _plan.items[key] || _plan.yItems[key] || {};
+// ★ v75: fallbackItem = 최근 목록 줄에서 열 때 그 날의 항목(이름·좌표). 없으면 오늘 → 최근 목록 순으로 찾는다.
+function planRecentItem_(key) {
+  const g = (_plan.recent || []).find(function(x) { return x.items && x.items[key]; });
+  return g ? g.items[key] : null;
+}
+function planStoreForKey_(key, fallbackItem) {
+  const it = _plan.items[key] || fallbackItem || planRecentItem_(key) || {};
   const inView = allStoresInView.find(function(s) { return s && s._key === key; });
   if (inView) return inView;
   // ★ v74: 화면 목록에 없어도 받아 둔 띠(파트너)·마스터 목록(관리자)에 있으면 그 객체(상태색·등급이 맞다)
@@ -5186,7 +5322,6 @@ function openPlanListPanel_() {
 function renderPlanList_() {
   const content = document.getElementById('panelContent');
   const rows = planSortedRows_(_plan.items, currentUserLocation);
-  const carry = planCarryCandidates_(_plan.yItems, _plan.items);
   const sortNote = currentUserLocation ? '내 위치에서 가까운 순' : '담은 순 (내 위치를 모름)';
   // ★ v74: 머리 줄 오른쪽에 지도 필터 전환(켜져 있으면 「전체 보기」, 꺼져 있으면 「지도에 갈 곳만」)
   const modeOn = isPlanModeOn_();
@@ -5197,10 +5332,6 @@ function renderPlanList_() {
   let html = '<div class="plan-list-head"><h2>오늘 갈 곳 ' + rows.length + '곳</h2>' + modeBtn + '</div>' +
     '<div class="addr">' + (_plan.loaded ? sortNote : '목록 불러오는 중…') +
     (modeOn ? ' · 지도에 갈 곳만 표시 중' : '') + '</div>';
-  if (carry.length) {
-    html += '<button type="button" class="plan-carry-btn" id="planCarryBtn">' + IC_.plus +
-            '<span>어제 못 간 곳 ' + carry.length + '곳 다시 담기</span></button>';
-  }
   if (!rows.length) {
     html += '<div class="plan-empty">아직 담은 곳이 없습니다. 업장 정보에서 이름 옆 별 버튼을 누르세요.</div>';
   } else {
@@ -5215,7 +5346,7 @@ function renderPlanList_() {
         '<button type="button" class="v70-row" data-plan-i="' + i + '">' +
           '<span class="v70-row-main">' +
             '<span class="v70-row-title" style="display:block;">' + escapeHtml(name) + '</span>' +
-            '<span class="v70-row-sub" style="display:block;">' + escapeHtml(sub) + '</span>' +
+            '<span class="v70-row-sub" style="display:block;">' + otherActiveRowTagHtml_(st, status) + escapeHtml(sub) + '</span>' +   // ★ v75: 타파트너영업중
           '</span>' + doneTag + statusBadgeHtml_(status) +
         '</button>' +
         '<button type="button" class="plan-row-btn" data-plan-nav="' + i + '" aria-label="' + escapeHtml(name) + ' 길찾기">' + IC_.nav + '</button>' +
@@ -5223,14 +5354,11 @@ function renderPlanList_() {
         '</li>';
     }).join('') + '</ul>';
   }
+  const recent = planRecentHtml_(rows.length);
+  html += recent.html;
   content.innerHTML = html;
   const modeEl = document.getElementById('planModeBtn');   // ★ v74
   if (modeEl && (modeOn || rows.length)) modeEl.onclick = function() { setPlanMode_(!isPlanModeOn_()); };
-  const carryBtn = document.getElementById('planCarryBtn');
-  if (carryBtn && carry.length) carryBtn.onclick = async function() {
-    carryBtn.disabled = true;
-    try { await carryOverPlans_(); } finally { carryBtn.disabled = false; }
-  };
   content.querySelectorAll('[data-plan-i]').forEach(function(btn) {
     const r = rows[Number(btn.dataset.planI)];
     if (r) btn.onclick = function() { openPlanStore_(r.key); };
@@ -5243,10 +5371,97 @@ function renderPlanList_() {
     const r = rows[Number(btn.dataset.planRm)];
     if (r) btn.onclick = function() { btn.disabled = true; removePlan_(r.key).finally(function() { btn.disabled = false; }); };
   });
+  bindPlanRecent_(content, recent);
+}
+/* ★ v75: 최근 목록 — 갈 곳 목록 아래 접는 구역. 오늘이 비면 펼쳐서, 아니면 접어서 시작한다(사용자가 바꾸면 그날 유지).
+   날 묶음 머리 「10월 13일 (월) · N곳」 + 「전체 다시 담기」(담을 게 없으면 「모두 담김」 비활성).
+   줄 = 이름 · 주소/거리 · 다녀옴(글자) · 「담기」(이미 오늘에 있으면 「담김」 비활성). 줄을 누르면 업장을 연다(‹ 갈 곳 목록). */
+function planRecentIsOpen_(todayCount) {
+  if (_planRecentOpen !== null) return _planRecentOpen;
+  const open = !todayCount;
+  if (_plan.loaded) _planRecentOpen = open;   // 불러온 뒤 처음 정한 값을 그날 유지(담다가 접히지 않게)
+  return open;
+}
+function planRecentHtml_(todayCount) {
+  const groups = (_plan.loaded && _plan.recent) ? _plan.recent.filter(function(g) { return Object.keys(g.items || {}).length; }) : [];
+  if (!groups.length) return { html: '', groups: [] };
+  const open = planRecentIsOpen_(todayCount);
+  const loc = currentUserLocation;
+  const gRows = groups.map(function(g) { return planSortedRows_(g.items, loc); });
+  let html = '<section class="plan-recent" aria-label="최근 목록">' +
+    '<button type="button" class="plan-recent-toggle" id="planRecentToggle" aria-expanded="' + (open ? 'true' : 'false') + '" aria-controls="planRecentBody">' +
+      '<span class="plan-recent-title">최근 목록</span><span class="plan-recent-meta">' + groups.length + '일 · 다시 담기</span>' +
+      '<span class="plan-recent-chev" aria-hidden="true">' + IC_.chev + '</span></button>' +
+    '<div id="planRecentBody" class="plan-recent-body"' + (open ? '' : ' hidden') + '>';
+  groups.forEach(function(g, gi) {
+    const rows = gRows[gi];
+    const addable = planRecentAddable_(g, _plan.items).length;
+    const label = planDayLabel_(g.date);
+    html += '<div class="plan-recent-day">' +
+      '<div class="plan-recent-day-head"><span class="plan-recent-day-title">' + escapeHtml(label) + ' · ' + rows.length + '곳</span>' +
+      '<button type="button" class="plan-recent-all" data-rc-all="' + gi + '"' + (addable ? '' : ' disabled') +
+        ' aria-label="' + escapeHtml(label) + (addable ? ' 목록에서 ' + addable + '곳 다시 담기' : ' 목록 모두 담김') + '">' +
+        (addable ? '전체 다시 담기' : '모두 담김') + '</button></div>' +
+      '<ul class="v70-list plan-list plan-recent-list" aria-label="' + escapeHtml(label) + ' 목록">' + rows.map(function(r, i) {
+        const it = r.item;
+        const name = it.n || '(이름 없음)';
+        const st = planStoreForKey_(r.key, it);
+        const status = getVisitStatus(st);
+        const sub = [it.a || '', formatPlanDist_(r.dist)].filter(Boolean).join(' · ') || '주소 정보 없음';
+        const done = it.done === true;
+        const inToday = isPlanned_(r.key);
+        return '<li class="plan-li' + (done ? ' done' : '') + '">' +
+          '<button type="button" class="v70-row" data-rc-i="' + gi + ':' + i + '">' +
+            '<span class="v70-row-main">' +
+              '<span class="v70-row-title" style="display:block;">' + escapeHtml(name) + '</span>' +
+              '<span class="v70-row-sub" style="display:block;">' + otherActiveRowTagHtml_(st, status) + escapeHtml(sub) + '</span>' +
+            '</span>' + (done ? '<span class="plan-done-tag">다녀옴</span>' : '') +
+          '</button>' +
+          '<button type="button" class="plan-recent-add' + (inToday ? ' in' : '') + '" data-rc-add="' + gi + ':' + i + '"' + (inToday ? ' disabled' : '') +
+            ' aria-label="' + escapeHtml(name) + (inToday ? ' 오늘 갈 곳에 담김' : ' 오늘 갈 곳에 담기') + '">' + (inToday ? '담김' : '담기') + '</button>' +
+          '</li>';
+      }).join('') + '</ul></div>';
+  });
+  html += '</div></section>';
+  return { html: html, groups: groups, rows: gRows };
+}
+function bindPlanRecent_(content, recent) {
+  if (!recent || !recent.groups || !recent.groups.length) return;
+  const tg = document.getElementById('planRecentToggle');
+  if (tg) tg.onclick = function() {
+    _planRecentOpen = !(tg.getAttribute('aria-expanded') === 'true');
+    renderPlanList_();
+  };
+  const pick = function(v) {
+    const p = String(v || '').split(':');
+    const g = recent.groups[Number(p[0])], rs = recent.rows[Number(p[0])];
+    const r = rs ? rs[Number(p[1])] : null;
+    return (g && r) ? { g: g, r: r } : null;
+  };
+  content.querySelectorAll('[data-rc-i]').forEach(function(btn) {
+    const x = pick(btn.dataset.rcI);
+    if (x) btn.onclick = function() { openPlanStore_(x.r.key, x.r.item); };
+  });
+  content.querySelectorAll('[data-rc-add]').forEach(function(btn) {
+    const x = pick(btn.dataset.rcAdd);
+    if (x) btn.onclick = function() {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      addPlanFromRecent_(x.g.date, x.r.key).then(function(ok) { if (!ok) btn.disabled = false; }, function() { btn.disabled = false; });
+    };
+  });
+  content.querySelectorAll('[data-rc-all]').forEach(function(btn) {
+    const g = recent.groups[Number(btn.dataset.rcAll)];
+    if (g) btn.onclick = function() {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      addPlanRecentAll_(g.date).then(function(n) { if (!n) btn.disabled = false; }, function() { btn.disabled = false; });
+    };
+  });
 }
 // 목록에서 업장 열기: 띠 밖(화면 밖)이어도 계획에 저장한 좌표·이름으로 연다(openPanel 이 stores/<key> 상세를 받는다)
-function openPlanStore_(key) {
-  const st = planStoreForKey_(key);
+function openPlanStore_(key, fallbackItem) {
+  const st = planStoreForKey_(key, fallbackItem);   // ★ v75: 최근 목록 줄은 그 날의 항목으로
   if (map && isFinite(st.lat) && isFinite(st.lng)) {
     _userMovedMap = true;   // 위치가 늦게 와도 화면을 옮기지 않게
     map.setCenter(new kakao.maps.LatLng(st.lat, st.lng));
