@@ -946,6 +946,8 @@ const AUTH_ENABLED = FIREBASE_WEB_API_KEY !== '';
    DB 규칙을 잠그면 예전 로그인은 어차피 실패하므로 false 로 바꾼다. */
 const LOGIN_FALLBACK_TO_LEGACY = true;
 const LOGIN_TIMEOUT_MS = 15000;           // 로그인·영업기준표 토큰 요청 상한
+const LOGIN_HEDGE_MS = 4000;              // ★ v78: 이 시간 안에 응답이 없으면 같은 요청을 한 번 더 보낸다(평소 응답 2.5~3초)
+const LOGIN_SLOW_NOTE_MS = 3500;          // ★ v78: 이 시간이 지나면 버튼에 '서버 응답 기다리는 중…'
 const AUTH_STATE_TIMEOUT_MS = 8000;       // 저장된 Firebase 세션 복원 대기 상한
 const SSO_STORAGE_KEY = 'upbox_sso_v1';   // 서버가 준 영업기준표 토큰 { token, date(KST) }
 const USER_ROLES_ = ['partner', 'admin', 'external'];
@@ -989,7 +991,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v77';   // ★ v77
+const APP_VERSION = 'v78';   // ★ v78
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -1370,11 +1372,18 @@ async function legacyLogin_(name, code, errEl) {
     errEl.textContent = "로그인 오류: " + e.message;
   }
 }
+let _loginSlowTimer = null;   // ★ v78: 로그인 버튼 안내 문구 타이머(함수 안에서만 쓴다 — 상수 블록 아님: 최상위 let 은 이 파일 중간에 있어도 setLoginBusy_ 가 호출되기 전에 평가된다)
+function setLoginBusyText_(text) {
+  const btn = document.getElementById('loginBtn');
+  if (btn && btn.disabled) btn.textContent = text;
+}
 function setLoginBusy_(on) {
   const btn = document.getElementById('loginBtn');
   if (!btn) return;
+  clearTimeout(_loginSlowTimer);
   btn.disabled = !!on;
   btn.textContent = on ? '로그인 중…' : '로그인';
+  if (on) _loginSlowTimer = setTimeout(function() { setLoginBusyText_('서버 응답 기다리는 중…'); }, LOGIN_SLOW_NOTE_MS);
 }
 function showLoginScreen_(message, name) {
   document.getElementById("loginScreen").style.display = "flex";
@@ -1421,6 +1430,35 @@ function postWebApp_(payload, timeoutMs) {
   timeout.catch(function() {});
   return Promise.race([req, timeout]).finally(function() { clearTimeout(timer); });
 }
+/* ★ v78: 헷지 요청 — Apps Script 웹앱은 평소 2.5~3초지만 가끔 수십 초 멈춘다(2026-10-23 실측: 같은 요청 5번 중 5번 30초 초과 → 곧 정상).
+   hedgeMs 안에 응답이 없으면 같은 요청을 한 번 더 보내 먼저 성공한 쪽을 쓴다. 둘 다 실패하면 마지막 오류. 전체 상한은 timeoutMs.
+   ⚠️ login · ssoToken 처럼 몇 번 보내도 결과가 같은 요청에만 쓴다(저장 요청에 쓰지 말 것). */
+function postWebAppHedged_(payload, timeoutMs, hedgeMs, onHedge) {
+  const total = timeoutMs || LOGIN_TIMEOUT_MS;
+  return new Promise(function(resolve, reject) {
+    let settled = false, pending = 0, hedgeTimer = null, lastErr = null;
+    const finish = function(fn, v) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(hedgeTimer);
+      fn(v);
+    };
+    const launch = function(ms) {
+      pending++;
+      postWebApp_(payload, ms).then(function(d) { finish(resolve, d); }, function(e) {
+        lastErr = e; pending--;
+        if (pending <= 0 && (hedgeTimer === null)) finish(reject, lastErr);
+      });
+    };
+    launch(total);
+    hedgeTimer = setTimeout(function() {
+      hedgeTimer = null;
+      if (settled) return;
+      if (onHedge) { try { onHedge(); } catch (e) {} }
+      launch(Math.max(1000, total - (hedgeMs || LOGIN_HEDGE_MS)));
+    }, hedgeMs || LOGIN_HEDGE_MS);
+  });
+}
 /* 서버 응답 분류 → { kind: 'ok' | 'denied' | 'unavailable', reason, message }
    ⚠️ 'denied' 는 서버가 로그인 실패를 '분명히' 말한 경우만. 지금 서버(login 미배포)는 action 을 몰라
       { ok:false, error:'MISSING_STORE_NAME' } 같은 걸 돌려주는데, 이걸 '코드 불일치'로 읽으면 전원이 잠긴다 → unavailable. */
@@ -1446,7 +1484,7 @@ function classifyLoginResponse_(data) {
 async function serverLogin_(name, code) {
   let data;
   try {
-    data = await postWebApp_({ action: 'login', name: name, code: code }, LOGIN_TIMEOUT_MS);
+    data = await postWebAppHedged_({ action: 'login', name: name, code: code }, LOGIN_TIMEOUT_MS, LOGIN_HEDGE_MS, function() { setLoginBusyText_('한 번 더 시도 중…'); });
   } catch(e) {
     const timeout = !!(e && e.message === 'TIMEOUT');
     return { kind: 'unavailable', reason: timeout ? 'timeout' : 'network',
@@ -4170,7 +4208,7 @@ function clearSsoToken_() {
   try { localStorage.removeItem(SSO_STORAGE_KEY); } catch(e) {}
 }
 async function fetchServerSsoToken_() {
-  const data = await postWebApp_({ action: 'ssoToken', name: currentUser.name, code: currentUser.code }, LOGIN_TIMEOUT_MS);
+  const data = await postWebAppHedged_({ action: 'ssoToken', name: currentUser.name, code: currentUser.code }, LOGIN_TIMEOUT_MS, LOGIN_HEDGE_MS);
   if (data && data.ok === true && typeof data.ssoToken === 'string' && data.ssoToken) {
     storeSsoToken_(data.ssoToken);
     return data.ssoToken;
