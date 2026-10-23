@@ -443,6 +443,11 @@
   .visit-form select { height: 40px; }
   .visit-form textarea { min-height: 64px; }
   .date-select-row select { padding: 6px 4px; }
+  /* ★ v77: 달력 입력 + 지우기 */
+  .date-select-row input[type="date"] { flex: 1; min-width: 0; min-height: 40px; background: #fff; }
+  .date-clear-btn { flex: 0 0 auto; min-height: 40px; min-width: 56px; padding: 0 12px; border: 1px solid var(--line); border-radius: 6px;
+                    background: #fff; color: var(--navy); font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; }
+  .date-clear-btn:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
   .num-warn-msg { font-size: 12px; line-height: 1.3; margin-top: 2px; }
   .repriority-toggle button { min-height: 40px; padding: 6px 0; }
   .draft-notice { padding: 6px 10px; margin-bottom: 8px; }
@@ -872,9 +877,9 @@
       <div class="ns-step" data-step="3" hidden>
         <!-- ★ v56: 예상계약일자 — 상세 상담내용 바로 위 -->
         <div class="ns-form-group">
-          <label for="nsEcdY">예상계약일자</label>
+          <label for="nsEcd">예상계약일자</label>
           <div class="date-select-row">
-            <select id="nsEcdY" aria-label="예상계약 연도"></select><select id="nsEcdM" aria-label="예상계약 월"></select><select id="nsEcdD" aria-label="예상계약 일"></select>
+            <input type="date" id="nsEcd" aria-label="예상계약일자"><button type="button" class="date-clear-btn" id="nsEcdClear" hidden>지우기</button>
           </div>
         </div>
         <div class="ns-form-group">
@@ -984,7 +989,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v76';   // ★ v76
+const APP_VERSION = 'v77';   // ★ v77
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -4509,53 +4514,36 @@ function daysInMonth_(y, m) {
   if (!y || !m) return 31;
   return new Date(Number(y), Number(m), 0).getDate();
 }
-function initDateSelects_(yId, mId, dId, onChange) {
-  const ySel = document.getElementById(yId), mSel = document.getElementById(mId), dSel = document.getElementById(dId);
-  if (!ySel || !mSel || !dSel) return;
-  if (ySel._dsInit) return;   // 폐기물 종류 전환 등으로 재호출돼도 리스너가 중복되지 않도록
-  ySel._dsInit = true;
-  const thisYear = new Date().getFullYear();
-  let yHtml = '<option value="">년</option>';
-  for (let y = thisYear; y <= thisYear + 3; y++) yHtml += '<option value="' + y + '">' + y + '년</option>';
-  ySel.innerHTML = yHtml;
-  let mHtml = '<option value="">월</option>';
-  for (let m = 1; m <= 12; m++) mHtml += '<option value="' + m + '">' + m + '월</option>';
-  mSel.innerHTML = mHtml;
-  const rebuildDays = function() {
-    const keep = dSel.value;
-    const max = daysInMonth_(ySel.value, mSel.value);
-    let dHtml = '<option value="">일</option>';
-    for (let d = 1; d <= max; d++) dHtml += '<option value="' + d + '">' + d + '일</option>';
-    dSel.innerHTML = dHtml;
-    if (keep && Number(keep) <= max) dSel.value = keep;   // 말일 초과 시에만 초기화
-  };
-  rebuildDays();
-  ySel.addEventListener('change', function() { rebuildDays(); if (onChange) onChange(); });
-  mSel.addEventListener('change', function() { rebuildDays(); if (onChange) onChange(); });
-  dSel.addEventListener('change', function() { if (onChange) onChange(); });
+/* ★ v77: 예상계약일자는 달력(<input type="date">) 하나. 값은 브라우저가 'YYYY-MM-DD' 로 준다 → 저장 형식 v76 과 같다.
+   initDateSelects_ 는 「지우기」 버튼만 묶는다(옵션 채우기는 없어짐). */
+function initDateSelects_(id, onChange) {
+  const el = document.getElementById(id);
+  if (!el || el._dsInit) return;
+  el._dsInit = true;
+  const clr = document.getElementById(id + 'Clear');
+  const sync = function() { if (clr) clr.hidden = !el.value; };
+  el.addEventListener('input', function() { sync(); if (onChange) onChange(); });
+  el.addEventListener('change', function() { sync(); if (onChange) onChange(); });
+  if (clr) clr.addEventListener('click', function() {
+    el.value = ''; sync();
+    try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+  });
+  sync();
 }
 function pad2_(n) { return String(n).length < 2 ? '0' + n : String(n); }
 // 년·월·일이 모두 선택된 경우에만 값을 만듭니다(부분 입력은 빈 값 처리).
-function getDateSelectValue_(yId, mId, dId) {
-  const y = (document.getElementById(yId) || {}).value || '';
-  const m = (document.getElementById(mId) || {}).value || '';
-  const d = (document.getElementById(dId) || {}).value || '';
-  if (!y || !m || !d) return '';
-  return y + '-' + pad2_(m) + '-' + pad2_(d);
+function getDateSelectValue_(id) {
+  const v = String((document.getElementById(id) || {}).value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
 }
-function setDateSelectValue_(yId, mId, dId, val) {
-  const ySel = document.getElementById(yId), mSel = document.getElementById(mId), dSel = document.getElementById(dId);
-  if (!ySel || !mSel || !dSel) return;
-  const parts = String(val || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (!parts) { ySel.value = ''; mSel.value = ''; dSel.value = ''; return; }
-  // 저장된 연도가 드롭다운 범위 밖이면(과거 기록 등) 옵션을 즉석에서 보강
-  if (!Array.prototype.some.call(ySel.options, function(o) { return o.value === parts[1]; })) {
-    ySel.insertAdjacentHTML('beforeend', '<option value="' + parts[1] + '">' + parts[1] + '년</option>');
-  }
-  ySel.value = parts[1];
-  mSel.value = String(Number(parts[2]));
-  ySel.dispatchEvent(new Event('change'));   // 일 옵션 재생성
-  dSel.value = String(Number(parts[3]));
+// 'YYYY-MM-DD'(또는 1자리 월·일) 만 받는다. 모양이 다르면 비운다.
+function setDateSelectValue_(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const p = String(val || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  el.value = p ? (p[1] + '-' + pad2_(p[2]) + '-' + pad2_(p[3])) : '';
+  const clr = document.getElementById(id + 'Clear');
+  if (clr) clr.hidden = !el.value;
 }
 // ★ v53: 폐기물 종류 드롭다운 + 동적 라벨 id 추가
 function buildVisitForm() {
@@ -4605,9 +4593,9 @@ function buildVisitForm() {
     '<label><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>' +
     '<select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select>' +
     // ★ v56: 예상계약일자 — 상세 상담내용 바로 위, 년/월/일 드롭다운
-    '<label>예상계약일자</label>' +
+    '<label for="v_ecd">예상계약일자</label>' +
     '<div class="date-select-row">' +
-      '<select id="v_ecdY"></select><select id="v_ecdM"></select><select id="v_ecdD"></select>' +
+      '<input type="date" id="v_ecd" aria-label="예상계약일자"><button type="button" class="date-clear-btn" id="v_ecdClear" hidden>지우기</button>' +
     '</div>' +
     '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
     '<label>최종영업결과 및 폐업 여부 선택</label>' +
@@ -4649,7 +4637,7 @@ function loadMyVisit(store, wasteType) {
   }
   setVal('v_wasteType', wasteType);
   applyWasteTypeUI(wasteType);
-  initDateSelects_('v_ecdY', 'v_ecdM', 'v_ecdD');   // ★ v56: 옵션 채우기(최초 1회)
+  initDateSelects_('v_ecd');   // ★ v56: 옵션 채우기(최초 1회)
   const rec = byType[wasteType];
   if (!rec) {
     // ★ v56: contactMethod 추가
@@ -4658,7 +4646,7 @@ function loadMyVisit(store, wasteType) {
     });
     applyFailReasonUI_('v_');   // ★ v60
     setRepriorityValue_('');                                  // ★ v58: 성사가능성 초기화
-    setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', '');   // ★ v56
+    setDateSelectValue_('v_ecd', '');   // ★ v56
     applySalesTypeDefault_();                                 // ★ v56: 아웃바운드 기본선택
     refreshNumericWarnings_(NUMERIC_FIELD_IDS_);              // ★ v56: 빈 값이므로 경고 해제
     applyDraftNotice_(store, wasteType);                      // ★ v61
@@ -4686,7 +4674,7 @@ function fillVisitFormFromCurrent_(cur) {
     setVal('v_' + k, cur[k]);
   });
   applyFailReasonUI_('v_');                                         // ★ v60
-  setDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD', cur.expectedContractDate);
+  setDateSelectValue_('v_ecd', cur.expectedContractDate);
   setRepriorityValue_(cur.repriority);                              // ★ v58
   applySalesTypeDefault_();                                          // ★ v56
   refreshNumericWarnings_(NUMERIC_FIELD_IDS_);                      // ★ v57
@@ -4735,7 +4723,7 @@ function bindVisitForm(store) {
   const formFieldIds = [
     'v_repriority','v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
     'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome',
-    'v_ecdY','v_ecdM','v_ecdD',
+    'v_ecd',
     'v_failReason','v_failReasonEtc'
   ];
   // ★ v60: 최종영업결과·불발사유가 바뀌면 노출 상태를 다시 계산
@@ -4813,7 +4801,7 @@ async function saveVisit(store) {
     const contactMethodVal = getVal('v_contactMethod');
     if (contactMethodVal) currentData.contactMethod = contactMethodVal;
     // ★ v56: 예상계약일자 — 년·월·일이 모두 선택된 경우에만 'YYYY-MM-DD'로 저장
-    const ecdVal = getDateSelectValue_('v_ecdY', 'v_ecdM', 'v_ecdD');
+    const ecdVal = getDateSelectValue_('v_ecd');
     if (ecdVal) currentData.expectedContractDate = ecdVal;
     const repriorityVal = getVal('v_repriority');
     if (repriorityVal) currentData.repriority = repriorityVal;
@@ -5934,8 +5922,8 @@ function resetNewStoreForm() {
   }
   const frEtc = document.getElementById('ns_failReasonEtc');
   if (frEtc) frEtc.value = '';
-  initDateSelects_('nsEcdY', 'nsEcdM', 'nsEcdD');
-  setDateSelectValue_('nsEcdY', 'nsEcdM', 'nsEcdD', '');
+  initDateSelects_('nsEcd');
+  setDateSelectValue_('nsEcd', '');
   attachNumericWarnings_(NS_NUMERIC_FIELD_IDS_);
   refreshNumericWarnings_(NS_NUMERIC_FIELD_IDS_);
   _nsSelectedAdminType = '';
@@ -6173,7 +6161,7 @@ async function submitNewStore() {
     // ★ v56: 접촉방식 / 예상계약일자
     //   addNewStore.gs가 아직 이 두 키를 모르면 그냥 무시됩니다(기존 동작 영향 없음).
     contactMethod: document.getElementById('nsContactMethod').value,
-    expectedContractDate: getDateSelectValue_('nsEcdY', 'nsEcdM', 'nsEcdD'),
+    expectedContractDate: getDateSelectValue_('nsEcd'),
     // ★ v60: 불발사유 / 기타불발사유
     failReason: document.getElementById('ns_failReason').value,
     failReasonEtc: document.getElementById('ns_failReason').value === FAIL_REASON_ETC
