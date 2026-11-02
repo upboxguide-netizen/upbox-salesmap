@@ -828,6 +828,10 @@
           <label for="nsContact">담당자 연락처<span class="num-warn-msg"></span></label>
           <input type="tel" id="nsContact" inputmode="numeric" placeholder="010-0000-0000" maxlength="13">
         </div>
+        <div class="ns-form-group" id="grp_nsBagSpec" style="display:none;">
+          <label for="nsBagSpec">봉투 규격</label>
+          <select id="nsBagSpec"><option value="">선택</option><option value="75L">75L</option><option value="100L">100L</option></select>
+        </div>
         <div class="ns-form-row">
           <div class="ns-form-group">
             <label for="nsAmount"><span id="lbl_nsAmount">월 예상배출량 (L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
@@ -991,7 +995,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v80';   // ★ v80
+const APP_VERSION = 'v81';   // ★ v81
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -1069,7 +1073,7 @@ const WASTE_TYPE_DEFAULT = 'FOOD';
 // 폐기물별 라벨 오버라이드
 const WASTE_FIELD_LABELS = {
   FOOD:    { amount: '월 예상배출량 (L)',  price: '현재 단가 (원/L)',   suggestedPrice: '제안 단가 (원/L)' },
-  PLASTIC: { amount: '월 예상배출량 (장, 75L 봉투 기준)', price: '현재 단가 (원/장당)', suggestedPrice: '제안 단가 (원/장당)' },
+  PLASTIC: { amount: '월 예상배출량 (장 · 규격 1장 기준)', price: '현재 단가 (원/장당)', suggestedPrice: '제안 단가 (원/장당)' },
   OIL:     { amount: '월 예상배출량 (통)', price: '현재 단가 (원/통당)', suggestedPrice: '제안 단가 (원/통당)' }
 };
 // 폐기물별로 숨길 필드 (숨긴 필드는 저장 시 빈값 처리)
@@ -2327,6 +2331,30 @@ function isOtherPartnerActive(store) {
   return true;
 }
 // ★ v53: 폐기물 유형별 다중 기록 지원. myVisitedStoreData는 대표 기록(핀색상/칩카운트 등 기존 로직 호환용)
+/* ★ v81: 업장 패널을 열 때 이 업장의 내 기록을 서버에서 다시 읽는다(다른 기기에서 저장한 것 반영).
+   실패하거나 5초 넘으면 지금 캐시로 그대로 진행한다. */
+async function refreshMyVisitForStore_(store) {
+  try {
+    if (!currentUser || !currentUser.key || !store || !store._key) return;
+    const me = currentUser.key;
+    const recs = await withTimeout_(Promise.all(WASTE_TYPES.map(function(w) {
+      return db.ref('visits/' + me + '/' + buildWasteRecKey_(me, store._key, w.code)).once('value')
+        .then(function(s) { return { code: w.code, rec: s.val() }; });
+    })), 5000, '내 기록 새로고침');
+    let changed = false;
+    recs.forEach(function(r) {
+      if (!r.rec) return;
+      const byType = myVisitedStoreDataByType[store._key] || (myVisitedStoreDataByType[store._key] = {});
+      const old = byType[r.code];
+      if (!old || Number(r.rec.lastUpdatedAt || 0) !== Number(old.lastUpdatedAt || 0)) { byType[r.code] = r.rec; changed = true; }
+    });
+    if (changed) {
+      myVisitedStoreData[store._key] = pickRepresentativeVisitRecord_(myVisitedStoreDataByType[store._key]);
+      _visitsRev++;
+      refreshMarkersForKeys_([store._key]);
+    }
+  } catch (e) { console.warn('[내 기록 새로고침 실패 — 저장된 캐시로 진행]', e && e.message); }
+}
 async function loadMyVisits() {
   try {
     const snap = await db.ref("visits/" + currentUser.key).once("value");
@@ -3866,6 +3894,10 @@ async function openPanel(store, opts) {
   if (mySeq !== _panelSeq) return;                     // 그 사이 다른 업장/목록을 열었다
   if (detail) store = Object.assign({}, detail, store);
   selectedStore = store;
+  if (!isContractGrade(store.grade) && !isExternalUser) {   // ★ v81: 다른 기기 저장분 반영
+    await refreshMyVisitForStore_(store);
+    if (mySeq !== _panelSeq) return;
+  }
   const isContract = isContractGrade(store.grade);
   const closedFlag = isClosed(store);
   const adminBadge = store.adminType ? '<span class="badge badge-admin">' + escapeHtml(store.adminType) + '</span>' : '';
@@ -4636,6 +4668,9 @@ function buildVisitForm() {
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
     // ★ v56: 라벨 텍스트를 내부 span(lbl_*)으로 감쌈 — applyWasteTypeUI의 textContent 치환이
     //   경고 문구 span을 지우지 않도록 하기 위함. setLabel() 로직은 그대로 둬도 동작함.
+    // ★ v81: 폐합성수지 봉투 규격 — 폐합성수지일 때만 보인다(applyWasteTypeUI)
+    '<div id="grp_bagSpec" style="display:none;"><label for="v_bagSpec"><span style="color:#E53935;">*</span> 봉투 규격</label>' +
+    '<select id="v_bagSpec"><option value="">선택</option><option value="75L">75L</option><option value="100L">100L</option></select></div>' +
     '<label for="v_amount"><span id="lbl_amount">월 예상배출량 (L)</span>' + NUM_WARN_HTML_ + '</label>' +
     '<input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500">' +
     '<label for="v_price"><span id="lbl_price">현재 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
@@ -4680,6 +4715,8 @@ function applyWasteTypeUI(wasteType) {
   setLabel('lbl_price', labels.price);
   setLabel('lbl_suggestedPrice', labels.suggestedPrice);
   const hidden = WASTE_HIDDEN_FIELDS[wasteType] || [];
+  const bagEl = document.getElementById('grp_bagSpec');   // ★ v81
+  if (bagEl) bagEl.style.display = wasteType === 'PLASTIC' ? '' : 'none';
   const groupMap = { bins: 'grp_bins', vinyl: 'grp_vinyl' };
   for (const key in groupMap) {
     const groupEl = document.getElementById(groupMap[key]);
@@ -4699,7 +4736,7 @@ function loadMyVisit(store, wasteType) {
   const rec = byType[wasteType];
   if (!rec) {
     // ★ v56: contactMethod 추가
-    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc'].forEach(function(k) {
+    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc','bagSpec'].forEach(function(k) {
       setVal('v_' + k, '');
     });
     applyFailReasonUI_('v_');   // ★ v60
@@ -4728,7 +4765,7 @@ function loadMyVisit(store, wasteType) {
 function fillVisitFormFromCurrent_(cur) {
   cur = cur || {};
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck',
-   'note','outcome','salesType','contactMethod','failReason','failReasonEtc'].forEach(function(k) {
+   'note','outcome','salesType','contactMethod','failReason','failReasonEtc','bagSpec'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
   });
   applyFailReasonUI_('v_');                                         // ★ v60
@@ -4780,7 +4817,7 @@ function bindVisitForm(store) {
   // ★ v56: 접촉방식 + 예상계약일자 3종 드롭다운 추가
   const formFieldIds = [
     'v_repriority','v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
-    'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome',
+    'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome','v_bagSpec',
     'v_ecd',
     'v_failReason','v_failReasonEtc'
   ];
@@ -4853,6 +4890,9 @@ async function saveVisit(store) {
       currentData[k] = hiddenFields.indexOf(k) !== -1 ? '' : getVal('v_' + k);
     });
     currentData.wasteType = wasteType; // ★ v53
+    // ★ v81: 봉투 규격 — 폐합성수지만 저장
+    const bagSpecVal = wasteType === 'PLASTIC' ? getVal('v_bagSpec') : '';
+    if (bagSpecVal) currentData.bagSpec = bagSpecVal;
     const salesTypeVal = getVal('v_salesType');
     if (salesTypeVal) currentData.salesType = salesTypeVal;
     // ★ v56: 접촉방식 — 값이 있을 때만 저장. 상태 판정에는 쓰이지 않습니다.
@@ -4889,6 +4929,19 @@ async function saveVisit(store) {
     const existingSnap = await withTimeout_(recRef.once("value"), SAVE_TIMEOUT_MS_, '기존 기록 조회');
     const existing = existingSnap.val();
     const now = Date.now();
+    /* ★ v81: 서버 기록이 이 기기가 아는 것보다 새로우면(다른 기기 저장), 폼에서 비운 칸은 서버 값을 지킨다. 채운 칸만 덮어쓴다. */
+    let staleKept = 0;
+    if (existing && existing.current) {
+      const cachedRec = (myVisitedStoreDataByType[store._key] || {})[wasteType];
+      const baseTs = Number((cachedRec && cachedRec.current && cachedRec.current.updatedAt) || 0);
+      if (Number(existing.current.updatedAt || 0) > baseTs) {
+        Object.keys(existing.current).forEach(function(k) {
+          if (k === 'updatedAt' || k === 'wasteType' || hiddenFields.indexOf(k) !== -1) return;
+          const nv = currentData[k], ov = existing.current[k];
+          if (hasValue_(ov) && !hasValue_(nv)) { currentData[k] = ov; staleKept++; }
+        });
+      }
+    }
     let payload;
     if (existing) {
       const history = existing.history || [];
@@ -4923,6 +4976,10 @@ async function saveVisit(store) {
     if (isAdminUser) renderAdminView(); else renderMarkers();
     updateChipCounts();
     markPlanDone_(store._key);   // ★ v73: 오늘 갈 곳이면 done:true
+    if (staleKept) {   // ★ v81
+      if (selectedStore && selectedStore._key === store._key && getVal('v_wasteType') === wasteType) fillVisitFormFromCurrent_(currentData);
+      showNsToast('다른 기기에서 먼저 저장된 기록이 있어 비어 있던 ' + staleKept + '칸은 그 값을 유지했습니다', 5000);
+    }
 
     /* ★ v61 ④: 알림은 패널 상태와 무관하게 뜹니다.
        저장 도중 패널을 닫아도 토스트는 body에 붙으므로 결과를 놓치지 않습니다.
@@ -5957,7 +6014,7 @@ function resetNewStoreForm() {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  ['nsVinyl', 'nsTruck'].forEach(function(id) {
+  ['nsVinyl', 'nsTruck', 'nsBagSpec'].forEach(function(id) {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -6093,6 +6150,8 @@ function applyNsWasteTypeUI(wasteType) {
   setLabel('lbl_nsPrice', labels.price);
   setLabel('lbl_nsSuggestedPrice', labels.suggestedPrice);
   const hidden = WASTE_HIDDEN_FIELDS[wasteType] || [];
+  const nsBagEl = document.getElementById('grp_nsBagSpec');   // ★ v81
+  if (nsBagEl) nsBagEl.style.display = wasteType === 'PLASTIC' ? '' : 'none';
   const groupMap = { bins: 'grp_nsBins', vinyl: 'grp_nsVinyl' };
   for (const key in groupMap) {
     const groupEl = document.getElementById(groupMap[key]);
@@ -6203,6 +6262,7 @@ async function submitNewStore() {
     adminType: _nsSelectedAdminType,
     salesType: _nsSelectedSalesType,
     wasteType: nsWasteType,
+    bagSpec: nsWasteType === 'PLASTIC' ? document.getElementById('nsBagSpec').value : '',   // ★ v81 (addNewStore v1.19 부터 반영, 이전 서버는 무시)
     roadAddress:  _nsSelectedPlace ? (_nsSelectedPlace.roadAddress  || '') : '',   // ★ 신규
     jibunAddress: _nsSelectedPlace ? (_nsSelectedPlace.jibunAddress || '') : '',   // ★ 신규
     currentStoreName: document.getElementById('nsCurrentStoreName').value.trim(),
