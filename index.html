@@ -991,7 +991,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v79';   // ★ v79
+const APP_VERSION = 'v80';   // ★ v80
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -1069,7 +1069,7 @@ const WASTE_TYPE_DEFAULT = 'FOOD';
 // 폐기물별 라벨 오버라이드
 const WASTE_FIELD_LABELS = {
   FOOD:    { amount: '월 예상배출량 (L)',  price: '현재 단가 (원/L)',   suggestedPrice: '제안 단가 (원/L)' },
-  PLASTIC: { amount: '월 예상배출량 (KG)', price: '현재 단가 (원/장당)', suggestedPrice: '제안 단가 (원/장당)' },
+  PLASTIC: { amount: '월 예상배출량 (장, 75L 봉투 기준)', price: '현재 단가 (원/장당)', suggestedPrice: '제안 단가 (원/장당)' },
   OIL:     { amount: '월 예상배출량 (통)', price: '현재 단가 (원/통당)', suggestedPrice: '제안 단가 (원/통당)' }
 };
 // 폐기물별로 숨길 필드 (숨긴 필드는 저장 시 빈값 처리)
