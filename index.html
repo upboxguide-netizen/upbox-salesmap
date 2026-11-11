@@ -995,7 +995,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v81';   // ★ v81
+const APP_VERSION = 'v82';   // ★ v82
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -4437,10 +4437,29 @@ const FAIL_REASON_ETC = '기타';   // 이 값일 때만 기타 입력란이 열
 // 불발사유 입력란을 열어줄 최종영업결과 값. '실패'만 두면 성사 건에는 안 보입니다.
 const FAIL_REASON_OUTCOMES = ['실패'];
 
-function buildFailReasonOptions_() {
-  return '<option value="">선택</option>' + FAIL_REASONS.map(function(r) {
+/* ★ v82: 폐기물 구분·업장 종류에 따라 맨 위에 올라오는 불발사유가 다르다. 나머지는 기존 7종 그대로 뒤에 붙는다. */
+const FAIL_REASONS_UCO = ['(UCO) 낮은 통당단가', '(UCO) 계약서 작성', '(UCO) 새식용유', '(UCO) 현금거래', '(UCO) 증빙방식', '(UCO) 수거횟수'];
+const FAIL_REASONS_SCHOOL = ['시간제약 (출입시간제한)', '배출장소 운영불가', '비조리교 (잔반 없음)', '폐교·휴교', '견적서 발송 거부', '방문미팅 거부'];
+const FAIL_REASON_TIME = '시간제약 (출입시간제한)';   // 이 값일 때만 '학교가 원하는 방문 시간대' 칸이 열립니다
+function failReasonList_(wasteType, isSchool) {
+  const top = wasteType === 'OIL' ? FAIL_REASONS_UCO : (wasteType === 'FOOD' && isSchool ? FAIL_REASONS_SCHOOL : []);
+  return top.concat(FAIL_REASONS.filter(function(r) { return top.indexOf(r) === -1; }));
+}
+function buildFailReasonOptions_(wasteType, isSchool) {
+  return '<option value="">선택</option>' + failReasonList_(wasteType, isSchool).map(function(r) {
     return '<option value="' + r + '">' + r + '</option>';
   }).join('');
+}
+// 폐기물 구분이 바뀌면 방문기록 폼의 불발사유 선택지를 새로 그린다. 값은 유지하지 않고 기본(선택 없음)으로 돌아간다
+// (저장된 기록이 있으면 loadMyVisit → fillVisitFormFromCurrent_ 가 그 폐기물의 기록으로 다시 채운다)
+function isSchoolStore_(store) {
+  if (!store) return false;
+  return storeBizCode_(store) === 's' || /(초등학교|중학교|고등학교|특수학교)\s*$/.test(String(store.name || ''));
+}
+function refreshFailReasonOptions_(wasteType) {
+  const sel = document.getElementById('v_failReason');
+  if (!sel) return;
+  sel.innerHTML = buildFailReasonOptions_(wasteType, (typeof selectedStore !== 'undefined') && isSchoolStore_(selectedStore));
 }
 /* 최종영업결과·불발사유 값에 따라 두 칸의 노출을 갱신합니다.
    숨길 때는 값도 같이 비웁니다 — 안 그러면 성사로 바꿔도 불발사유가 남아 저장됩니다. */
@@ -4456,6 +4475,12 @@ function applyFailReasonUI_(prefix) {
   const showEtc = show && sel && sel.value === FAIL_REASON_ETC;
   if (gE) gE.style.display = showEtc ? '' : 'none';
   if (!showEtc && etc) etc.value = '';
+  // ★ v82: 시간제약을 고르면 학교가 원하는 방문 시간대 입력 칸을 연다(숨길 때 값도 비운다)
+  const gT = document.getElementById(prefix + 'grp_preferredTime');
+  const tIn = document.getElementById(prefix + 'preferredTime');
+  const showT = show && sel && sel.value === FAIL_REASON_TIME;
+  if (gT) gT.style.display = showT ? '' : 'none';
+  if (!showT && tIn) tIn.value = '';
 }
 const CONTACT_METHODS = ['팔로업콜', '대면미팅', '단순견적발송(콜,미팅X)'];
 
@@ -4705,6 +4730,11 @@ function buildVisitForm() {
       '<label>기타 불발사유</label>' +
       '<input id="v_failReasonEtc" type="text" placeholder="사유를 직접 입력해주세요">' +
     '</div>' +
+    // ★ v82: 시간제약 → 학교가 원하는 방문 시간대
+    '<div id="v_grp_preferredTime" style="display:none;">' +
+      '<label>학교가 원하는 방문 시간대</label>' +
+      '<input id="v_preferredTime" type="text" placeholder="예: 평일 오후 2~4시 (점심시간 제외)">' +
+    '</div>' +
     '</div>' +
     // ★ v71: 저장은 패널 아래에 붙어 있는 바의 유일한 주 버튼. 바로 위에 '리드 기준' 안내(다음 단계까지 남은 항목)
     '<div class="save-bar"><div class="lead-hint" id="v_leadHint"></div>' +
@@ -4725,6 +4755,7 @@ function applyWasteTypeUI(wasteType) {
     const groupEl = document.getElementById(groupMap[key]);
     if (groupEl) groupEl.style.display = hidden.indexOf(key) !== -1 ? 'none' : '';
   }
+  refreshFailReasonOptions_(wasteType);   // ★ v82
 }
 // ★ v53: wasteType 지정 시 그 유형의 기록만 로드. 없으면 저장된 유형 중 하나, 그것도 없으면 기본값(FOOD)
 function loadMyVisit(store, wasteType) {
@@ -4739,7 +4770,7 @@ function loadMyVisit(store, wasteType) {
   const rec = byType[wasteType];
   if (!rec) {
     // ★ v56: contactMethod 추가
-    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc','bagSpec'].forEach(function(k) {
+    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','bagSpec'].forEach(function(k) {
       setVal('v_' + k, '');
     });
     applyFailReasonUI_('v_');   // ★ v60
@@ -4768,7 +4799,7 @@ function loadMyVisit(store, wasteType) {
 function fillVisitFormFromCurrent_(cur) {
   cur = cur || {};
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck',
-   'note','outcome','salesType','contactMethod','failReason','failReasonEtc','bagSpec'].forEach(function(k) {
+   'note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','bagSpec'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
   });
   applyFailReasonUI_('v_');                                         // ★ v60
@@ -4803,7 +4834,15 @@ function applyDraftNotice_(store, wasteType) {
     box.classList.remove('show');
   };
 }
-function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v || (id === 'v_bagSpec' ? '75L' : ""); }   // ★ v81: 봉투 규격 기본 75L
+function setVal(id, v) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  // ★ v82: 불발사유는 폐기물·업장에 따라 선택지가 달라져, 저장된 값이 지금 목록에 없으면 그 값을 옵션으로 끼워 넣어 잃지 않는다
+  if (v && el.tagName === 'SELECT' && /failReason$/.test(id) && !Array.prototype.some.call(el.options, function(o) { return o.value === v; })) {
+    el.insertAdjacentHTML('beforeend', '<option value="' + v + '">' + v + '</option>');
+  }
+  el.value = v || (id === 'v_bagSpec' ? '75L' : "");
+}   // ★ v81: 봉투 규격 기본 75L
 function bindVisitForm(store) {
   const btn = document.getElementById("saveVisitBtn");
   if (!btn) return;
@@ -4822,7 +4861,7 @@ function bindVisitForm(store) {
     'v_repriority','v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
     'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome','v_bagSpec',
     'v_ecd',
-    'v_failReason','v_failReasonEtc'
+    'v_failReason','v_failReasonEtc','v_preferredTime'
   ];
   // ★ v60: 최종영업결과·불발사유가 바뀌면 노출 상태를 다시 계산
   ['v_outcome','v_failReason'].forEach(function(id) {
@@ -4911,6 +4950,9 @@ async function saveVisit(store) {
     if (failReasonVal) currentData.failReason = failReasonVal;
     const failReasonEtcVal = getVal('v_failReasonEtc');
     if (failReasonVal === FAIL_REASON_ETC && failReasonEtcVal) currentData.failReasonEtc = failReasonEtcVal;
+    // ★ v82: 시간제약일 때만 학교 희망 시간대 저장
+    const preferredTimeVal = getVal('v_preferredTime');
+    if (failReasonVal === FAIL_REASON_TIME && preferredTimeVal) currentData.preferredTime = preferredTimeVal;
     currentData.updatedAt = Date.now();
 
     /* ★ v61 ②: 오프라인이면 시도 자체를 하지 않습니다.
