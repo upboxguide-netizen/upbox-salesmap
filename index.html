@@ -3754,7 +3754,7 @@ function effectiveVisitValues_(cur) {
     truck:  cur.truck,
     note:   cur.note,
     bins:           keep(cur.bins,           isValidBins_(cur.bins, cur.vinyl)),
-    contact:        keep(cur.contact,        isValidContact_(cur.contact)),
+    contact:        isValidContact_(cur.contact) ? cur.contact : keep(cur.contactNut, isValidContact_(cur.contactNut)),   // ★ v82: 학교는 행정실·영양사 중 하나만 유효해도 연락처 확보
     amount:         keep(cur.amount,         isValidAmount_(cur.amount)),
     suggestedPrice: keep(cur.suggestedPrice, isValidPrice_(cur.suggestedPrice))
   };
@@ -3820,9 +3820,10 @@ function readVisitFormCurrent_() {
   const wasteType = getVal('v_wasteType') || WASTE_TYPE_DEFAULT;
   const hidden = WASTE_HIDDEN_FIELDS[wasteType] || [];
   const cur = {};
-  ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','repriority'].forEach(function(k) {
+  ['currentStoreName','contact','contactNut','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','repriority'].forEach(function(k) {
     cur[k] = hidden.indexOf(k) !== -1 ? '' : getVal('v_' + k);
   });
+  stripSeed_(cur);
   return { cur: cur, hidden: hidden };
 }
 function updateLeadHint_() {
@@ -4116,10 +4117,10 @@ async function loadPartnerRecordsForStore_(pk, storeKey) {
   return out.filter(Boolean);
 }
 const PARTNER_REC_FIELDS_ = [
-  ['currentStoreName', '현재 수거·운반 업체'], ['contact', '담당자 연락처'], ['amount', '월 예상배출량'],
+  ['currentStoreName', '현재 수거·운반 업체'], ['contact', '담당자·행정실 연락처'], ['contactNut', '영양사 연락처'], ['emailAdm', '행정실 이메일'], ['emailNut', '영양사 이메일'], ['fax', '팩스번호'], ['amount', '월 예상배출량'],
   ['price', '현재 단가'], ['suggestedPrice', '제안 단가'], ['freq', '주 수거횟수'], ['bins', '통 갯수'],
   ['vinyl', '비닐 사용여부'], ['truck', '5톤 차량 진입'], ['repriority', '성사가능성'], ['salesType', '영업구분'],
-  ['contactMethod', '접촉방식'], ['expectedContractDate', '예상계약일자'], ['outcome', '최종영업결과'],
+  ['contactMethod', '접촉방식'], ['expectedContractDate', '예상계약일자'], ['decisionPeriod', '예상계약결정시기'], ['outcome', '최종영업결과'],
   ['failReason', '불발사유'], ['failReasonEtc', '기타 불발사유'], ['note', '상세 상담내용']
 ];
 async function openPartnerRecordView_(store, pk, fromGroup, fromPlan) {
@@ -4431,6 +4432,9 @@ const FAIL_REASONS = [
   '서비스불만(세척 등)',
   '처리기도입',
   '지자체 사용중',
+  '미팅불발(담당자부재)', '미팅불발(업장거절)', '미팅불발(연락두절)', '미팅불발(일정 조율 실패)', '미팅불발(검토 후 회신없음)',
+  '미팅미진행(자체출장 등 비효율)', '미팅미진행(타겟미스)', '미팅미진행(장기간소통)',
+  '(비대상) 인바운드중복', '(비대상) 턴키계약', '미팅진행여부 확인불가',
   '기타'
 ];
 const FAIL_REASON_ETC = '기타';   // 이 값일 때만 기타 입력란이 열립니다
@@ -4455,6 +4459,54 @@ function buildFailReasonOptions_(wasteType, isSchool) {
 function isSchoolStore_(store) {
   if (!store) return false;
   return storeBizCode_(store) === 's' || /(초등학교|중학교|고등학교|특수학교)\s*$/.test(String(store.name || ''));
+}
+// 학교 업장이면 예상계약일자 대신 예상계약결정시기를 보인다(학교가 아니면 반대)
+function applyDecisionPeriodUI_() {
+  const school = (typeof selectedStore !== 'undefined') && isSchoolStore_(selectedStore);
+  const gE = document.getElementById('v_grp_ecd'), gD = document.getElementById('v_grp_decisionPeriod');
+  if (gE) gE.style.display = school ? 'none' : '';
+  if (gD) gD.style.display = school ? '' : 'none';
+  if (school) setDateSelectValue_('v_ecd', '');
+  else setVal('v_decisionPeriod', '');
+  const gN = document.getElementById('v_grp_contactNut'), lc = document.getElementById('lbl_contact');
+  if (gN) gN.style.display = school ? '' : 'none';
+  if (lc) lc.textContent = school ? '행정실 연락처' : '담당자 연락처';
+  if (!school) ['contactNut','emailAdm','emailNut','fax'].forEach(function(k) { setVal('v_' + k, ''); });
+}
+// ★ v82: 콜드콜로 확보된 학교 연락처(store.cc)를 폼에 미리 채운다. 파트너가 바꾼 값만 저장(미리 채운 값 그대로면 저장하지 않음)
+const CC_SEED_KEYS_ = ['contact', 'contactNut', 'emailAdm', 'emailNut', 'fax'];
+function applyColdcallSeed_(store) {
+  CC_SEED_KEYS_.forEach(function(k) { const el = document.getElementById('v_' + k); if (el) delete el.dataset.seed; });
+  const hint = document.getElementById('v_ccHint');
+  if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
+  const cc = store && store.cc;
+  if (!cc || !isSchoolStore_(store)) return;
+  let n = 0;
+  CC_SEED_KEYS_.forEach(function(k) {
+    const el = document.getElementById('v_' + k), sv = String(cc[k] == null ? '' : cc[k]).trim();
+    if (!el || !sv) return;
+    el.dataset.seed = sv;
+    if (!String(el.value || '').trim()) { el.value = sv; n++; }
+  });
+  if (hint && n > 0) { hint.textContent = '콜드콜로 확인된 연락처가 미리 채워져 있습니다. 바꾸신 값만 저장됩니다.'; hint.style.display = ''; }
+}
+function stripSeed_(cur) {
+  CC_SEED_KEYS_.forEach(function(k) {
+    const el = document.getElementById('v_' + k);
+    if (el && el.dataset.seed && String(cur[k] || '') === el.dataset.seed) cur[k] = '';
+  });
+  return cur;
+}
+// 전화·팩스: 휴대폰은 010-0000-0000, 지역번호는 02-000-0000 / 041-363-4621 / 031-1234-5678 모양으로 하이픈을 맞춘다
+function fmtLandline_(v) {
+  if (v.charAt(0) !== '0') return v;
+  const a = v.indexOf('02') === 0 ? 2 : 3;
+  v = v.substring(0, a === 2 ? 10 : 11);
+  if (v.length <= a) return v;
+  const rest = v.substring(a);
+  if (rest.length <= 3) return v.substring(0, a) + '-' + rest;
+  if (rest.length <= 7) return v.substring(0, a) + '-' + rest.substring(0, 3) + '-' + rest.substring(3);
+  return v.substring(0, a) + '-' + rest.substring(0, 4) + '-' + rest.substring(4, 8);
 }
 function refreshFailReasonOptions_(wasteType) {
   const sel = document.getElementById('v_failReason');
@@ -4689,8 +4741,19 @@ function buildVisitForm() {
     '<label><span style="color:#E53935;">*</span> 현재 수거·운반 업체명</label>' +
     '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 — 지금 폐기물을 가져가는 업체">' +
     '<div style="font-size:12px;color:var(--text-sub);margin-top:3px;">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 없으면 사유를 적어주세요.</div>' +
-    '<label for="v_contact">담당자 연락처' + NUM_WARN_HTML_ + '</label>' +
+    '<label for="v_contact"><span id="lbl_contact">담당자 연락처</span>' + NUM_WARN_HTML_ + '</label>' +
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
+    '<div id="v_grp_contactNut" style="display:none;">' +
+    '<label for="v_contactNut">영양사 연락처</label>' +
+    '<input id="v_contactNut" type="tel" inputmode="numeric" placeholder="예: 041-000-0000 / 010-0000-0000" maxlength="13">' +
+    '<label for="v_emailAdm">행정실 이메일</label>' +
+    '<input id="v_emailAdm" type="email" inputmode="email" autocomplete="off" placeholder="예: admin@school.kr">' +
+    '<label for="v_emailNut">영양사 이메일</label>' +
+    '<input id="v_emailNut" type="email" inputmode="email" autocomplete="off" placeholder="예: nutri@school.kr">' +
+    '<label for="v_fax">팩스번호</label>' +
+    '<input id="v_fax" type="tel" inputmode="numeric" placeholder="예: 041-000-0000" maxlength="13">' +
+    '<div id="v_ccHint" style="display:none;font-size:12px;color:var(--text-sub);margin-top:3px;"></div>' +
+    '</div>' +
     // ★ v56: 라벨 텍스트를 내부 span(lbl_*)으로 감쌈 — applyWasteTypeUI의 textContent 치환이
     //   경고 문구 span을 지우지 않도록 하기 위함. setLabel() 로직은 그대로 둬도 동작함.
     // ★ v81: 폐합성수지 봉투 규격 — 폐합성수지일 때만 보인다(applyWasteTypeUI). 월 예상배출량 옆에 가로로 배치, 기본 75L
@@ -4714,9 +4777,17 @@ function buildVisitForm() {
     '<label><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>' +
     '<select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select>' +
     // ★ v56: 예상계약일자 — 상세 상담내용 바로 위, 년/월/일 드롭다운
+    '<div id="v_grp_ecd">' +
     '<label for="v_ecd">예상계약일자</label>' +
     '<div class="date-select-row">' +
       '<input type="date" id="v_ecd" aria-label="예상계약일자"><button type="button" class="date-clear-btn" id="v_ecdClear" hidden>지우기</button>' +
+    '</div>' +
+    '</div>' +
+    // ★ v82: 학교 업장 전용 — 예상계약결정시기(학교는 계약 시작일이 같아 '언제 결정하나'를 기록)
+    '<div id="v_grp_decisionPeriod" style="display:none;">' +
+    '<label for="v_decisionPeriod">예상계약결정시기</label>' +
+    '<input id="v_decisionPeriod" type="text" list="dl_decisionPeriod" autocomplete="off" placeholder="선택하거나 직접 입력 (예: 1월 말~2월 초)">' +
+    '<datalist id="dl_decisionPeriod"><option value="11월"><option value="12월"><option value="1월"><option value="1월 말~2월 초"><option value="1~2월"><option value="2월"><option value="2월 말~3월 초"><option value="3월 이후"><option value="미정"></datalist>' +
     '</div>' +
     '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
     '<label>최종영업결과 및 폐업 여부 선택</label>' +
@@ -4756,6 +4827,7 @@ function applyWasteTypeUI(wasteType) {
     if (groupEl) groupEl.style.display = hidden.indexOf(key) !== -1 ? 'none' : '';
   }
   refreshFailReasonOptions_(wasteType);   // ★ v82
+  applyDecisionPeriodUI_();
 }
 // ★ v53: wasteType 지정 시 그 유형의 기록만 로드. 없으면 저장된 유형 중 하나, 그것도 없으면 기본값(FOOD)
 function loadMyVisit(store, wasteType) {
@@ -4770,7 +4842,7 @@ function loadMyVisit(store, wasteType) {
   const rec = byType[wasteType];
   if (!rec) {
     // ★ v56: contactMethod 추가
-    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','bagSpec'].forEach(function(k) {
+    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','decisionPeriod','contactNut','emailAdm','emailNut','fax','bagSpec'].forEach(function(k) {
       setVal('v_' + k, '');
     });
     applyFailReasonUI_('v_');   // ★ v60
@@ -4782,6 +4854,7 @@ function loadMyVisit(store, wasteType) {
     updateLeadHint_();                                        // ★ v71
     const dateEl = document.getElementById("visitDates");
     if (dateEl) dateEl.textContent = "";
+    applyColdcallSeed_(store);   // ★ v82
     return;
   }
   const cur = rec.current || {};
@@ -4799,12 +4872,13 @@ function loadMyVisit(store, wasteType) {
 function fillVisitFormFromCurrent_(cur) {
   cur = cur || {};
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck',
-   'note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','bagSpec'].forEach(function(k) {
+   'note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','decisionPeriod','contactNut','emailAdm','emailNut','fax','bagSpec'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
   });
   applyFailReasonUI_('v_');                                         // ★ v60
   setDateSelectValue_('v_ecd', cur.expectedContractDate);
   setRepriorityValue_(cur.repriority);                              // ★ v58
+  applyColdcallSeed_((typeof selectedStore !== 'undefined') ? selectedStore : null);   // ★ v82
   applySalesTypeDefault_();                                          // ★ v56
   refreshNumericWarnings_(NUMERIC_FIELD_IDS_);                      // ★ v57
   updateLeadHint_();                                                 // ★ v71
@@ -4861,7 +4935,7 @@ function bindVisitForm(store) {
     'v_repriority','v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
     'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome','v_bagSpec',
     'v_ecd',
-    'v_failReason','v_failReasonEtc','v_preferredTime'
+    'v_failReason','v_failReasonEtc','v_preferredTime','v_decisionPeriod','v_contactNut','v_emailAdm','v_emailNut','v_fax'
   ];
   // ★ v60: 최종영업결과·불발사유가 바뀌면 노출 상태를 다시 계산
   ['v_outcome','v_failReason'].forEach(function(id) {
@@ -4889,7 +4963,7 @@ function bindVisitForm(store) {
   // ★ v58: 성사가능성이 드롭다운으로 바뀌어 토글 핸들러는 불필요 (formFieldIds가 처리)
   const contactInput = document.getElementById("v_contact");
   if (contactInput) {
-    contactInput.addEventListener("input", function(e) {
+    const fmtContact_ = function(e) {
       let v = e.target.value.replace(/[^0-9]/g, "");
       if (!v) { e.target.value = ""; return; }
       const mobilePrefix = ["010","011","016","017","018","019"];
@@ -4900,8 +4974,10 @@ function bindVisitForm(store) {
         else if (prefix3 === "010") e.target.value = v.substring(0, 3) + "-" + v.substring(3, 7) + "-" + v.substring(7, 11);
         else if (v.length === 11) e.target.value = v.substring(0, 3) + "-" + v.substring(3, 7) + "-" + v.substring(7, 11);
         else e.target.value = v.substring(0, 3) + "-" + v.substring(3, 6) + "-" + v.substring(6, 10);
-      } else { e.target.value = v; }
-    });
+      } else { e.target.value = fmtLandline_(v); }
+    };
+    contactInput.addEventListener("input", fmtContact_);
+    ["v_contactNut", "v_fax"].forEach(function(id) { const el2 = document.getElementById(id); if (el2) el2.addEventListener("input", fmtContact_); });
   }
 }
 async function saveVisit(store) {
@@ -4943,6 +5019,13 @@ async function saveVisit(store) {
     // ★ v56: 예상계약일자 — 년·월·일이 모두 선택된 경우에만 'YYYY-MM-DD'로 저장
     const ecdVal = getDateSelectValue_('v_ecd');
     if (ecdVal) currentData.expectedContractDate = ecdVal;
+    // ★ v82: 학교 업장은 예상계약결정시기 저장(Firebase 에만. 시트 미러 열은 GAS 개편 때)
+    const decisionPeriodVal = getVal('v_decisionPeriod');
+    if (isSchoolStore_(store) && decisionPeriodVal) currentData.decisionPeriod = decisionPeriodVal;
+    if (isSchoolStore_(store)) {   // ★ v82: 학교 영양사 연락처·이메일·팩스(행정실 연락처는 contact)
+      ['contactNut','emailAdm','emailNut','fax'].forEach(function(k) { currentData[k] = getVal('v_' + k); });
+      stripSeed_(currentData);     // 콜드콜 값 그대로면 저장하지 않는다
+    }
     const repriorityVal = getVal('v_repriority');
     if (repriorityVal) currentData.repriority = repriorityVal;
     // ★ v60: 불발사유 / 기타불발사유
