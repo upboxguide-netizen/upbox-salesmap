@@ -4471,6 +4471,8 @@ function applyDecisionPeriodUI_() {
   const gN = document.getElementById('v_grp_contactNut'), lc = document.getElementById('lbl_contact');
   if (gN) gN.style.display = school ? '' : 'none';
   if (lc) lc.textContent = school ? '행정실 연락처' : '담당자 연락처';
+  const ci = document.getElementById('v_contact');
+  if (ci) ci.placeholder = school ? '예: 041-000-0000' : '예: 010-0000-0000';
   if (!school) ['contactNut','emailAdm','emailNut','fax'].forEach(function(k) { setVal('v_' + k, ''); });
 }
 // ★ v82: 콜드콜로 확보된 학교 연락처(store.cc)를 폼에 미리 채운다. 파트너가 바꾼 값만 저장(미리 채운 값 그대로면 저장하지 않음)
@@ -4745,11 +4747,11 @@ function buildVisitForm() {
     '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
     '<div id="v_grp_contactNut" style="display:none;">' +
     '<label for="v_contactNut">영양사 연락처</label>' +
-    '<input id="v_contactNut" type="tel" inputmode="numeric" placeholder="예: 041-000-0000 / 010-0000-0000" maxlength="13">' +
+    '<input id="v_contactNut" type="tel" inputmode="numeric" placeholder="예: 041-000-0000" maxlength="13">' +
     '<label for="v_emailAdm">행정실 이메일</label>' +
-    '<input id="v_emailAdm" type="email" inputmode="email" autocomplete="off" placeholder="예: admin@school.kr">' +
+    '<input id="v_emailAdm" type="email" inputmode="email" autocomplete="off" placeholder="예: admin@sen.go.kr">' +
     '<label for="v_emailNut">영양사 이메일</label>' +
-    '<input id="v_emailNut" type="email" inputmode="email" autocomplete="off" placeholder="예: nutri@school.kr">' +
+    '<input id="v_emailNut" type="email" inputmode="email" autocomplete="off" placeholder="예: nutri@sen.go.kr">' +
     '<label for="v_fax">팩스번호</label>' +
     '<input id="v_fax" type="tel" inputmode="numeric" placeholder="예: 041-000-0000" maxlength="13">' +
     '<div id="v_ccHint" style="display:none;font-size:12px;color:var(--text-sub);margin-top:3px;"></div>' +
