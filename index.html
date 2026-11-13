@@ -172,6 +172,10 @@
   .service { display: flex; gap: 8px; margin-bottom: 14px; }
   .service-badge { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; background: #F5F5F5; color: #666; }
   .service-badge.on { background: #E8F5E9; color: var(--st-lead); }
+  .service.wok-row { flex-wrap: wrap; align-items: center; margin-top: -6px; }
+  .wok-label { font-size: 12px; color: var(--text-sub); margin-right: 2px; }
+  .time-range-row { display: flex; align-items: center; gap: 6px; }
+  .time-range-row select { flex: 1; min-width: 0; }
   /* ★ v55: 영업중인 폐기물 배지 (2안) */
   .waste-badges-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
   .waste-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px 5px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
@@ -3950,6 +3954,11 @@ async function openPanel(store, opts) {
     const plusText = store.plus && store.plus !== '' ? store.plus : '-';
     serviceHtml = '<div class="service"><span class="' + basicClass + '">베이직 ' + escapeHtml(basicText) + '</span><span class="' + plusClass + '">플러스 ' + escapeHtml(plusText) + '</span></div>';
   }
+  let wokHtml = '';
+  if (!isContract && store.wok) {
+    const wl = (Array.isArray(store.wok) ? store.wok : String(store.wok).split(/[,\/·、]+/)).map(function(x) { return String(x).trim(); }).filter(Boolean);
+    if (wl.length) wokHtml = '<div class="service wok-row"><span class="wok-label">계약가능</span>' + wl.map(function(x) { return '<span class="service-badge on">' + escapeHtml(x) + '</span>'; }).join('') + '</div>';
+  }
   const roadviewHtml = isContract ? '' : '<div class="roadview-section"><div class="roadview-header" onclick="toggleRoadview()"><span class="rv-title">' + IC_.camera + '<span id="rvHeaderText">현장 로드뷰 (눌러서 보기)</span></span><span class="roadview-header-toggle" id="rvToggleArrow">' + IC_.chev + '</span></div><div class="roadview-body" id="rvBody"><div class="rv-loading" id="rvLoading" style="display:none;">로드 중...</div><div id="roadview"></div><div class="rv-empty" id="rvEmpty" style="display:none;">로드뷰 없음</div><a href="https://map.kakao.com/link/roadview/' + store.lat + ',' + store.lng + '" target="_blank" class="rv-external">카카오맵에서 보기 →</a></div></div>';
   const infoRows = [];
   if (store.bizType) infoRows.push({k:"업종", v:store.bizType});
@@ -3977,7 +3986,7 @@ async function openPanel(store, opts) {
     wasteBadgesHtml +
     roadviewHtml +
     '<div class="badges">' + adminBadge + gradeBadge + closedBadge + '</div>' +
-    projectsBadgeHtml + adminInfoHtml + otherContactHtml + serviceHtml +
+    projectsBadgeHtml + adminInfoHtml + otherContactHtml + serviceHtml + wokHtml +
     infoHtml + memoHtml + priceGuideBtnHtml + navBtnHtml + visitFormHtml;
   if (!isContract) { loadMyVisit(store); bindVisitForm(store); }
   const backBtn = document.getElementById('v70BackToGroup');
@@ -4120,7 +4129,7 @@ const PARTNER_REC_FIELDS_ = [
   ['currentStoreName', '현재 수거·운반 업체'], ['contact', '담당자·행정실 연락처'], ['contactNut', '영양사 연락처'], ['emailAdm', '행정실 이메일'], ['emailNut', '영양사 이메일'], ['fax', '팩스번호'], ['amount', '월 예상배출량'],
   ['price', '현재 단가'], ['suggestedPrice', '제안 단가'], ['freq', '주 수거횟수'], ['bins', '통 갯수'],
   ['vinyl', '비닐 사용여부'], ['truck', '5톤 차량 진입'], ['repriority', '성사가능성'], ['salesType', '영업구분'],
-  ['contactMethod', '접촉방식'], ['expectedContractDate', '예상계약일자'], ['decisionPeriod', '예상계약결정시기'], ['outcome', '최종영업결과'],
+  ['contactMethod', '접촉방식'], ['expectedContractDate', '예상계약일자'], ['decisionPeriod', '예상계약결정시기'], ['collectLimit', '수거시간 제약'], ['collectFrom', '수거 시작'], ['collectTo', '수거 종료'], ['outcome', '최종영업결과'],
   ['failReason', '불발사유'], ['failReasonEtc', '기타 불발사유'], ['note', '상세 상담내용']
 ];
 async function openPartnerRecordView_(store, pk, fromGroup, fromPlan) {
@@ -4474,6 +4483,8 @@ function applyDecisionPeriodUI_() {
   const ci = document.getElementById('v_contact');
   if (ci) ci.placeholder = school ? '예: 041-000-0000' : '예: 010-0000-0000';
   if (!school) ['contactNut','emailAdm','emailNut','fax'].forEach(function(k) { setVal('v_' + k, ''); });
+  document.querySelectorAll('.school-req').forEach(function(el) { el.style.display = school ? '' : 'none'; });   // 학교만 * 표시
+  applyCollectTimeUI_();
 }
 // ★ v82: 콜드콜로 확보된 학교 연락처(store.cc)를 폼에 미리 채운다. 파트너가 바꾼 값만 저장(미리 채운 값 그대로면 저장하지 않음)
 const CC_SEED_KEYS_ = ['contact', 'contactNut', 'emailAdm', 'emailNut', 'fax'];
@@ -4535,6 +4546,27 @@ function applyFailReasonUI_(prefix) {
   const showT = show && sel && sel.value === FAIL_REASON_TIME;
   if (gT) gT.style.display = showT ? '' : 'none';
   if (!showT && tIn) tIn.value = '';
+}
+// 수거 시간대 선택지: 맨 위는 '0시'(안내 문구 역할, 값 없음), 그 아래 05:00~22:00 을 30분 단위로
+function buildTimeOptions_() {
+  let h = '<option value="">0시</option>';
+  for (let m = 5 * 60; m <= 22 * 60; m += 30) {
+    const hh = Math.floor(m / 60), mm = m % 60;
+    h += '<option value="' + pad2_(hh) + ':' + pad2_(mm) + '">' + hh + '시' + (mm ? ' 30분' : '') + '</option>';
+  }
+  return h;
+}
+function applyCollectTimeUI_() {
+  const school = (typeof selectedStore !== 'undefined') && isSchoolStore_(selectedStore);
+  const g = document.getElementById('v_grp_collectTime'), w = document.getElementById('v_grp_collectWin');
+  if (g) g.style.display = school ? '' : 'none';
+  const lim = school ? getVal('v_collectLimit') : '';
+  if (!school) setVal('v_collectLimit', '');
+  const on = lim === '있음';
+  if (w) w.style.display = on ? '' : 'none';
+  if (!on) { setVal('v_collectFrom', ''); setVal('v_collectTo', ''); }
+  const f = getVal('v_collectFrom'), t = getVal('v_collectTo'), hint = document.getElementById('v_collectHint');
+  if (hint) hint.style.display = (on && f && t && t <= f) ? '' : 'none';
 }
 const CONTACT_METHODS = ['팔로업콜', '대면미팅', '단순견적발송(콜,미팅X)'];
 
@@ -4729,13 +4761,13 @@ function buildVisitForm() {
         '<button type="button" id="v_draftDiscard">삭제</button>' +
       '</span>' +
     '</div>' +
-    '<label>성사가능성</label>' +
+    '<label><span class="school-req" style="display:none;color:#E53935;">*</span> 성사가능성</label>' +
     '<select id="v_repriority">' + buildRepriorityOptions_() + '</select>' +
 
     '<label>영업구분</label>' +
     '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
     // ★ v56: 접촉방식 — 영업구분 바로 아래, 동일 양식(select)
-    '<label>접촉방식</label>' +
+    '<label><span class="school-req" style="display:none;color:#E53935;">*</span> 접촉방식</label>' +
     '<select id="v_contactMethod">' + buildContactMethodOptions_() + '</select>' +
     '<label>폐기물 선택</label>' +
     '<select id="v_wasteType">' + wasteOptions + '</select>' +
@@ -4786,12 +4818,20 @@ function buildVisitForm() {
     '</div>' +
     '</div>' +
     // ★ v82: 학교 업장 전용 — 예상계약결정시기(학교는 계약 시작일이 같아 '언제 결정하나'를 기록)
+    '<div id="v_grp_collectTime" style="display:none;">' +
+    '<label for="v_collectLimit">수거시간 제약 여부</label>' +
+    '<select id="v_collectLimit"><option value="">선택</option><option value="없음">없음</option><option value="있음">있음</option></select>' +
+    '<div id="v_grp_collectWin" style="display:none;">' +
+    '<label>현재 업체 수거(방문) 시간대</label>' +
+    '<div class="time-range-row"><select id="v_collectFrom">' + buildTimeOptions_() + '</select><span>부터</span><select id="v_collectTo">' + buildTimeOptions_() + '</select><span>까지</span></div>' +
+    '<div id="v_collectHint" style="display:none;font-size:12px;color:#E53935;margin-top:3px;">종료 시각이 시작 시각보다 늦어야 저장됩니다.</div>' +
+    '</div></div>' +
     '<div id="v_grp_decisionPeriod" style="display:none;">' +
-    '<label for="v_decisionPeriod">예상계약결정시기</label>' +
+    '<label for="v_decisionPeriod"><span style="color:#E53935;">*</span> 예상계약결정시기</label>' +
     '<input id="v_decisionPeriod" type="text" list="dl_decisionPeriod" autocomplete="off" placeholder="선택하거나 직접 입력 (예: 1월 말~2월 초)">' +
     '<datalist id="dl_decisionPeriod"><option value="11월"><option value="12월"><option value="1월"><option value="1월 말~2월 초"><option value="1~2월"><option value="2월"><option value="2월 말~3월 초"><option value="3월 이후"><option value="미정"></datalist>' +
     '</div>' +
-    '<label>상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
+    '<label><span class="school-req" style="display:none;color:#E53935;">*</span> 상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
     '<label>최종영업결과 및 폐업 여부 선택</label>' +
     '<select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option><option value="폐업">폐업</option></select>' +
     // ★ v60: 불발사유 (AD열) / 기타불발사유 (AE열) — 최종영업결과가 '실패'일 때만 노출
@@ -4844,10 +4884,11 @@ function loadMyVisit(store, wasteType) {
   const rec = byType[wasteType];
   if (!rec) {
     // ★ v56: contactMethod 추가
-    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','decisionPeriod','contactNut','emailAdm','emailNut','fax','bagSpec'].forEach(function(k) {
+    ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck','note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','decisionPeriod','contactNut','emailAdm','emailNut','fax','collectLimit','collectFrom','collectTo','bagSpec'].forEach(function(k) {
       setVal('v_' + k, '');
     });
     applyFailReasonUI_('v_');   // ★ v60
+    applyCollectTimeUI_();
     setRepriorityValue_('');                                  // ★ v58: 성사가능성 초기화
     setDateSelectValue_('v_ecd', '');   // ★ v56
     applySalesTypeDefault_();                                 // ★ v56: 아웃바운드 기본선택
@@ -4874,10 +4915,11 @@ function loadMyVisit(store, wasteType) {
 function fillVisitFormFromCurrent_(cur) {
   cur = cur || {};
   ['currentStoreName','contact','amount','price','suggestedPrice','freq','bins','vinyl','truck',
-   'note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','decisionPeriod','contactNut','emailAdm','emailNut','fax','bagSpec'].forEach(function(k) {
+   'note','outcome','salesType','contactMethod','failReason','failReasonEtc','preferredTime','decisionPeriod','contactNut','emailAdm','emailNut','fax','collectLimit','collectFrom','collectTo','bagSpec'].forEach(function(k) {
     setVal('v_' + k, cur[k]);
   });
   applyFailReasonUI_('v_');                                         // ★ v60
+  applyCollectTimeUI_();
   setDateSelectValue_('v_ecd', cur.expectedContractDate);
   setRepriorityValue_(cur.repriority);                              // ★ v58
   applyColdcallSeed_((typeof selectedStore !== 'undefined') ? selectedStore : null);   // ★ v82
@@ -4937,7 +4979,7 @@ function bindVisitForm(store) {
     'v_repriority','v_salesType','v_contactMethod','v_wasteType','v_currentStoreName','v_contact','v_amount','v_price',
     'v_suggestedPrice','v_freq','v_bins','v_vinyl','v_truck','v_note','v_outcome','v_bagSpec',
     'v_ecd',
-    'v_failReason','v_failReasonEtc','v_preferredTime','v_decisionPeriod','v_contactNut','v_emailAdm','v_emailNut','v_fax'
+    'v_failReason','v_failReasonEtc','v_preferredTime','v_decisionPeriod','v_contactNut','v_emailAdm','v_emailNut','v_fax','v_collectLimit','v_collectFrom','v_collectTo'
   ];
   // ★ v60: 최종영업결과·불발사유가 바뀌면 노출 상태를 다시 계산
   ['v_outcome','v_failReason'].forEach(function(id) {
@@ -4946,6 +4988,10 @@ function bindVisitForm(store) {
       el._failReasonBound = true;
       el.addEventListener('change', function() { applyFailReasonUI_('v_'); });
     }
+  });
+  ['v_collectLimit','v_collectFrom','v_collectTo'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', applyCollectTimeUI_);
   });
   attachNumericWarnings_(NUMERIC_FIELD_IDS_);   // ★ v56: 숫자 외 입력 시 경고(입력은 막지 않음)
   const resetSaveBtn = function() {
@@ -5024,6 +5070,12 @@ async function saveVisit(store) {
     // ★ v82: 학교 업장은 예상계약결정시기 저장(Firebase 에만. 시트 미러 열은 GAS 개편 때)
     const decisionPeriodVal = getVal('v_decisionPeriod');
     if (isSchoolStore_(store) && decisionPeriodVal) currentData.decisionPeriod = decisionPeriodVal;
+    if (isSchoolStore_(store)) {   // 수거시간 제약: 시작<종료일 때만 시간대 저장
+      const cl = getVal('v_collectLimit');
+      if (cl) currentData.collectLimit = cl;
+      const cf = getVal('v_collectFrom'), ct = getVal('v_collectTo');
+      if (cl === '있음' && cf && ct && cf < ct) { currentData.collectFrom = cf; currentData.collectTo = ct; }
+    }
     if (isSchoolStore_(store)) {   // ★ v82: 학교 영양사 연락처·이메일·팩스(행정실 연락처는 contact)
       ['contactNut','emailAdm','emailNut','fax'].forEach(function(k) { currentData[k] = getVal('v_' + k); });
       stripSeed_(currentData);     // 콜드콜 값 그대로면 저장하지 않는다
