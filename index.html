@@ -883,6 +883,15 @@
       </div>
       <!-- ── 3단계: 상담 결과 ── -->
       <div class="ns-step" data-step="3" hidden>
+        <div class="ns-form-group" id="ns_grp_collectTime" hidden>
+          <label for="nsCollectLimit">수거시간 제약 여부</label>
+          <select id="nsCollectLimit"><option value="">선택</option><option value="없음">없음</option><option value="있음">있음</option></select>
+          <div id="ns_grp_collectWin" hidden style="margin-top:8px;">
+            <label>현재 업체 수거(방문) 시간대</label>
+            <div class="time-range-row"><select id="nsCollectFrom"></select><span>부터</span><select id="nsCollectTo"></select><span>까지</span></div>
+            <div id="nsCollectHint" hidden style="font-size:12px;color:#E53935;margin-top:3px;">종료 시각이 시작 시각보다 늦어야 저장됩니다.</div>
+          </div>
+        </div>
         <!-- ★ v56: 예상계약일자 — 상세 상담내용 바로 위 -->
         <div class="ns-form-group">
           <label for="nsEcd">예상계약일자</label>
@@ -4557,7 +4566,7 @@ function buildTimeOptions_() {
   return h;
 }
 function applyCollectTimeUI_() {
-  const school = (typeof selectedStore !== 'undefined') && isSchoolStore_(selectedStore);
+  const school = (typeof selectedStore !== 'undefined') && isSchoolStore_(selectedStore);   // 수거시간 제약은 학교 업장만(폐기물 종류 무관)
   const g = document.getElementById('v_grp_collectTime'), w = document.getElementById('v_grp_collectWin');
   if (g) g.style.display = school ? '' : 'none';
   const lim = school ? getVal('v_collectLimit') : '';
@@ -5070,7 +5079,7 @@ async function saveVisit(store) {
     // ★ v82: 학교 업장은 예상계약결정시기 저장(Firebase 에만. 시트 미러 열은 GAS 개편 때)
     const decisionPeriodVal = getVal('v_decisionPeriod');
     if (isSchoolStore_(store) && decisionPeriodVal) currentData.decisionPeriod = decisionPeriodVal;
-    if (isSchoolStore_(store)) {   // 수거시간 제약: 시작<종료일 때만 시간대 저장
+    if (isSchoolStore_(store)) {   // 수거시간 제약(학교만): 시작<종료일 때만 시간대 저장
       const cl = getVal('v_collectLimit');
       if (cl) currentData.collectLimit = cl;
       const cf = getVal('v_collectFrom'), ct = getVal('v_collectTo');
@@ -6220,6 +6229,17 @@ function resetNewStoreForm() {
   }
   const frEtc = document.getElementById('ns_failReasonEtc');
   if (frEtc) frEtc.value = '';
+  ['nsCollectFrom', 'nsCollectTo'].forEach(function(id) {
+    const s = document.getElementById(id);
+    if (s && !s.options.length) s.innerHTML = buildTimeOptions_();
+    if (s) s.value = '';
+  });
+  { const cl = document.getElementById('nsCollectLimit'); if (cl) cl.value = ''; }
+  ['nsStoreName', 'nsCollectLimit', 'nsCollectFrom', 'nsCollectTo'].forEach(function(id) {
+    const s = document.getElementById(id);
+    if (s && !s._collectBound) { s._collectBound = true; s.addEventListener(s.tagName === 'SELECT' ? 'change' : 'input', applyNsCollectUI_); }
+  });
+  applyNsCollectUI_();
   initDateSelects_('nsEcd');
   setDateSelectValue_('nsEcd', '');
   attachNumericWarnings_(NS_NUMERIC_FIELD_IDS_);
@@ -6292,6 +6312,7 @@ function selectKakaoPlace(idx) {
     address: addr,
     roadAddress: p.road_address_name || '',   // ★ 신규
     jibunAddress: p.address_name || '',       // ★ 신규
+    cat: p.category_group_code || '',
     lat: parseFloat(p.y),
     lng: parseFloat(p.x)
   };
@@ -6302,6 +6323,7 @@ function selectKakaoPlace(idx) {
 
   document.getElementById('nsStoreName').value = p.place_name;
   document.getElementById('nsAddress').value = addr;
+  applyNsCollectUI_();
   nsShowFieldErr_('nsStoreName', false);   // ★ v71
   nsShowFieldErr_('nsAddress', false);
 
@@ -6311,6 +6333,31 @@ function selectKakaoPlace(idx) {
 function clearSelectedPlace() {
   _nsSelectedPlace = null;
   document.getElementById('nsSelectedPlace').classList.remove('show');
+}
+function nsIsSchool_() {
+  const nm = String((document.getElementById('nsStoreName') || {}).value || '').trim();
+  return /(초등학교|중학교|고등학교|특수학교)\s*$/.test(nm) || !!(_nsSelectedPlace && _nsSelectedPlace.cat === 'SC4');
+}
+function applyNsCollectUI_() {
+  const el = function(id) { return document.getElementById(id); };
+  const school = nsIsSchool_();
+  const g = el('ns_grp_collectTime'), w = el('ns_grp_collectWin'), lim = el('nsCollectLimit'), f = el('nsCollectFrom'), t = el('nsCollectTo');
+  if (!g || !lim) return;
+  g.hidden = !school;
+  if (!school) lim.value = '';
+  const on = school && lim.value === '있음';
+  if (w) w.hidden = !on;
+  if (!on) { f.value = ''; t.value = ''; }
+  const hint = el('nsCollectHint');
+  if (hint) hint.hidden = !(on && f.value && t.value && t.value <= f.value);
+}
+function nsCollectPayload_() {
+  const el = function(id) { return document.getElementById(id); };
+  if (!nsIsSchool_()) return {};
+  const lim = el('nsCollectLimit').value, f = el('nsCollectFrom').value, t = el('nsCollectTo').value;
+  const out = { collectLimit: lim };
+  if (lim === '있음' && f && t && f < t) { out.collectFrom = f; out.collectTo = t; }
+  return out;
 }
 function selectAdminType(btn) {
   document.querySelectorAll('button[data-admintype]').forEach(function(b) { b.classList.remove('active'); });
@@ -6470,6 +6517,7 @@ async function submitNewStore() {
   };
   const btn = document.getElementById('nsSubmitBtn');
   btn.disabled = true;
+  Object.assign(payload, nsCollectPayload_());   // 학교일 때만 수거시간 제약
   nsSetNavDisabled_(true);   // ★ v71: 등록 중엔 이전/취소 잠금
   /* ★ v68: 등록은 6~10초 걸리는데(대부분 지도용DB 59,000행 append) 그동안 피드백이
      버튼 글자 하나뿐이라 멈춘 것처럼 보였다. 경과에 따라 문구를 바꿔 진행 중임을 알린다. */
