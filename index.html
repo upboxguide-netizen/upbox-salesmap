@@ -6106,7 +6106,15 @@ async function searchStores(q) {
 function renderSearchResults(list) {
   const resultsEl = document.getElementById("searchResults");
   if (list.length === 0) {
-    resultsEl.innerHTML = '<div class="search-item search-empty" style="color:var(--text-sub); padding:14px 12px; line-height:1.5;">검색 결과가 없습니다.<br><span style="color:#8A5A00; font-weight:700;">+ 업장추가</span> 버튼으로 추가해주세요.</div>';
+    resultsEl.innerHTML = isExternalUser
+      ? '<div class="search-item search-empty" style="color:var(--text-sub); padding:14px 12px; line-height:1.5;">검색 결과가 없습니다.</div>'
+      : '<div class="search-item search-empty" id="searchEmptyAdd" role="button" tabindex="0" style="color:var(--text-sub); padding:14px 12px; line-height:1.5; cursor:pointer;">검색 결과가 없습니다.<br><span style="color:#8A5A00; font-weight:700;">+ 업장추가</span>를 눌러 추가해주세요.</div>';
+    { const addEl = document.getElementById('searchEmptyAdd');
+      if (addEl) {
+        const go = function() { resultsEl.style.display = 'none'; openNewStoreModal(); };
+        addEl.onclick = go;
+        addEl.onkeydown = function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+      } }
     resultsEl.style.display = "block";
     return;
   }
