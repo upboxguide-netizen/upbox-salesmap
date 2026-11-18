@@ -1035,7 +1035,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v83';   // ★ v83
+const APP_VERSION = 'v84';   // ★ v84
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -2925,13 +2925,38 @@ function filterLegacyDuplicatesAgainstMaster_(list) {
   });
   return masters.concat(filteredRest);
 }
+/* ★ v84: 같은 학교 판정 — '정신여자고등학교' = '정신여자중고등학교' (학제 표기만 다름). 학교 이름 끝의 학제(초·중·고·중고·초중·초중고 + 등학교/학교)를 떼고
+   나머지(학교 고유명)가 같으면서 SCHOOL_TWIN_RADIUS_M 안이면 같은 학교다. 고유명이 3글자 미만이면('대성' 등 흔한 이름) 쓰지 않는다.
+   ⚠️ SCHOOL_TWIN_* 상수는 함수 안에서만 읽는다(최상위에서 읽으면 선언 순서 문제 TDZ). */
+const SCHOOL_TWIN_RADIUS_M = 250;
+const SCHOOL_TWIN_MIN_BASE_LEN = 3;
+const SCHOOL_LEVEL_TAIL_RE_ = /(초중고등학교|초중고|중고등학교|초중학교|초등학교|중학교|고등학교|특수학교|학교)$/;
+function schoolBaseName_(name) {
+  const n = normalizeText(name).replace(/\([^)]*\)/g, '');
+  if (!/학교$/.test(n)) return '';
+  const b = n.replace(SCHOOL_LEVEL_TAIL_RE_, '');
+  return b.length >= SCHOOL_TWIN_MIN_BASE_LEN ? b : '';
+}
+function hasSchoolContractTwin_(schoolContracts, o) {
+  if (!schoolContracts.length) return false;
+  const ob = schoolBaseName_(o.name);
+  if (!ob) return false;
+  for (let i = 0; i < schoolContracts.length; i++) {
+    const c = schoolContracts[i];
+    if (c.base !== ob) continue;
+    if (haversine(o.lat, o.lng, c.s.lat, c.s.lng) * 1000 <= SCHOOL_TWIN_RADIUS_M) return true;
+  }
+  return false;
+}
 function removeContractDuplicates(list) {
   const contracts = list.filter(s => isContractGrade(s.grade));
   const others = list.filter(s => !isContractGrade(s.grade));
   const grid = buildGeoGrid_(contracts, CONTRACT_TWIN_CELL_M);   // ★ v79: 넓은 격자 + 넓은 규칙
+  const schoolContracts = [];                                    // ★ v84: 학교 기계약만 따로(고유명 포함)
+  contracts.forEach(function(c) { const b = schoolBaseName_(c.name); if (b && isFinite(c.lat) && isFinite(c.lng)) schoolContracts.push({ s: c, base: b }); });
   const filteredOthers = others.filter(function(o) {
     if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
-    return !hasContractTwin_(grid, o);
+    return !hasContractTwin_(grid, o) && !hasSchoolContractTwin_(schoolContracts, o);
   });
   return contracts.concat(filterLegacyDuplicatesAgainstMaster_(filteredOthers));
 }
@@ -5024,12 +5049,12 @@ function initSchoolPhotos_(store) {
   box.innerHTML =
     '<p class="sp-title">수거동선 사진</p>' +
     '<p class="sp-sub">차량이 들어와 수거함까지 가는 길을 순서대로 찍어주세요. 사진 순서가 동선 순서입니다. 계약 때 서류에 들어갑니다.</p>' +
-    '<div class="sp-btns"><button type="button" class="sp-btn" id="sp_add">사진 추가</button><button type="button" class="sp-btn" id="sp_shot">바로 촬영</button></div>' +
+    '<div class="sp-btns"><button type="button" class="sp-btn" id="sp_add">사진 선택</button><button type="button" class="sp-btn" id="sp_shot">바로 촬영</button></div>' +
     '<input type="file" id="sp_f1" accept="image/*" multiple hidden><input type="file" id="sp_f2" accept="image/*" capture="environment" hidden>' +
-    '<div id="sp_stageWrap" hidden><div class="sp-h">올릴 사진 <span class="sp-n" id="sp_stN"></span><span class="sp-grow"></span>' +
-    '<button type="button" class="sp-btn" id="sp_clear" style="min-height:36px;">모두 빼기</button><button type="button" class="sp-btn main" id="sp_go" style="min-height:36px;">올리기</button></div>' +
+    '<div id="sp_stageWrap" hidden><div class="sp-h">추가할 사진 <span class="sp-n" id="sp_stN"></span><span class="sp-grow"></span>' +
+    '<button type="button" class="sp-btn" id="sp_clear" style="min-height:36px;">모두 삭제</button><button type="button" class="sp-btn main" id="sp_go" style="min-height:36px;">추가</button></div>' +
     '<div class="sp-strip" id="sp_stage"></div><p class="sp-sub" style="margin:0;">끌어서 순서를 바꿀 수 있습니다. 터치는 길게 눌렀다가 끌어주세요.</p></div>' +
-    '<div class="sp-h">올린 사진 <span class="sp-n" id="sp_doneN"></span></div>' +
+    '<div class="sp-h">추가한 사진 <span class="sp-n" id="sp_doneN"></span></div>' +
     '<div class="sp-strip" id="sp_done"><div class="sp-empty">불러오는 중…</div></div>' +
     '<div id="sp_ask"></div><p class="sp-msg" id="sp_msg"></p>';
   document.getElementById('sp_add').onclick = function() { document.getElementById('sp_f1').click(); };
@@ -5062,7 +5087,7 @@ function spLoadDone_() {
   }).catch(function(e) {
     if (spState_ !== st) return;
     const el = document.getElementById('sp_done');
-    if (el) el.innerHTML = '<div class="sp-empty">올린 사진을 불러오지 못했습니다. 사진 추가는 계속 쓸 수 있습니다.</div>';
+    if (el) el.innerHTML = '<div class="sp-empty">추가한 사진을 불러오지 못했습니다. 사진 선택은 계속 쓸 수 있습니다.</div>';
   });
 }
 
@@ -5092,8 +5117,8 @@ function spRenderPending_() {
   st.pending.forEach(function(p, i) {
     const d = document.createElement('div'); d.className = 'sp-it'; d.dataset.id = p.id;
     d.innerHTML = '<span class="sp-no">' + (st.done.length + i + 1) + '</span>' +
-      (p.state === 'up' ? '<span class="sp-st">올리는 중</span>' : p.state === 'err' ? '<span class="sp-st err">실패</span>' : '') +
-      '<img alt="올릴 사진 ' + (i + 1) + '"><button type="button" class="sp-x">빼기</button>';
+      (p.state === 'up' ? '<span class="sp-st">추가 중</span>' : p.state === 'err' ? '<span class="sp-st err">실패</span>' : '') +
+      '<img alt="추가할 사진 ' + (i + 1) + '"><button type="button" class="sp-x">삭제</button>';
     d.querySelector('img').src = p.url;
     const x = d.querySelector('.sp-x'); x.disabled = st.busy;
     x.onclick = function() { try { URL.revokeObjectURL(p.url); } catch (e) {} st.pending = st.pending.filter(function(y) { return y !== p; }); spRenderPending_(); };
@@ -5104,7 +5129,7 @@ function spRenderDone_() {
   const st = spState_; if (!st) return;
   const box = document.getElementById('sp_done'); if (!box) return;
   document.getElementById('sp_doneN').textContent = st.done.length ? '· ' + st.done.length + '장' : '';
-  if (!st.done.length) { box.innerHTML = '<div class="sp-empty">올린 사진이 없습니다.</div>'; return; }
+  if (!st.done.length) { box.innerHTML = '<div class="sp-empty">추가한 사진이 없습니다.</div>'; return; }
   box.innerHTML = '';
   st.done.forEach(function(p, i) {
     const d = document.createElement('div'); d.className = 'sp-it'; d.dataset.id = p.id;
@@ -5194,7 +5219,7 @@ function spUploadAll_() {
     if (spState_ !== st) return;
     const p = st.pending.find(function(x) { return x.state === 'wait'; });
     if (!p) return finish();
-    p.state = 'up'; spRenderPending_(); spMsg_('올리는 중… (' + (ok + 1) + '/' + (ok + st.pending.filter(function(x) { return x.state !== 'err'; }).length) + ')');
+    p.state = 'up'; spRenderPending_(); spMsg_('추가 중… (' + (ok + 1) + '/' + (ok + st.pending.filter(function(x) { return x.state !== 'err'; }).length) + ')');
     spUploadOne_(p).then(function() { ok++; st.pending = st.pending.filter(function(x) { return x !== p; }); try { URL.revokeObjectURL(p.url); } catch (e) {} spRenderPending_(); spRenderDone_(); next(); },
       function(e) { fail++; p.state = 'err'; spRenderPending_(); spStopOnErr_(e, p, next, function() { finish(); }); });
   }
@@ -5208,8 +5233,8 @@ function spUploadAll_() {
     st.busy = false;
     st.pending.forEach(function(x) { if (x.state === 'err') x.state = 'wait'; });
     spRenderPending_();
-    if (fail) spMsg_(ok + '장 올렸습니다. ' + st.pending.length + '장은 올리지 못했습니다. 다시 올리기를 눌러주세요.', 'err');
-    else spMsg_(ok + '장 올렸습니다.');
+    if (fail) spMsg_(ok + '장 추가했습니다. ' + st.pending.length + '장은 추가하지 못했습니다. 다시 추가를 눌러주세요.', 'err');
+    else spMsg_(ok + '장 추가했습니다.');
     if (spState_ === st && st.afterUpload) { const f = st.afterUpload; st.afterUpload = null; if (!fail) f(); }
   }
   next();
@@ -5268,13 +5293,13 @@ function spDeleteDone_(p) {
 function spAskClear_() { const a = document.getElementById('sp_ask'); if (a) a.innerHTML = ''; }
 function spGuardSave_(doSave) {
   const st = spState_;
-  if (!st || st.busy) { if (st && st.busy) { spMsg_('사진을 올리는 중입니다. 끝나면 저장해주세요.', 'warn'); return true; } return false; }
+  if (!st || st.busy) { if (st && st.busy) { spMsg_('사진을 추가하는 중입니다. 끝나면 저장해주세요.', 'warn'); return true; } return false; }
   const n = st.pending.length;
   if (!n || st.warned) return false;
   st.warned = true;
   const a = document.getElementById('sp_ask');
-  a.innerHTML = '<div class="sp-ask">아직 올리지 않은 사진이 ' + n + '장 있습니다. 이대로 저장하면 이 사진은 올라가지 않습니다.' +
-    '<div class="sp-btns"><button type="button" class="sp-btn main" id="sp_askUp">사진 올리고 저장</button><button type="button" class="sp-btn" id="sp_askSkip">사진 빼고 저장</button></div></div>';
+  a.innerHTML = '<div class="sp-ask">아직 추가하지 않은 사진이 ' + n + '장 있습니다. 이대로 저장하면 이 사진은 추가되지 않습니다.' +
+    '<div class="sp-btns"><button type="button" class="sp-btn main" id="sp_askUp">사진 추가하고 저장</button><button type="button" class="sp-btn" id="sp_askSkip">사진 삭제하고 저장</button></div></div>';
   document.getElementById('sp_askUp').onclick = function() { st.afterUpload = doSave; spUploadAll_(); };
   document.getElementById('sp_askSkip').onclick = function() { st.warned = true; spAskClear_(); doSave(); };
   a.scrollIntoView({ block: 'center', behavior: 'smooth' });
