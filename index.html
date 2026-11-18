@@ -5044,7 +5044,7 @@ function initSchoolPhotos_(store) {
   if (!box) return;
   if (!store || !store._key || !currentUser) { box.style.display = 'none'; box.innerHTML = ''; spState_ = null; return; }
   if (spState_ && spState_.pending.length) { spState_.pending.forEach(function(p) { try { URL.revokeObjectURL(p.url); } catch (e) {} }); }
-  spState_ = { store: store, uid: spScopeUid_(store), pending: [], done: [], busy: false, warned: false, loaded: false, ops: 0, reorderPending: false, opFail: false, upFail: 0 };
+  spState_ = { store: store, uid: spScopeUid_(store), pending: [], done: [], busy: false, warned: false, loaded: false, ops: 0, reorderPending: false, opFail: false, upFail: 0, waste: getVal('v_wasteType') || WASTE_TYPE_DEFAULT };
   box.style.display = '';
   box.innerHTML =
     '<p class="sp-title">수거동선 사진</p>' +
@@ -5250,7 +5250,7 @@ function spUploadOne_(p) {
     let n = 0;
     function attempt() {
       n++;
-      return spCall_({ action: 'uploadSchoolPhoto', schoolName: st.store.name, photoId: p.id, data: data, thumb: thumb, takenAt: p.takenAt }).then(function(r) {
+      return spCall_({ action: 'uploadSchoolPhoto', schoolName: spDisplayName_(st), category: isSchoolStore_(st.store) ? 'school' : 'general', photoId: p.id, data: data, thumb: thumb, takenAt: p.takenAt }).then(function(r) {
         if (!r || !r.ok) { const er = new Error((r && r.error) || 'UPLOAD_FAIL'); er.fatal = (r && (r.error === 'INVALID' || r.error === 'TOO_LARGE' || r.error === 'RATE_LIMITED')); throw er; }
         if (spState_ === st) st.done.push({ id: p.id, thumb: p.thumb, order: r.order });
         if (r.share === 'NO_EMAIL' || r.share === 'SHARE_BLOCKED') spMsg_('폴더 보기 권한은 아직 못 드렸습니다. 사진은 앱에서 볼 수 있고, 본사에서 곧 처리합니다.', 'warn');
@@ -5319,6 +5319,11 @@ function spIdle_(st) {
   else f();
 }
 /* 사진은 폐기물 종류별로 따로 보관한다. 음식물은 예전 그대로(업장키), 그 외는 업장키_종류코드 */
+/* 드라이브 폴더·파일에 쓰는 이름: 음식물 외에는 '업장명 (폐기물 종류)' */
+function spDisplayName_(st) {
+  const lab = (WASTE_TYPES.find(function(x) { return x.code === st.waste; }) || {}).label;
+  return (st.store.name || '') + (st.waste && st.waste !== WASTE_TYPE_DEFAULT && lab ? ' (' + lab + ')' : '');
+}
 function spScopeUid_(store) { const w = getVal('v_wasteType') || WASTE_TYPE_DEFAULT; return w === WASTE_TYPE_DEFAULT ? store._key : store._key + '_' + w; }
 function spGuardSave_(doSave) {
   const st = spState_;
