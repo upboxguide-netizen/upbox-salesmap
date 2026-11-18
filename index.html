@@ -574,6 +574,33 @@
   .v75-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   /* 상태 바: 한 줄 · 화면 폭을 넘으면 말줄임(기계약 거리 문구가 붙어도 390pt 에서 넘치지 않게) */
   #statusBar { max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+
+  /* ★ v83: 학교 수거동선 사진 */
+  .sp-box { margin: 16px 0 6px; padding: 12px; border: 1px solid #E6E6EE; border-radius: 10px; background: var(--surface); }
+  .sp-title { font-size: 14px; font-weight: 700; color: var(--navy); margin: 0 0 2px; }
+  .sp-sub { font-size: 12px; color: #6B6B7B; margin: 0 0 10px; line-height: 1.45; }
+  .sp-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .sp-btn { min-height: 40px; padding: 0 14px; border: 1px solid #C9C9D6; border-radius: 8px; background: #fff; color: var(--navy); font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .sp-btn.main { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .sp-btn:disabled { opacity: .5; cursor: default; }
+  .sp-h { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--navy); margin: 12px 0 6px; }
+  .sp-h .sp-n { font-weight: 500; color: #6B6B7B; }
+  .sp-h .sp-grow { flex: 1; }
+  .sp-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px; -webkit-overflow-scrolling: touch; }
+  .sp-it { flex: 0 0 auto; width: 96px; position: relative; user-select: none; -webkit-user-select: none; touch-action: pan-x; cursor: grab; }
+  .sp-it.drag { opacity: .55; outline: 2px solid var(--amber); border-radius: 8px; }
+  .sp-it img { display: block; width: 96px; height: 96px; object-fit: cover; border-radius: 8px; background: #EEE; pointer-events: none; }
+  .sp-no { position: absolute; top: 4px; left: 4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: rgba(20,20,40,.78); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .sp-st { position: absolute; top: 4px; right: 4px; padding: 1px 6px; border-radius: 8px; background: rgba(255,255,255,.92); font-size: 11px; font-weight: 700; color: var(--navy); pointer-events: none; }
+  .sp-st.err { color: #C62828; }
+  .sp-x { margin-top: 4px; width: 100%; min-height: 36px; border: 1px solid #D6D6E0; border-radius: 6px; background: #fff; color: #555; font-size: 13px; font-family: inherit; cursor: pointer; }
+  .sp-x.ask { border-color: #C62828; color: #C62828; font-weight: 700; }
+  .sp-empty { font-size: 12px; color: #8A8A99; padding: 8px 0; }
+  .sp-msg { font-size: 12px; margin: 6px 0 0; color: #6B6B7B; min-height: 16px; }
+  .sp-msg.warn { color: #B26A00; font-weight: 600; }
+  .sp-msg.err { color: #C62828; }
+  .sp-ask { margin-top: 10px; padding: 10px; border: 1px solid #E0A100; border-radius: 8px; background: #FFF8E1; font-size: 13px; color: #5C4300; }
+  .sp-ask .sp-btns { margin: 8px 0 0; }
 </style>
 </head>
 <body>
@@ -1008,7 +1035,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v82';   // ★ v82
+const APP_VERSION = 'v83';   // ★ v83
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -4859,6 +4886,7 @@ function buildVisitForm() {
     '</div>' +
     '</div>' +
     // ★ v71: 저장은 패널 아래에 붙어 있는 바의 유일한 주 버튼. 바로 위에 '리드 기준' 안내(다음 단계까지 남은 항목)
+    '<div id="v_photoBox" class="sp-box" style="display:none;"></div>' +
     '<div class="save-bar"><div class="lead-hint" id="v_leadHint"></div>' +
     '<button type="button" class="save-btn" id="saveVisitBtn">저장</button></div>';
 }
@@ -4970,10 +4998,294 @@ function setVal(id, v) {
   }
   el.value = v || (id === 'v_bagSpec' ? '75L' : "");
 }   // ★ v81: 봉투 규격 기본 75L
+
+/* ════ ★ v83: 학교 수거동선 사진 ════
+   서버: 신규업장추가시트적재.js doPost → 학교사진.js (uploadSchoolPhoto / listMySchoolPhotos / reorderSchoolPhotos / deleteSchoolPhoto).
+   저장 버튼과는 따로 — 사진은 '올리기'를 눌러야 올라간다. 순서가 곧 동선 순서다. */
+const SP_LONG_EDGE_ = 1600, SP_THUMB_EDGE_ = 320, SP_TRIES_ = 3, SP_TIMEOUT_MS_ = 60000;
+let spState_ = null;   // { store, uid, pending:[{id,file,url,state,thumb}], done:[{id,thumb,order}], busy, warned }
+function spCreds_() { return currentUser ? { name: currentUser.name, code: currentUser.code } : null; }
+function spNewId_() { return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function spEsc_(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function spMsg_(text, cls) { const el = document.getElementById('sp_msg'); if (el) { el.textContent = text || ''; el.className = 'sp-msg' + (cls ? ' ' + cls : ''); } }
+function spCall_(payload, ms) {
+  const c = spCreds_();
+  if (!c) return Promise.reject(new Error('NO_LOGIN'));
+  return postWebApp_(Object.assign({ name: c.name, code: c.code, schoolUid: spState_ ? spState_.uid : '' }, payload), ms || SP_TIMEOUT_MS_);
+}
+
+function initSchoolPhotos_(store) {
+  const box = document.getElementById('v_photoBox');
+  if (!box) return;
+  if (!isSchoolStore_(store) || !currentUser) { box.style.display = 'none'; box.innerHTML = ''; spState_ = null; return; }
+  if (spState_ && spState_.pending.length) { spState_.pending.forEach(function(p) { try { URL.revokeObjectURL(p.url); } catch (e) {} }); }
+  spState_ = { store: store, uid: store._key, pending: [], done: [], busy: false, warned: false, loaded: false };
+  box.style.display = '';
+  box.innerHTML =
+    '<p class="sp-title">수거동선 사진</p>' +
+    '<p class="sp-sub">차량이 들어와 수거함까지 가는 길을 순서대로 찍어주세요. 사진 순서가 동선 순서입니다. 계약 때 서류에 들어갑니다.</p>' +
+    '<div class="sp-btns"><button type="button" class="sp-btn" id="sp_add">사진 추가</button><button type="button" class="sp-btn" id="sp_shot">바로 촬영</button></div>' +
+    '<input type="file" id="sp_f1" accept="image/*" multiple hidden><input type="file" id="sp_f2" accept="image/*" capture="environment" hidden>' +
+    '<div id="sp_stageWrap" hidden><div class="sp-h">올릴 사진 <span class="sp-n" id="sp_stN"></span><span class="sp-grow"></span>' +
+    '<button type="button" class="sp-btn" id="sp_clear" style="min-height:36px;">모두 빼기</button><button type="button" class="sp-btn main" id="sp_go" style="min-height:36px;">올리기</button></div>' +
+    '<div class="sp-strip" id="sp_stage"></div><p class="sp-sub" style="margin:0;">끌어서 순서를 바꿀 수 있습니다. 터치는 길게 눌렀다가 끌어주세요.</p></div>' +
+    '<div class="sp-h">올린 사진 <span class="sp-n" id="sp_doneN"></span></div>' +
+    '<div class="sp-strip" id="sp_done"><div class="sp-empty">불러오는 중…</div></div>' +
+    '<div id="sp_ask"></div><p class="sp-msg" id="sp_msg"></p>';
+  document.getElementById('sp_add').onclick = function() { document.getElementById('sp_f1').click(); };
+  document.getElementById('sp_shot').onclick = function() { document.getElementById('sp_f2').click(); };
+  ['sp_f1', 'sp_f2'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', function(e) { spAddFiles_(e.target.files); e.target.value = ''; });
+  });
+  document.getElementById('sp_clear').onclick = function() { spClearPending_(); };
+  document.getElementById('sp_go').onclick = function() { spUploadAll_(); };
+  spSortable_(document.getElementById('sp_stage'), function(ids) {
+    spState_.pending = ids.map(function(id) { return spState_.pending.find(function(p) { return p.id === id; }); }).filter(Boolean);
+    spRenderPending_();
+  });
+  spSortable_(document.getElementById('sp_done'), function(ids) {
+    spState_.done = ids.map(function(id) { return spState_.done.find(function(p) { return p.id === id; }); }).filter(Boolean);
+    spRenderDone_();
+    spSaveOrder_();
+  });
+  spLoadDone_();
+}
+
+function spLoadDone_() {
+  const st = spState_; if (!st) return;
+  spCall_({ action: 'listMySchoolPhotos' }, 20000).then(function(r) {
+    if (spState_ !== st) return;
+    if (!r || !r.ok) throw new Error((r && r.error) || 'LIST_FAIL');
+    st.done = (r.photos || []).map(function(p) { return { id: p.id, thumb: p.thumb ? 'data:image/jpeg;base64,' + p.thumb : '', order: p.order }; });
+    st.loaded = true;
+    spRenderDone_();
+  }).catch(function(e) {
+    if (spState_ !== st) return;
+    const el = document.getElementById('sp_done');
+    if (el) el.innerHTML = '<div class="sp-empty">올린 사진을 불러오지 못했습니다. 사진 추가는 계속 쓸 수 있습니다.</div>';
+  });
+}
+
+function spAddFiles_(list) {
+  if (!spState_) return;
+  Array.prototype.forEach.call(list || [], function(f) {
+    if (!/^image\//.test(f.type || 'image/jpeg')) return;
+    spState_.pending.push({ id: spNewId_(), file: f, url: URL.createObjectURL(f), state: 'wait', thumb: '', takenAt: new Date(f.lastModified || Date.now()).toISOString() });
+  });
+  spState_.warned = false; spAskClear_();
+  spRenderPending_();
+}
+function spClearPending_() {
+  if (!spState_ || spState_.busy) return;
+  spState_.pending.forEach(function(p) { try { URL.revokeObjectURL(p.url); } catch (e) {} });
+  spState_.pending = []; spAskClear_(); spRenderPending_();
+}
+function spRenderPending_() {
+  const st = spState_; if (!st) return;
+  const box = document.getElementById('sp_stage'), wrap = document.getElementById('sp_stageWrap');
+  if (!box) return;
+  wrap.hidden = st.pending.length === 0;
+  document.getElementById('sp_stN').textContent = st.pending.length ? '· ' + st.pending.length + '장' : '';
+  document.getElementById('sp_go').disabled = st.busy;
+  document.getElementById('sp_clear').disabled = st.busy;
+  box.innerHTML = '';
+  st.pending.forEach(function(p, i) {
+    const d = document.createElement('div'); d.className = 'sp-it'; d.dataset.id = p.id;
+    d.innerHTML = '<span class="sp-no">' + (st.done.length + i + 1) + '</span>' +
+      (p.state === 'up' ? '<span class="sp-st">올리는 중</span>' : p.state === 'err' ? '<span class="sp-st err">실패</span>' : '') +
+      '<img alt="올릴 사진 ' + (i + 1) + '"><button type="button" class="sp-x">빼기</button>';
+    d.querySelector('img').src = p.url;
+    const x = d.querySelector('.sp-x'); x.disabled = st.busy;
+    x.onclick = function() { try { URL.revokeObjectURL(p.url); } catch (e) {} st.pending = st.pending.filter(function(y) { return y !== p; }); spRenderPending_(); };
+    box.appendChild(d);
+  });
+}
+function spRenderDone_() {
+  const st = spState_; if (!st) return;
+  const box = document.getElementById('sp_done'); if (!box) return;
+  document.getElementById('sp_doneN').textContent = st.done.length ? '· ' + st.done.length + '장' : '';
+  if (!st.done.length) { box.innerHTML = '<div class="sp-empty">올린 사진이 없습니다.</div>'; return; }
+  box.innerHTML = '';
+  st.done.forEach(function(p, i) {
+    const d = document.createElement('div'); d.className = 'sp-it'; d.dataset.id = p.id;
+    d.innerHTML = '<span class="sp-no">' + (i + 1) + '</span><img alt="동선 ' + (i + 1) + '번 사진"><button type="button" class="sp-x">삭제</button>';
+    if (p.thumb) d.querySelector('img').src = p.thumb;
+    const x = d.querySelector('.sp-x');
+    x.onclick = function() {
+      if (!x.classList.contains('ask')) {
+        x.classList.add('ask'); x.textContent = '정말 삭제';
+        setTimeout(function() { if (x.isConnected) { x.classList.remove('ask'); x.textContent = '삭제'; } }, 3500);
+        return;
+      }
+      spDeleteDone_(p);
+    };
+    box.appendChild(d);
+  });
+}
+
+/* 드래그 정렬 — 이동·놓기는 document 에서 받는다(끄는 도중 DOM 순서를 바꾸면 요소의 포인터 캡처가 풀리므로).
+   마우스: 6px 움직이면 시작. 터치: 250ms 눌러야 시작(그 전엔 가로 스크롤). */
+function spSortable_(box, onDone) {
+  let act = null;
+  box.addEventListener('touchmove', function(e) { if (act) e.preventDefault(); }, { passive: false });
+  box.addEventListener('dragstart', function(e) { e.preventDefault(); });
+  box.addEventListener('pointerdown', function(e) {
+    const it = e.target.closest('.sp-it');
+    if (!it || !box.contains(it) || e.target.closest('button')) return;
+    const sx = e.clientX, sy = e.clientY, touch = e.pointerType === 'touch', pid = e.pointerId;
+    let started = false, timer = null;
+    function start() { started = true; act = it; it.classList.add('drag'); document.body.style.cursor = 'grabbing'; }
+    function stop() {
+      clearTimeout(timer);
+      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+      it.classList.remove('drag'); document.body.style.cursor = ''; act = null;
+    }
+    function move(ev) {
+      if (ev.pointerId !== pid) return;
+      if (!started) {
+        if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) <= 6) return;
+        if (touch) { stop(); return; }
+        start();
+      }
+      const prev = it.style.pointerEvents; it.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(ev.clientX, ev.clientY); it.style.pointerEvents = prev;
+      const over = el && el.closest && el.closest('.sp-it');
+      if (!over || over === it || over.parentNode !== box) return;
+      const r = over.getBoundingClientRect();
+      if (ev.clientX > r.left + r.width / 2) box.insertBefore(it, over.nextSibling); else box.insertBefore(it, over);
+    }
+    function up(ev) {
+      if (ev && ev.pointerId !== pid) return;
+      const was = started; stop();
+      if (was) onDone(Array.prototype.map.call(box.querySelectorAll('.sp-it'), function(n) { return n.dataset.id; }));
+    }
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+    if (touch) timer = setTimeout(function() { start(); if (navigator.vibrate) { try { navigator.vibrate(10); } catch (x) {} } }, 250);
+  });
+}
+
+/* 긴 변 1600px JPEG(0.8) + 320px 썸네일(0.6). 휴대폰 원본(4~8MB)을 그대로 올리지 않는다 */
+function spLoadImage_(file) {
+  if (window.createImageBitmap) {
+    return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(function() { return spImgEl_(file); });
+  }
+  return spImgEl_(file);
+}
+function spImgEl_(file) {
+  return new Promise(function(res, rej) {
+    const u = URL.createObjectURL(file), im = new Image();
+    im.onload = function() { URL.revokeObjectURL(u); res(im); };
+    im.onerror = function() { URL.revokeObjectURL(u); rej(new Error('IMG')); };
+    im.src = u;
+  });
+}
+function spToB64_(img, edge, q) {
+  const w0 = img.width || img.naturalWidth, h0 = img.height || img.naturalHeight, k = Math.min(1, edge / Math.max(w0, h0));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w0 * k)); c.height = Math.max(1, Math.round(h0 * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', q).split(',')[1] || '';
+}
+
+function spUploadAll_() {
+  const st = spState_; if (!st || st.busy || !st.pending.length) return;
+  st.busy = true; st.warned = false; spAskClear_(); spRenderPending_();
+  let ok = 0, fail = 0;
+  function next() {
+    if (spState_ !== st) return;
+    const p = st.pending.find(function(x) { return x.state === 'wait'; });
+    if (!p) return finish();
+    p.state = 'up'; spRenderPending_(); spMsg_('올리는 중… (' + (ok + 1) + '/' + (ok + st.pending.filter(function(x) { return x.state !== 'err'; }).length) + ')');
+    spUploadOne_(p).then(function() { ok++; st.pending = st.pending.filter(function(x) { return x !== p; }); try { URL.revokeObjectURL(p.url); } catch (e) {} spRenderPending_(); spRenderDone_(); next(); },
+      function(e) { fail++; p.state = 'err'; spRenderPending_(); spStopOnErr_(e, p, next, function() { finish(); }); });
+  }
+  function spStopOnErr_(e, p, cont, stop) {
+    if (e && (e.message === 'INVALID' || e.message === 'NO_LOGIN' || e.message === 'RATE_LIMITED')) { stop(); return; }
+    // 실패한 한 장이 나머지를 막지 않게: 실패 표시만 하고 다음 장으로. 남은 게 없으면 끝
+    const rest = st.pending.filter(function(x) { return x.state === 'wait'; });
+    if (rest.length) { cont(); } else { stop(); }
+  }
+  function finish() {
+    st.busy = false;
+    st.pending.forEach(function(x) { if (x.state === 'err') x.state = 'wait'; });
+    spRenderPending_();
+    if (fail) spMsg_(ok + '장 올렸습니다. ' + st.pending.length + '장은 올리지 못했습니다. 다시 올리기를 눌러주세요.', 'err');
+    else spMsg_(ok + '장 올렸습니다.');
+    if (spState_ === st && st.afterUpload) { const f = st.afterUpload; st.afterUpload = null; if (!fail) f(); }
+  }
+  next();
+}
+function spUploadOne_(p) {
+  const st = spState_;
+  return spLoadImage_(p.file).then(function(img) {
+    const data = spToB64_(img, SP_LONG_EDGE_, 0.8), thumb = spToB64_(img, SP_THUMB_EDGE_, 0.6);
+    if (img.close) { try { img.close(); } catch (e) {} }
+    if (!data) throw new Error('IMG');
+    p.thumb = 'data:image/jpeg;base64,' + thumb;
+    let n = 0;
+    function attempt() {
+      n++;
+      return spCall_({ action: 'uploadSchoolPhoto', schoolName: st.store.name, photoId: p.id, data: data, thumb: thumb, takenAt: p.takenAt }).then(function(r) {
+        if (!r || !r.ok) { const er = new Error((r && r.error) || 'UPLOAD_FAIL'); er.fatal = (r && (r.error === 'INVALID' || r.error === 'TOO_LARGE' || r.error === 'RATE_LIMITED')); throw er; }
+        if (spState_ === st) st.done.push({ id: p.id, thumb: p.thumb, order: r.order });
+        if (r.share === 'NO_EMAIL' || r.share === 'SHARE_BLOCKED') spMsg_('폴더 보기 권한은 아직 못 드렸습니다. 사진은 앱에서 볼 수 있고, 본사에서 곧 처리합니다.', 'warn');
+        return r;
+      }).catch(function(e) {
+        if (e && e.fatal) throw e;
+        if (n >= SP_TRIES_) throw e;
+        return new Promise(function(res) { setTimeout(res, 800 * n); }).then(attempt);
+      });
+    }
+    return attempt();
+  });
+}
+
+let spReorderTimer_ = null;
+function spSaveOrder_() {
+  const st = spState_; if (!st) return;
+  clearTimeout(spReorderTimer_);
+  spMsg_('순서 저장 중…');
+  spReorderTimer_ = setTimeout(function() {
+    spCall_({ action: 'reorderSchoolPhotos', orderedIds: st.done.map(function(p) { return p.id; }) }, 45000).then(function(r) {
+      if (!r || !r.ok) throw new Error('FAIL');
+      spMsg_('순서를 저장했습니다.');
+    }).catch(function() { spMsg_('순서를 저장하지 못했습니다. 사진을 다시 끌어 놓아주세요.', 'err'); });
+  }, 600);
+}
+function spDeleteDone_(p) {
+  const st = spState_; if (!st) return;
+  st.done = st.done.filter(function(x) { return x !== p; }); spRenderDone_(); spRenderPending_();
+  spMsg_('삭제하는 중…');
+  spCall_({ action: 'deleteSchoolPhoto', photoId: p.id }, 45000).then(function(r) {
+    if (!r || !r.ok) throw new Error('FAIL');
+    spMsg_('삭제했습니다.');
+  }).catch(function() {
+    if (spState_ === st) { st.done.push(p); spRenderDone_(); }
+    spMsg_('삭제하지 못했습니다. 잠시 후 다시 눌러주세요.', 'err');
+  });
+}
+
+/* 저장 버튼 앞 확인 — 올리지 않은 사진이 남아 있으면 먼저 묻는다. 막았으면 true */
+function spAskClear_() { const a = document.getElementById('sp_ask'); if (a) a.innerHTML = ''; }
+function spGuardSave_(doSave) {
+  const st = spState_;
+  if (!st || st.busy) { if (st && st.busy) { spMsg_('사진을 올리는 중입니다. 끝나면 저장해주세요.', 'warn'); return true; } return false; }
+  const n = st.pending.length;
+  if (!n || st.warned) return false;
+  st.warned = true;
+  const a = document.getElementById('sp_ask');
+  a.innerHTML = '<div class="sp-ask">아직 올리지 않은 사진이 ' + n + '장 있습니다. 이대로 저장하면 이 사진은 올라가지 않습니다.' +
+    '<div class="sp-btns"><button type="button" class="sp-btn main" id="sp_askUp">사진 올리고 저장</button><button type="button" class="sp-btn" id="sp_askSkip">사진 빼고 저장</button></div></div>';
+  document.getElementById('sp_askUp').onclick = function() { st.afterUpload = doSave; spUploadAll_(); };
+  document.getElementById('sp_askSkip').onclick = function() { st.warned = true; spAskClear_(); doSave(); };
+  a.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  return true;
+}
+
 function bindVisitForm(store) {
   const btn = document.getElementById("saveVisitBtn");
   if (!btn) return;
-  btn.onclick = function() { saveVisit(store); };
+  btn.onclick = function() { if (spGuardSave_(function() { saveVisit(store); })) return; saveVisit(store); };
+  initSchoolPhotos_(store);   // ★ v83
   // ★ v53: 폐기물 종류 변경 시 해당 유형의 기존 기록으로 폼 전환 (저장 안 된 새 폼이면 빈 값)
   const wasteSelect = document.getElementById('v_wasteType');
   if (wasteSelect) {
