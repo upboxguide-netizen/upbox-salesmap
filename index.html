@@ -5044,11 +5044,11 @@ function initSchoolPhotos_(store) {
   if (!box) return;
   if (!store || !store._key || !currentUser) { box.style.display = 'none'; box.innerHTML = ''; spState_ = null; return; }
   if (spState_ && spState_.pending.length) { spState_.pending.forEach(function(p) { try { URL.revokeObjectURL(p.url); } catch (e) {} }); }
-  spState_ = { store: store, uid: store._key, pending: [], done: [], busy: false, warned: false, loaded: false };
+  spState_ = { store: store, uid: spScopeUid_(store), pending: [], done: [], busy: false, warned: false, loaded: false, ops: 0, reorderPending: false, opFail: false, upFail: 0 };
   box.style.display = '';
   box.innerHTML =
     '<p class="sp-title">수거동선 사진</p>' +
-    '<p class="sp-sub">차량이 들어와 수거함까지 가는 길을 순서대로 찍어주세요. 사진 순서가 동선 순서입니다. 계약 때 서류에 들어갑니다.</p>' +
+    '<p class="sp-sub">차량이 들어와 수거함까지 가는 길을 순서대로 찍어주세요. 사진 순서가 동선 순서입니다. 폐기물 종류별로 따로 보관됩니다. 계약 신청서는 본사가 대신 넣어드릴 수 없어, 추가한 사진을 파트너님 전용 드라이브 폴더로 공유해 드립니다. 신청서를 낼 때 그 폴더에서 꺼내 쓰세요.</p>' +
     '<div class="sp-btns"><button type="button" class="sp-btn" id="sp_add">사진 선택</button><button type="button" class="sp-btn" id="sp_shot">바로 촬영</button></div>' +
     '<input type="file" id="sp_f1" accept="image/*" multiple hidden><input type="file" id="sp_f2" accept="image/*" capture="environment" hidden>' +
     '<div id="sp_stageWrap" hidden><div class="sp-h">추가할 사진 <span class="sp-n" id="sp_stN"></span><span class="sp-grow"></span>' +
@@ -5213,7 +5213,7 @@ function spToB64_(img, edge, q) {
 
 function spUploadAll_() {
   const st = spState_; if (!st || st.busy || !st.pending.length) return;
-  st.busy = true; st.warned = false; spAskClear_(); spRenderPending_();
+  st.busy = true; st.warned = false; st.upFail = 0; spTouchSaved_(); spAskClear_(); spRenderPending_();
   let ok = 0, fail = 0;
   function next() {
     if (spState_ !== st) return;
@@ -5235,13 +5235,8 @@ function spUploadAll_() {
     spRenderPending_();
     if (fail) spMsg_(ok + '장 추가했습니다. ' + st.pending.length + '장은 추가하지 못했습니다. 다시 추가를 눌러주세요.', 'err');
     else spMsg_(ok + '장 추가했습니다.');
-    if (spState_ === st && st.afterUpload) {
-      const f = st.afterUpload; st.afterUpload = null;
-      const sb = document.getElementById('saveVisitBtn');
-      if (sb && sb.textContent === '사진 추가 후 저장…') { sb.disabled = false; sb.textContent = '저장'; }
-      if (!fail) f();
-      else spMsg_('사진 ' + st.pending.length + '장을 추가하지 못해 저장하지 않았습니다. 사진을 다시 추가한 뒤 저장해주세요.', 'err');
-    }
+    st.upFail = fail;
+    spIdle_(st);
   }
   next();
 }
@@ -5274,37 +5269,65 @@ let spReorderTimer_ = null;
 function spSaveOrder_() {
   const st = spState_; if (!st) return;
   clearTimeout(spReorderTimer_);
+  st.reorderPending = true; spTouchSaved_();
   spMsg_('순서 저장 중…');
   spReorderTimer_ = setTimeout(function() {
     spCall_({ action: 'reorderSchoolPhotos', orderedIds: st.done.map(function(p) { return p.id; }) }, 45000).then(function(r) {
       if (!r || !r.ok) throw new Error('FAIL');
       spMsg_('순서를 저장했습니다.');
-    }).catch(function() { spMsg_('순서를 저장하지 못했습니다. 사진을 다시 끌어 놓아주세요.', 'err'); });
+      st.reorderPending = false; spIdle_(st);
+    }).catch(function() {
+      spMsg_('순서를 저장하지 못했습니다. 사진을 다시 끌어 놓아주세요.', 'err');
+      st.reorderPending = false; st.opFail = true; spIdle_(st);
+    });
   }, 600);
 }
 function spDeleteDone_(p) {
   const st = spState_; if (!st) return;
   st.done = st.done.filter(function(x) { return x !== p; }); spRenderDone_(); spRenderPending_();
   spMsg_('삭제하는 중…');
+  spOpStart_();
   spCall_({ action: 'deleteSchoolPhoto', photoId: p.id }, 45000).then(function(r) {
     if (!r || !r.ok) throw new Error('FAIL');
     spMsg_('삭제했습니다.');
+    spOpEnd_(st, false);
   }).catch(function() {
     if (spState_ === st) { st.done.push(p); spRenderDone_(); }
     spMsg_('삭제하지 못했습니다. 잠시 후 다시 눌러주세요.', 'err');
+    spOpEnd_(st, true);
   });
 }
 
 /* 저장 버튼 앞 확인 — 올리지 않은 사진이 남아 있으면 먼저 묻는다. 막았으면 true */
 function spAskClear_() { const a = document.getElementById('sp_ask'); if (a) a.innerHTML = ''; }
+const SP_WAIT_LABEL_ = '사진 반영 후 저장…';
+/* 사진 작업(추가·삭제·순서 저장)이 하나라도 진행 중인가. 저장은 이게 모두 끝난 뒤에만 한다 */
+function spBusy_() { const st = spState_; return !!(st && (st.busy || st.ops > 0 || st.reorderPending)); }
+function spTouchSaved_() { const sb = document.getElementById('saveVisitBtn'); if (sb && sb.textContent === '✓ 저장됨') sb.textContent = '저장'; }
+function spOpStart_() { const st = spState_; if (!st) return; st.ops = (st.ops || 0) + 1; spTouchSaved_(); }
+function spOpEnd_(st, failed) { st.ops = Math.max(0, (st.ops || 1) - 1); if (failed) st.opFail = true; spIdle_(st); }
+/* 모두 끝났고 저장이 대기 중이면: 하나라도 실패했으면 저장하지 않고 알린다, 아니면 저장 */
+function spIdle_(st) {
+  if (spState_ !== st || !st.afterUpload) return;
+  if (st.busy || st.ops > 0 || st.reorderPending) return;
+  const f = st.afterUpload; st.afterUpload = null;
+  const sb = document.getElementById('saveVisitBtn');
+  if (sb && sb.textContent === SP_WAIT_LABEL_) { sb.disabled = false; sb.textContent = '저장'; }
+  const bad = st.opFail || (st.upFail && st.pending.length);
+  st.opFail = false; st.upFail = 0;
+  if (bad) spMsg_('사진 변경을 끝내지 못해 저장하지 않았습니다. 사진을 확인한 뒤 다시 저장해주세요.', 'err');
+  else f();
+}
+/* 사진은 폐기물 종류별로 따로 보관한다. 음식물은 예전 그대로(업장키), 그 외는 업장키_종류코드 */
+function spScopeUid_(store) { const w = getVal('v_wasteType') || WASTE_TYPE_DEFAULT; return w === WASTE_TYPE_DEFAULT ? store._key : store._key + '_' + w; }
 function spGuardSave_(doSave) {
   const st = spState_;
   if (!st) return false;
-  if (st.busy) {
+  if (spBusy_()) {
     st.afterUpload = doSave;
     const sb = document.getElementById('saveVisitBtn');
-    if (sb) { sb.disabled = true; sb.textContent = '사진 추가 후 저장…'; }
-    spMsg_('사진을 모두 추가한 뒤 자동으로 저장합니다.', 'warn');
+    if (sb) { sb.disabled = true; sb.textContent = SP_WAIT_LABEL_; }
+    spMsg_('사진 변경을 모두 마친 뒤 자동으로 저장합니다.', 'warn');
     return true;
   }
   const n = st.pending.length;
@@ -5327,8 +5350,16 @@ function bindVisitForm(store) {
   // ★ v53: 폐기물 종류 변경 시 해당 유형의 기존 기록으로 폼 전환 (저장 안 된 새 폼이면 빈 값)
   const wasteSelect = document.getElementById('v_wasteType');
   if (wasteSelect) {
+    wasteSelect._prevWaste = wasteSelect.value;
     wasteSelect.addEventListener('change', function() {
+      if (spState_ && (spBusy_() || spState_.pending.length)) {   // 사진 작업 중이거나 추가하지 않은 사진이 있으면 종류를 못 바꾼다
+        wasteSelect.value = wasteSelect._prevWaste;
+        showNsToast(spBusy_() ? '사진을 처리하는 중입니다. 끝난 뒤 바꿔주세요.' : '추가하지 않은 사진이 있습니다. 추가하거나 삭제한 뒤 폐기물 종류를 바꿔주세요.', 4000);
+        return;
+      }
+      wasteSelect._prevWaste = wasteSelect.value;
       loadMyVisit(store, wasteSelect.value);
+      initSchoolPhotos_(store);   // 폐기물 종류별 사진으로 바꿔 불러온다
       btn.textContent = '저장';
       btn.disabled = false;
     });
