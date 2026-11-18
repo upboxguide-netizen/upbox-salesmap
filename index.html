@@ -5042,7 +5042,7 @@ function spCall_(payload, ms) {
 function initSchoolPhotos_(store) {
   const box = document.getElementById('v_photoBox');
   if (!box) return;
-  if (!isSchoolStore_(store) || !currentUser) { box.style.display = 'none'; box.innerHTML = ''; spState_ = null; return; }
+  if (!store || !store._key || !currentUser) { box.style.display = 'none'; box.innerHTML = ''; spState_ = null; return; }
   if (spState_ && spState_.pending.length) { spState_.pending.forEach(function(p) { try { URL.revokeObjectURL(p.url); } catch (e) {} }); }
   spState_ = { store: store, uid: store._key, pending: [], done: [], busy: false, warned: false, loaded: false };
   box.style.display = '';
@@ -5235,7 +5235,13 @@ function spUploadAll_() {
     spRenderPending_();
     if (fail) spMsg_(ok + '장 추가했습니다. ' + st.pending.length + '장은 추가하지 못했습니다. 다시 추가를 눌러주세요.', 'err');
     else spMsg_(ok + '장 추가했습니다.');
-    if (spState_ === st && st.afterUpload) { const f = st.afterUpload; st.afterUpload = null; if (!fail) f(); }
+    if (spState_ === st && st.afterUpload) {
+      const f = st.afterUpload; st.afterUpload = null;
+      const sb = document.getElementById('saveVisitBtn');
+      if (sb && sb.textContent === '사진 추가 후 저장…') { sb.disabled = false; sb.textContent = '저장'; }
+      if (!fail) f();
+      else spMsg_('사진 ' + st.pending.length + '장을 추가하지 못해 저장하지 않았습니다. 사진을 다시 추가한 뒤 저장해주세요.', 'err');
+    }
   }
   next();
 }
@@ -5293,7 +5299,14 @@ function spDeleteDone_(p) {
 function spAskClear_() { const a = document.getElementById('sp_ask'); if (a) a.innerHTML = ''; }
 function spGuardSave_(doSave) {
   const st = spState_;
-  if (!st || st.busy) { if (st && st.busy) { spMsg_('사진을 추가하는 중입니다. 끝나면 저장해주세요.', 'warn'); return true; } return false; }
+  if (!st) return false;
+  if (st.busy) {
+    st.afterUpload = doSave;
+    const sb = document.getElementById('saveVisitBtn');
+    if (sb) { sb.disabled = true; sb.textContent = '사진 추가 후 저장…'; }
+    spMsg_('사진을 모두 추가한 뒤 자동으로 저장합니다.', 'warn');
+    return true;
+  }
   const n = st.pending.length;
   if (!n || st.warned) return false;
   st.warned = true;
