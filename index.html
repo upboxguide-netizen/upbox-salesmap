@@ -379,6 +379,7 @@
   .priceGuideBtn, .navBtn { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px;
                             background: var(--surface); color: var(--navy); border: 1px solid var(--navy); }
   .navBtn { margin-bottom: 14px; }
+  a.priceGuideBtn { text-decoration: none; }
   .save-bar { position: sticky; bottom: 0; z-index: 5; background: var(--surface); margin: 14px -18px -20px;
               padding: 8px 18px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line-2);
               box-shadow: 0 -4px 12px rgba(0,0,0,.06); }
@@ -1035,7 +1036,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v84';   // ★ v84
+const APP_VERSION = 'v85';   // ★ v85
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -4030,6 +4031,7 @@ async function openPanel(store, opts) {
   const memoHtml = store.memo ? '<div class="memo">' + IC_.note + ' ' + escapeHtml(store.memo) + '</div>' : '';
   // ★ v71: 단가 가이드 · 길안내는 보조 버튼(외곽선). 주 버튼은 아래 고정 바의 '저장' 하나다.
   const priceGuideBtnHtml = isContract ? '' : '<button class="priceGuideBtn" type="button" onclick="openPriceGuide()">' + IC_.chart + ' 영업기준표 확인</button>';
+  const quoteBtnHtml = (isContract || !isSchoolStore_(store)) ? '' : '<a class="priceGuideBtn" id="quoteSendBtn" href="https://walla.my/survey/1tIqaX6UmN7eBkMnB1RA" target="_blank" rel="noopener noreferrer">' + IC_.note + ' 견적서 발송하기</a>';   // ★ v85: 학교 전용 외부 링크
   const navBtnHtml = isContract ? '' : '<button class="navBtn" type="button" onclick="openKakaoNav(selectedStore)">' + IC_.nav + ' 카카오맵 길찾기</button>';
   const visitFormHtml = isContract ? '' : buildVisitForm();
   // ★ v55: 순서 재배치 — 업장명 → 주소 → 폐기물배지 → 로드뷰 → 배지/서비스 → 정보테이블(회색라인 포함)
@@ -4048,7 +4050,7 @@ async function openPanel(store, opts) {
     roadviewHtml +
     '<div class="badges">' + adminBadge + gradeBadge + closedBadge + '</div>' +
     projectsBadgeHtml + adminInfoHtml + otherContactHtml + serviceHtml + wokHtml +
-    infoHtml + memoHtml + priceGuideBtnHtml + navBtnHtml + visitFormHtml;
+    infoHtml + memoHtml + priceGuideBtnHtml + quoteBtnHtml + navBtnHtml + visitFormHtml;
   if (!isContract) { loadMyVisit(store); bindVisitForm(store); }
   const backBtn = document.getElementById('v70BackToGroup');
   if (backBtn) backBtn.onclick = function() { openSpotGroupPanel_(fromGroup); };
