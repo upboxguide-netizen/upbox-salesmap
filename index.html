@@ -4610,12 +4610,19 @@ function applyFailReasonUI_(prefix) {
   if (gT) gT.style.display = showT ? '' : 'none';
   if (!showT && tIn) tIn.value = '';
 }
-// 수거 시간대 선택지: 맨 위는 '0시'(안내 문구 역할, 값 없음), 그 아래 05:00~22:00 을 30분 단위로
-function buildTimeOptions_() {
-  let h = '<option value="">0시</option>';
-  for (let m = 5 * 60; m <= 22 * 60; m += 30) {
+// 수거 시간대 선택지: 맨 위 '선택'(값 없음), 그 아래 00:00~23:30 을 30분 단위로(오전/오후 표기). 끝 시각(isEnd)만 24:00(자정)까지
+function timeLabel_(hh, mm) {
+  if (hh === 24) return '밤 12시(자정)';
+  const ap = hh < 12 ? '오전 ' : '오후 ';
+  const h12 = hh % 12 === 0 ? 12 : hh % 12;
+  return ap + h12 + '시' + (mm ? ' 30분' : '') + (hh === 0 && !mm ? '(자정)' : '') + (hh === 12 && !mm ? '(정오)' : '');
+}
+function buildTimeOptions_(isEnd) {
+  let h = '<option value="">선택</option>';
+  const last = isEnd ? 24 * 60 : 23 * 60 + 30;
+  for (let m = 0; m <= last; m += 30) {
     const hh = Math.floor(m / 60), mm = m % 60;
-    h += '<option value="' + pad2_(hh) + ':' + pad2_(mm) + '">' + hh + '시' + (mm ? ' 30분' : '') + '</option>';
+    h += '<option value="' + pad2_(hh) + ':' + pad2_(mm) + '">' + timeLabel_(hh, mm) + '</option>';
   }
   return h;
 }
@@ -4886,13 +4893,13 @@ function buildVisitForm() {
     '<select id="v_collectLimit"><option value="">선택</option><option value="없음">없음</option><option value="있음">있음</option></select>' +
     '<div id="v_grp_collectWin" style="display:none;">' +
     '<label>현재 업체 수거(방문) 시간대</label>' +
-    '<div class="time-range-row"><select id="v_collectFrom">' + buildTimeOptions_() + '</select><span>부터</span><select id="v_collectTo">' + buildTimeOptions_() + '</select><span>까지</span></div>' +
+    '<div class="time-range-row"><select id="v_collectFrom">' + buildTimeOptions_() + '</select><span>부터</span><select id="v_collectTo">' + buildTimeOptions_(true) + '</select><span>까지</span></div>' +
     '<div id="v_collectHint" style="display:none;font-size:12px;color:#E53935;margin-top:3px;">종료 시각이 시작 시각보다 늦어야 저장됩니다.</div>' +
     '</div></div>' +
     '<div id="v_grp_decisionPeriod" style="display:none;">' +
-    '<label for="v_decisionPeriod"><span style="color:#E53935;">*</span> 예상계약결정시기</label>' +
-    '<input id="v_decisionPeriod" type="text" list="dl_decisionPeriod" autocomplete="off" placeholder="선택하거나 직접 입력 (예: 1월 말~2월 초)">' +
-    '<datalist id="dl_decisionPeriod"><option value="11월"><option value="12월"><option value="1월"><option value="1월 말~2월 초"><option value="1~2월"><option value="2월"><option value="2월 말~3월 초"><option value="3월 이후"><option value="미정"></datalist>' +
+    '<label for="v_decisionPeriodSel"><span style="color:#E53935;">*</span> 예상계약결정시기</label>' +
+    '<select id="v_decisionPeriodSel" aria-label="예상계약결정시기"><option value="">선택</option><option value="11월">11월</option><option value="12월">12월</option><option value="1월">1월</option><option value="1월 말~2월 초">1월 말~2월 초</option><option value="1~2월">1~2월</option><option value="2월">2월</option><option value="2월 말~3월 초">2월 말~3월 초</option><option value="3월 이후">3월 이후</option><option value="미정">미정</option><option value="__custom">직접 입력</option></select>' +
+    '<input id="v_decisionPeriod" type="text" autocomplete="off" placeholder="직접 입력 (예: 1월 말~2월 초)" style="display:none;margin-top:6px;">' +
     '</div>' +
     '<label><span class="school-req" style="display:none;color:#E53935;">*</span> 상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
     '<label>최종영업결과 및 폐업 여부 선택</label>' +
@@ -5016,6 +5023,28 @@ function applyDraftNotice_(store, wasteType) {
     box.classList.remove('show');
   };
 }
+/* 예상계약결정시기: 선택 목록(select)이 값을 고르고, 실제 값은 v_decisionPeriod 입력칸 하나다(저장·판정 코드는 그대로).
+   목록에 없는 값(예전에 직접 쓴 값)이면 '직접 입력'으로 두고 입력칸을 보인다. */
+const DECISION_PERIODS_ = ['11월', '12월', '1월', '1월 말~2월 초', '1~2월', '2월', '2월 말~3월 초', '3월 이후', '미정'];
+function syncDecisionSel_() {
+  const sel = document.getElementById('v_decisionPeriodSel'), inp = document.getElementById('v_decisionPeriod');
+  if (!sel || !inp) return;
+  const v = String(inp.value || '').trim();
+  if (!v) { sel.value = ''; inp.style.display = 'none'; }
+  else if (DECISION_PERIODS_.indexOf(v) !== -1) { sel.value = v; inp.style.display = 'none'; }
+  else { sel.value = '__custom'; inp.style.display = ''; }
+}
+function bindDecisionSel_() {
+  const sel = document.getElementById('v_decisionPeriodSel'), inp = document.getElementById('v_decisionPeriod');
+  if (!sel || !inp || sel._bound) return;
+  sel._bound = true;
+  sel.addEventListener('change', function() {
+    if (sel.value === '__custom') { inp.style.display = ''; try { inp.focus(); } catch (e) {} return; }
+    inp.value = sel.value; inp.style.display = 'none';
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  syncDecisionSel_();
+}
 function setVal(id, v) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -5024,6 +5053,7 @@ function setVal(id, v) {
     el.insertAdjacentHTML('beforeend', '<option value="' + v + '">' + v + '</option>');
   }
   el.value = v || (id === 'v_bagSpec' ? '75L' : "");
+  if (id === 'v_decisionPeriod') syncDecisionSel_();
 }   // ★ v81: 봉투 규격 기본 75L
 
 /* ════ ★ v83: 학교 수거동선 사진 ════
@@ -5354,6 +5384,7 @@ function bindVisitForm(store) {
   if (!btn) return;
   btn.onclick = function() { if (spGuardSave_(function() { saveVisit(store); })) return; saveVisit(store); };
   initSchoolPhotos_(store);   // ★ v83
+  bindDecisionSel_();
   // ★ v53: 폐기물 종류 변경 시 해당 유형의 기존 기록으로 폼 전환 (저장 안 된 새 폼이면 빈 값)
   const wasteSelect = document.getElementById('v_wasteType');
   if (wasteSelect) {
@@ -6627,7 +6658,7 @@ function resetNewStoreForm() {
   if (frEtc) frEtc.value = '';
   ['nsCollectFrom', 'nsCollectTo'].forEach(function(id) {
     const s = document.getElementById(id);
-    if (s && !s.options.length) s.innerHTML = buildTimeOptions_();
+    if (s && !s.options.length) s.innerHTML = buildTimeOptions_(id === 'nsCollectTo');
     if (s) s.value = '';
   });
   { const cl = document.getElementById('nsCollectLimit'); if (cl) cl.value = ''; }
