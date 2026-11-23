@@ -180,15 +180,6 @@
   .waste-badges-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
   .waste-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px 5px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
   .waste-badge-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .roadview-section { border: 1px solid var(--line-2); border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
-  .roadview-header { padding: 10px 14px; background: #F8F8F8; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; color: #555; font-weight: 500; }
-  .roadview-header:hover { background: #F0F0F0; }
-  .roadview-header-toggle { font-size: 12px; color: var(--text-sub); }
-  .roadview-body { display: none; position: relative; height: 220px; background: var(--line-2); }
-  .roadview-body.expanded { display: block; }
-  #roadview { width: 100%; height: 100%; }
-  .rv-loading, .rv-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-sub); font-size: 13px; background: #F5F5F5; }
-  .rv-external { position: absolute; bottom: 8px; right: 8px; background: rgba(54,56,89,0.9); color: white; padding: 5px 10px; border-radius: 4px; text-decoration: none; font-size: 12px; z-index: 10; }
   .info-table { border-top: 1px solid var(--line-2); padding-top: 12px; margin-bottom: 14px; }
   .info-row { display: flex; gap: 10px; font-size: 13px; padding: 4px 0; }
   .info-key { color: var(--text-sub); min-width: 80px; }
@@ -362,10 +353,6 @@
   .admin-stat-item, .admin-partner-selector { min-height: 36px; }
   .ns-admin-type-buttons button, .ns-outcome-buttons button { min-height: 44px; font-size: 13px; }
   .draft-notice button { min-height: 36px; font-size: 13px; }
-  .roadview-header { min-height: 44px; }
-  .roadview-header-toggle { display: inline-flex; transition: transform .15s; }
-  .roadview-header-toggle.up { transform: rotate(180deg); }
-  .rv-title { display: inline-flex; align-items: center; gap: 6px; }
 
   /* 스위치: 손가락 닿는 곳은 56×44, 보이는 막대는 44×24 */
   .cf-switch, .cf-switch.on { width: 56px; height: 44px; background: transparent; border-radius: 22px; padding: 0; }
@@ -434,8 +421,6 @@
   .contact-info { font-size: 13px; padding: 5px 10px; margin-bottom: 8px; }
   .service { margin-bottom: 10px; }
   .waste-badges-row { margin-bottom: 8px; }
-  .roadview-section { margin-bottom: 10px; }
-  .roadview-header { min-height: 40px; padding: 6px 12px; }
   .priceGuideBtn, .navBtn { min-height: 44px; padding: 8px 10px; font-size: 14px; }
   .navBtn { margin-bottom: 10px; }
 
@@ -602,6 +587,36 @@
   .sp-msg.err { color: #C62828; }
   .sp-ask { margin-top: 10px; padding: 10px; border: 1px solid #E0A100; border-radius: 8px; background: #FFF8E1; font-size: 13px; color: #5C4300; }
   .sp-ask .sp-btns { margin: 8px 0 0; }
+
+  /* ════ ★ v86 ════ */
+  .ns-toast { pointer-events: none; }   /* 투명해도 화면 맨 아래 가운데에 떠 있어 저장 버튼 한가운데 탭을 가로채던 문제 */
+  .save-btn, .act-row .priceGuideBtn, .act-row .navBtn, .vsec-h, .wtab, .memo-more { touch-action: manipulation; }
+  .memo-s { display: flex; gap: 8px; align-items: flex-start; padding: 6px 10px; margin: 0 0 8px; }
+  .memo-s .ic { flex: none; margin-top: 2px; }
+  .memo-t { flex: 1; min-width: 0; }
+  .memo-t.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .memo-more { flex: none; border: 0; background: transparent; color: #8C6900; font: inherit; font-size: 12px; font-weight: 700; min-height: 28px; padding: 0 2px; cursor: pointer; }
+  .memo-more[hidden] { display: none; }
+  .wtabs { display: flex; gap: 4px; background: #EEF0F6; border-radius: 9px; padding: 3px; margin: 0 0 8px; }
+  .wtab { flex: 1; min-width: 0; min-height: 36px; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: #4A4D66; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; }
+  .wtab[aria-pressed="true"] { background: #fff; color: var(--navy); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+  .wtab-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .act-row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin: 8px 0 10px; }
+  .act-row .priceGuideBtn, .act-row .navBtn { margin: 0; min-height: 44px; padding: 4px 2px; font-size: 12px; line-height: 1.2; flex-direction: column; gap: 2px; text-align: center; }
+  .vsec { border-bottom: 1px solid var(--line-2); }
+  .vsec-h { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 8px; background: transparent; border: 0; padding: 0; margin: 0; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink); text-align: left; cursor: pointer; }
+  .vsec-chev { margin-left: auto; color: var(--text-sub); font-size: 12px; transition: transform .15s; transform: rotate(-90deg); }
+  .vsec.open > .vsec-h .vsec-chev { transform: none; }
+  .vsec-st { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+  .vsec-st:empty { display: none; }
+  .vsec-st.need { background: #FDECEA; color: #B71C1C; }
+  .vsec-st.done { background: #E8F5E9; color: #2E7D32; }
+  .vsec-st.opt { background: #EEF0F6; color: #5A5D75; font-weight: 500; }
+  .vsec-b { display: none; padding: 0 0 10px; }
+  .vsec.open > .vsec-b { display: block; }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+  .g2 > div { min-width: 0; }
+  .vsec-h:focus-visible, .wtab:focus-visible, .memo-more:focus-visible { outline: 3px solid var(--amber); outline-offset: 1px; }
 </style>
 </head>
 <body>
@@ -912,7 +927,7 @@
       <!-- ── 3단계: 상담 결과 ── -->
       <div class="ns-step" data-step="3" hidden>
         <div class="ns-form-group" id="ns_grp_collectTime" hidden>
-          <label for="nsCollectLimit">수거시간 제약 여부</label>
+          <label for="nsCollectLimit"><span style="color:#E53935;">*</span> 수거시간 제약 여부</label>
           <select id="nsCollectLimit"><option value="">선택</option><option value="없음">없음</option><option value="있음">있음</option></select>
           <div id="ns_grp_collectWin" hidden style="margin-top:8px;">
             <label>현재 업체 수거(방문) 시간대</label>
@@ -1000,6 +1015,7 @@ const KB_OPEN_THRESHOLD_PX = 120;         // visualViewport 높이가 innerHeigh
 const KB_PANEL_VH_RATIO = 0.67;           // 업장 패널 기본 높이(67vh)
 const KB_FOCUS_SCROLL_DELAY_MS = 320;     // 키보드가 다 올라온 뒤 입력칸을 가운데로
 let _ssoMem = null;                       // 영업기준표 토큰 메모리 사본
+let _kbHoldUntil = 0;   // ★ v86: 저장 바를 누르는 0.7초 동안은 키보드 재배치를 미뤄 버튼이 손가락 밑에서 움직이지 않게 한다
 let _kbOpen = false;                      // 지금 키보드가 열려 있나
 const firebaseConfig = {
   databaseURL: "https://salespartners-map-67daf-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -1036,7 +1052,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v85';   // ★ v85
+const APP_VERSION = 'v86';   // ★ v86
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -1667,6 +1683,7 @@ function computeKeyboardLayout_(vv, innerH) {
   return { open: true, bottom: bottom, panelH: panelH, top: Math.round(offTop), vvH: Math.round(vv.height) };
 }
 function applyKeyboardLayout_() {
+  if (Date.now() < _kbHoldUntil) return { open: _kbOpen };
   const L = computeKeyboardLayout_(window.visualViewport, window.innerHeight);
   const panel = document.getElementById('storePanel');
   if (panel) {
@@ -1742,6 +1759,13 @@ function initKeyboardAvoidance_() {
       try { applyKeyboardLayout_(); ensureFieldVisible_(t); } catch(err) {}
     }, KB_FOCUS_SCROLL_DELAY_MS);
   });
+  document.addEventListener('pointerdown', function(e) {   // ★ v86
+    const t = e && e.target;
+    if (t && t.closest && t.closest('.save-bar, .ns-submit-row')) {
+      _kbHoldUntil = Date.now() + 700;
+      setTimeout(function() { try { applyKeyboardLayout_(); } catch(err) {} }, 750);
+    }
+  }, true);
 }
 initKeyboardAvoidance_();
 async function fetchInitialLocation() {
@@ -3902,6 +3926,47 @@ function updateLeadHint_() {
       h.lines.map(function(l) { return '<span class="lead-hint-line">' + escapeHtml(l) + '</span>'; }).join('');
     el.title = ['지금: ' + getStatusLabel(h.status)].concat(h.lines).join(' · ');   // ★ v72: 한 줄로 잘려도 전체 문구
   } catch (e) { el.textContent = ''; el.title = ''; }
+  try { updateSecStatus_(); } catch (e2) {}   // ★ v86
+}
+/* ★ v86: 구역 제목의 진행 표시. data-req(항상 필수) · data-req-school(학교만 필수) · data-opt(선택). 'id@그룹id' 는 그 그룹이 보일 때만 센다 */
+function vsecVisible_(el) {
+  for (let n = el; n && !(n.classList && n.classList.contains('vsec-b')); n = n.parentElement) {
+    if (n.style && n.style.display === 'none') return false;
+  }
+  return true;
+}
+function updateSecStatus_() {
+  const school = (typeof selectedStore !== 'undefined') && isSchoolStore_(selectedStore);
+  document.querySelectorAll('.vsec').forEach(function(sec) {
+    const st = sec.querySelector('.vsec-st');
+    if (!st) return;
+    const ids = function(a) { return (sec.getAttribute(a) || '').split(',').filter(Boolean); };
+    const cnt = function(list) {
+      let n = 0, tot = 0;
+      list.forEach(function(spec) {
+        const p = spec.split('@'), el = document.getElementById(p[0]), vis = document.getElementById(p[1] || p[0]);
+        if (!el || !vis || !vsecVisible_(vis)) return;
+        tot++; if (String(el.value || '').trim()) n++;
+      });
+      return { n: n, t: tot };
+    };
+    const r = cnt(ids('data-req').concat(school ? ids('data-req-school') : [])), o = cnt(ids('data-opt'));
+    if (r.t) { st.textContent = '필수 ' + r.n + '/' + r.t; st.className = 'vsec-st ' + (r.n === r.t ? 'done' : 'need'); }
+    else if (o.t) { st.textContent = '입력 ' + o.n + '/' + o.t; st.className = 'vsec-st opt'; }
+    else { st.textContent = ''; st.className = 'vsec-st'; }
+  });
+}
+function wasteTabsHtml_(store) {
+  const byType = (myVisitedStoreDataByType && myVisitedStoreDataByType[store._key]) || {};
+  const short = { FOOD: '음식물', PLASTIC: '폐합성수지', OIL: '폐식용유' };
+  return '<div class="wtabs" role="group" aria-label="폐기물 종류">' + WASTE_TYPES.map(function(w) {
+    const rec = byType[w.code];
+    const dot = rec ? '<span class="wtab-dot" style="background:' + getStatusColor(classifyVisitCurrent(rec.current)) + ';"></span>' : '';
+    return '<button type="button" class="wtab" data-w="' + w.code + '" aria-pressed="false">' + dot + escapeHtml(short[w.code] || w.label) + '</button>';
+  }).join('') + '</div>';
+}
+function syncWasteTabs_(code) {
+  document.querySelectorAll('.wtab[data-w]').forEach(function(b) { b.setAttribute('aria-pressed', b.dataset.w === code ? 'true' : 'false'); });
 }
 function getVisitStatus(store) {
   if (isContractGrade(store.grade)) return "contract";
@@ -4021,18 +4086,19 @@ async function openPanel(store, opts) {
     const wl = (Array.isArray(store.wok) ? store.wok : String(store.wok).split(/[,\/·、]+/)).map(function(x) { return String(x).trim(); }).filter(Boolean);
     if (wl.length) wokHtml = '<div class="service wok-row"><span class="wok-label">계약가능</span>' + wl.map(function(x) { return '<span class="service-badge on">' + escapeHtml(x) + '</span>'; }).join('') + '</div>';
   }
-  const roadviewHtml = isContract ? '' : '<div class="roadview-section"><div class="roadview-header" onclick="toggleRoadview()"><span class="rv-title">' + IC_.camera + '<span id="rvHeaderText">현장 로드뷰 (눌러서 보기)</span></span><span class="roadview-header-toggle" id="rvToggleArrow">' + IC_.chev + '</span></div><div class="roadview-body" id="rvBody"><div class="rv-loading" id="rvLoading" style="display:none;">로드 중...</div><div id="roadview"></div><div class="rv-empty" id="rvEmpty" style="display:none;">로드뷰 없음</div><a href="https://map.kakao.com/link/roadview/' + store.lat + ',' + store.lng + '" target="_blank" class="rv-external">카카오맵에서 보기 →</a></div></div>';
   const infoRows = [];
-  if (store.bizType) infoRows.push({k:"업종", v:store.bizType});
+  const schoolInfo_ = isSchoolStore_(store);   // ★ v85: 학교는 업종·전화번호 행을 숨긴다
+  if (store.bizType && !schoolInfo_) infoRows.push({k:"업종", v:store.bizType});
   if (store.area) infoRows.push({k:"면적", v:store.area});
-  if (store.phone) infoRows.push({k:"전화번호", v:store.phone});
+  if (store.phone && !schoolInfo_) infoRows.push({k:"전화번호", v:store.phone});
   if (store.volume) infoRows.push({k:"예상배출량", v:store.volume});
   const infoHtml = infoRows.length === 0 ? '' : '<div class="info-table">' + infoRows.map(r => '<div class="info-row"><span class="info-key">' + r.k + '</span><span class="info-value">' + escapeHtml(r.v) + '</span></div>').join('') + '</div>';
-  const memoHtml = store.memo ? '<div class="memo">' + IC_.note + ' ' + escapeHtml(store.memo) + '</div>' : '';
+  const memoTopHtml = store.memo ? '<div class="memo memo-s">' + IC_.note + '<span class="memo-t clamp">' + escapeHtml(store.memo) + '</span><button type="button" class="memo-more" hidden>더보기</button></div>' : '';   // ★ v86
   // ★ v71: 단가 가이드 · 길안내는 보조 버튼(외곽선). 주 버튼은 아래 고정 바의 '저장' 하나다.
   const priceGuideBtnHtml = isContract ? '' : '<button class="priceGuideBtn" type="button" onclick="openPriceGuide()">' + IC_.chart + ' 영업기준표 확인</button>';
   const quoteBtnHtml = (isContract || !isSchoolStore_(store)) ? '' : '<a class="priceGuideBtn" id="quoteSendBtn" href="https://walla.my/survey/1tIqaX6UmN7eBkMnB1RA" target="_blank" rel="noopener noreferrer">' + IC_.note + ' 견적서 발송하기</a>';   // ★ v85: 학교 전용 외부 링크
   const navBtnHtml = isContract ? '' : '<button class="navBtn" type="button" onclick="openKakaoNav(selectedStore)">' + IC_.nav + ' 카카오맵 길찾기</button>';
+  const actRowHtml = isContract ? '' : '<div class="act-row">' + priceGuideBtnHtml + quoteBtnHtml + navBtnHtml + '</div>';   // ★ v86
   const visitFormHtml = isContract ? '' : buildVisitForm();
   // ★ v55: 순서 재배치 — 업장명 → 주소 → 폐기물배지 → 로드뷰 → 배지/서비스 → 정보테이블(회색라인 포함)
   const wasteBadgesHtml = buildWasteBadgesHtml_(store);
@@ -4046,12 +4112,17 @@ async function openPanel(store, opts) {
     planNameRowHtml_(store) +   // ★ v74: 이름 + 오른쪽 별 토글(외주면 이름만)
     '<div class="addr">' + escapeHtml(store.address || '') + '</div>' +
     partnerListHtml +
-    wasteBadgesHtml +
-    roadviewHtml +
+    memoTopHtml +
+    (isContract ? wasteBadgesHtml : wasteTabsHtml_(store)) +
     '<div class="badges">' + adminBadge + gradeBadge + closedBadge + '</div>' +
     projectsBadgeHtml + adminInfoHtml + otherContactHtml + serviceHtml + wokHtml +
-    infoHtml + memoHtml + priceGuideBtnHtml + quoteBtnHtml + navBtnHtml + visitFormHtml;
+    infoHtml + actRowHtml + visitFormHtml;
   if (!isContract) { loadMyVisit(store); bindVisitForm(store); }
+  const memoT = content.querySelector('.memo-t'), memoMore = content.querySelector('.memo-more');   // ★ v86: 2줄을 넘을 때만 더보기
+  if (memoT && memoMore) {
+    requestAnimationFrame(function() { if (memoT.scrollHeight > memoT.clientHeight + 1) memoMore.hidden = false; });
+    memoMore.onclick = function() { const c = memoT.classList.toggle('clamp'); memoMore.textContent = c ? '더보기' : '접기'; };
+  }
   const backBtn = document.getElementById('v70BackToGroup');
   if (backBtn) backBtn.onclick = function() { openSpotGroupPanel_(fromGroup); };
   const planBack = fromPlan ? document.getElementById('v73BackToPlan') : null;   // ★ v73
@@ -4249,41 +4320,6 @@ async function openPartnerRecordView_(store, pk, fromGroup, fromPlan) {
   }).join('');
   content.innerHTML = back + head + blocks;
   bindBack();
-}
-function toggleRoadview() {
-  const body = document.getElementById("rvBody");
-  const arrow = document.getElementById("rvToggleArrow");
-  const headerText = document.getElementById("rvHeaderText");
-  if (!body) return;
-  if (currentRvState === 'collapsed') {
-    body.classList.add("expanded");
-    arrow.classList.add("up");                 // ★ v71: 화살표는 SVG 회전
-    headerText.textContent = "현장 로드뷰";
-    currentRvState = 'expanded';
-    loadRoadviewForCurrentStore();
-  } else {
-    body.classList.remove("expanded");
-    arrow.classList.remove("up");
-    headerText.textContent = "현장 로드뷰 (눌러서 보기)";
-    currentRvState = 'collapsed';
-  }
-}
-function loadRoadviewForCurrentStore() {
-  if (!selectedStore) return;
-  const rvLoading = document.getElementById("rvLoading");
-  const rvEmpty = document.getElementById("rvEmpty");
-  const rvContainer = document.getElementById("roadview");
-  rvLoading.style.display = "flex";
-  rvEmpty.style.display = "none";
-  rvContainer.innerHTML = "";
-  const position = new kakao.maps.LatLng(selectedStore.lat, selectedStore.lng);
-  const rvClient = new kakao.maps.RoadviewClient();
-  rvClient.getNearestPanoId(position, 50, function(panoId) {
-    rvLoading.style.display = "none";
-    if (!panoId) { rvEmpty.style.display = "flex"; return; }
-    rvInstance = new kakao.maps.Roadview(rvContainer);
-    rvInstance.setPanoId(panoId, position);
-  });
 }
 function buildKakaoNavUrl(store) {
   const name = String(store.name || '업장').replace(/[,/]/g, ' ').trim();
@@ -4548,6 +4584,7 @@ function applyDecisionPeriodUI_() {
   if (!school) ['contactNut','emailAdm','emailNut','fax'].forEach(function(k) { setVal('v_' + k, ''); });
   document.querySelectorAll('.school-req').forEach(function(el) { el.style.display = school ? '' : 'none'; });   // 학교만 * 표시
   applyCollectTimeUI_();
+  try { updateSecStatus_(); } catch (e) {}   // ★ v86
 }
 // ★ v82: 콜드콜로 확보된 학교 연락처(store.cc)를 폼에 미리 채운다. 파트너가 바꾼 값만 저장(미리 채운 값 그대로면 저장하지 않음)
 const CC_SEED_KEYS_ = ['contact', 'contactNut', 'emailAdm', 'emailNut', 'fax'];
@@ -4610,12 +4647,10 @@ function applyFailReasonUI_(prefix) {
   if (gT) gT.style.display = showT ? '' : 'none';
   if (!showT && tIn) tIn.value = '';
 }
-// 수거 시간대 선택지: 맨 위 '선택'(값 없음), 그 아래 00:00~23:30 을 30분 단위로(오전/오후 표기). 끝 시각(isEnd)만 24:00(자정)까지
-function timeLabel_(hh, mm) {
-  if (hh === 24) return '밤 12시(자정)';
-  const ap = hh < 12 ? '오전 ' : '오후 ';
-  const h12 = hh % 12 === 0 ? 12 : hh % 12;
-  return ap + h12 + '시' + (mm ? ' 30분' : '') + (hh === 0 && !mm ? '(자정)' : '') + (hh === 12 && !mm ? '(정오)' : '');
+// 수거 시간대 선택지: 맨 위 '선택'(값 없음), 그 아래 00:00~23:30 을 30분 단위로(시트와 같은 HH:MM 표기). 끝 시각(isEnd)만 24:00(자정)까지
+function timeLabel_(hh, mm) {   // 전체영업자관리 시트 드롭다운과 같은 24시간 'HH:MM' 표기(값과 같은 글자). 자정·정오만 덧붙임
+  const t = pad2_(hh) + ':' + pad2_(mm);
+  return t + (hh === 0 && !mm ? ' (자정)' : '') + (hh === 12 && !mm ? ' (정오)' : '') + (hh === 24 ? ' (자정)' : '');
 }
 function buildTimeOptions_(isEnd) {
   let h = '<option value="">선택</option>';
@@ -4831,93 +4866,108 @@ function buildVisitForm() {
         '<button type="button" id="v_draftDiscard">삭제</button>' +
       '</span>' +
     '</div>' +
-    '<label><span class="school-req" style="display:none;color:#E53935;">*</span> 성사가능성</label>' +
-    '<select id="v_repriority">' + buildRepriorityOptions_() + '</select>' +
-
-    '<label>영업구분</label>' +
-    '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select>' +
-    // ★ v56: 접촉방식 — 영업구분 바로 아래, 동일 양식(select)
-    '<label><span class="school-req" style="display:none;color:#E53935;">*</span> 접촉방식</label>' +
-    '<select id="v_contactMethod">' + buildContactMethodOptions_() + '</select>' +
-    '<label>폐기물 선택</label>' +
-    '<select id="v_wasteType">' + wasteOptions + '</select>' +
+    '<select id="v_wasteType" style="display:none;" aria-hidden="true" tabindex="-1">' + wasteOptions + '</select>' +
     '<div class="visit-dates" id="visitDates"></div>' +
-    '<label><span style="color:#E53935;">*</span> 현재 수거·운반 업체명</label>' +
-    '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 — 지금 폐기물을 가져가는 업체">' +
-    '<div style="font-size:12px;color:var(--text-sub);margin-top:3px;">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 없으면 사유를 적어주세요.</div>' +
-    '<label for="v_contact"><span id="lbl_contact">담당자 연락처</span>' + NUM_WARN_HTML_ + '</label>' +
-    '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
+    // ★ v86 구역 1: 수거 현황 (필수 칸 모음)
+    '<div class="vsec open" id="vs1" data-req="v_currentStoreName,v_bins@grp_bins,v_vinyl@grp_vinyl,v_truck,v_collectLimit@v_grp_collectTime">' +
+      '<button type="button" class="vsec-h" aria-expanded="true"><span class="vsec-t">수거 현황</span><span class="vsec-st"></span><span class="vsec-chev" aria-hidden="true">▾</span></button>' +
+      '<div class="vsec-b">' +
+      '<label for="v_currentStoreName"><span style="color:#E53935;">*</span> 현재 수거·운반 업체명</label>' +
+      '<input id="v_currentStoreName" type="text" placeholder="예: ㅇㅇ환경 — 지금 폐기물을 가져가는 업체">' +
+      '<div style="font-size:12px;color:var(--text-sub);margin-top:3px;">사업장 이름이 아니라 <b>수집운반업체</b> 이름입니다. 없으면 사유를 적어주세요.</div>' +
+      '<div class="g2">' +
+        '<div id="grp_bins"><label for="v_bins"><span style="color:#E53935;">*</span> 현재 통 갯수' + NUM_WARN_HTML_ + '</label>' +
+        '<input id="v_bins" type="text" inputmode="numeric" placeholder="예: 4"></div>' +
+        '<div id="grp_vinyl"><label for="v_vinyl"><span style="color:#E53935;">*</span> 비닐 사용여부</label>' +
+        '<select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="지자체">지자체</option><option value="처리기">처리기</option></select></div>' +
+      '</div>' +
+      '<label for="v_truck"><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>' +
+      '<select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select>' +
+      '<div id="v_grp_collectTime" style="display:none;">' +
+        '<label for="v_collectLimit"><span style="color:#E53935;">*</span> 수거시간 제약 여부</label>' +
+        '<select id="v_collectLimit"><option value="">선택</option><option value="없음">없음</option><option value="있음">있음</option></select>' +
+        '<div id="v_grp_collectWin" style="display:none;">' +
+          '<label>현재 업체 수거(방문) 시간대</label>' +
+          '<div class="time-range-row"><select id="v_collectFrom">' + buildTimeOptions_() + '</select><span>부터</span><select id="v_collectTo">' + buildTimeOptions_(true) + '</select><span>까지</span></div>' +
+          '<div id="v_collectHint" style="display:none;font-size:12px;color:#E53935;margin-top:3px;">종료 시각이 시작 시각보다 늦어야 저장됩니다.</div>' +
+        '</div></div>' +
+      '</div></div>' +
+    // ★ v86 구역 2: 연락처·배출량·단가 (유효리드 기준 3항목이 여기 모여 있다)
+    '<div class="vsec open" id="vs2" data-opt="v_contact,v_amount,v_price,v_suggestedPrice,v_freq">' +
+      '<button type="button" class="vsec-h" aria-expanded="true"><span class="vsec-t">연락처·배출량·단가</span><span class="vsec-st"></span><span class="vsec-chev" aria-hidden="true">▾</span></button>' +
+      '<div class="vsec-b">' +
+      '<label for="v_contact"><span id="lbl_contact">담당자 연락처</span>' + NUM_WARN_HTML_ + '</label>' +
+      '<input id="v_contact" type="tel" inputmode="numeric" placeholder="예: 010-0000-0000" maxlength="13">' +
+      '<div id="grp_bagSpec" style="display:none;"><label for="v_bagSpec">봉투 규격</label>' +
+      '<select id="v_bagSpec"><option value="75L">75L</option><option value="100L">100L</option></select></div>' +
+      '<div class="g2">' +
+        '<div><label for="v_amount"><span id="lbl_amount">월 예상배출량 (L)</span>' + NUM_WARN_HTML_ + '</label>' +
+        '<input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500"></div>' +
+        '<div><label for="v_price"><span id="lbl_price">현재 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
+        '<input id="v_price" type="text" inputmode="numeric" placeholder="예: 180"></div>' +
+      '</div>' +
+      '<div class="g2">' +
+        '<div><label for="v_suggestedPrice"><span id="lbl_suggestedPrice">제안 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
+        '<input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170"></div>' +
+        '<div><label for="v_freq">현재 주 수거횟수' + NUM_WARN_HTML_ + '</label>' +
+        '<input id="v_freq" type="text" inputmode="numeric" placeholder="예: 3"></div>' +
+      '</div>' +
+      '</div></div>' +
+    // ★ v86 구역 3: 추가 연락처(학교 전용 · 기본 접힘)
     '<div id="v_grp_contactNut" style="display:none;">' +
-    '<label for="v_contactNut">영양사 연락처</label>' +
-    '<input id="v_contactNut" type="tel" inputmode="numeric" placeholder="예: 041-000-0000" maxlength="13">' +
-    '<label for="v_emailAdm">행정실 이메일</label>' +
-    '<input id="v_emailAdm" type="email" inputmode="email" autocomplete="off" placeholder="예: admin@sen.go.kr">' +
-    '<label for="v_emailNut">영양사 이메일</label>' +
-    '<input id="v_emailNut" type="email" inputmode="email" autocomplete="off" placeholder="예: nutri@sen.go.kr">' +
-    '<label for="v_fax">팩스번호</label>' +
-    '<input id="v_fax" type="tel" inputmode="numeric" placeholder="예: 041-000-0000" maxlength="13">' +
-    '<div id="v_ccHint" style="display:none;font-size:12px;color:var(--text-sub);margin-top:3px;"></div>' +
+      '<div class="vsec" id="vs3" data-opt="v_contactNut,v_emailAdm,v_emailNut,v_fax">' +
+        '<button type="button" class="vsec-h" aria-expanded="false"><span class="vsec-t">추가 연락처</span><span class="vsec-st"></span><span class="vsec-chev" aria-hidden="true">▾</span></button>' +
+        '<div class="vsec-b">' +
+        '<label for="v_contactNut">영양사 연락처</label>' +
+        '<input id="v_contactNut" type="tel" inputmode="numeric" placeholder="예: 041-000-0000" maxlength="13">' +
+        '<label for="v_emailAdm">행정실 이메일</label>' +
+        '<input id="v_emailAdm" type="email" inputmode="email" autocomplete="off" placeholder="예: admin@sen.go.kr">' +
+        '<label for="v_emailNut">영양사 이메일</label>' +
+        '<input id="v_emailNut" type="email" inputmode="email" autocomplete="off" placeholder="예: nutri@sen.go.kr">' +
+        '<label for="v_fax">팩스번호</label>' +
+        '<input id="v_fax" type="tel" inputmode="numeric" placeholder="예: 041-000-0000" maxlength="13">' +
+        '<div id="v_ccHint" style="display:none;font-size:12px;color:var(--text-sub);margin-top:3px;"></div>' +
+        '</div></div>' +
     '</div>' +
-    // ★ v56: 라벨 텍스트를 내부 span(lbl_*)으로 감쌈 — applyWasteTypeUI의 textContent 치환이
-    //   경고 문구 span을 지우지 않도록 하기 위함. setLabel() 로직은 그대로 둬도 동작함.
-    // ★ v81: 폐합성수지 봉투 규격 — 폐합성수지일 때만 보인다(applyWasteTypeUI). 월 예상배출량 옆에 가로로 배치, 기본 75L
-    '<div style="display:flex;gap:8px;align-items:flex-start;">' +
-    '<div id="grp_bagSpec" style="display:none;flex:0 0 34%;min-width:0;"><label for="v_bagSpec">봉투 규격</label>' +
-    '<select id="v_bagSpec"><option value="75L">75L</option><option value="100L">100L</option></select></div>' +
-    '<div style="flex:1;min-width:0;">' +
-    '<label for="v_amount"><span id="lbl_amount">월 예상배출량 (L)</span>' + NUM_WARN_HTML_ + '</label>' +
-    '<input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500">' +
-    '</div></div>' +
-    '<label for="v_price"><span id="lbl_price">현재 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
-    '<input id="v_price" type="text" inputmode="numeric" placeholder="예: 180">' +
-    '<label for="v_suggestedPrice"><span id="lbl_suggestedPrice">제안 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
-    '<input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170">' +
-    '<label for="v_freq">현재 주 수거횟수' + NUM_WARN_HTML_ + '</label>' +
-    '<input id="v_freq" type="text" inputmode="numeric" placeholder="예: 3">' +
-    '<div id="grp_bins"><label for="v_bins"><span style="color:#E53935;">*</span> 현재 통 갯수' + NUM_WARN_HTML_ + '</label>' +
-    '<input id="v_bins" type="text" inputmode="numeric" placeholder="예: 4"></div>' +
-    '<div id="grp_vinyl"><label><span style="color:#E53935;">*</span> 비닐 사용여부</label>' +
-    '<select id="v_vinyl"><option value="">선택</option><option value="사용">사용</option><option value="미사용">미사용</option><option value="지자체">지자체</option><option value="처리기">처리기</option></select></div>' +
-    '<label><span style="color:#E53935;">*</span> 5톤 차량 진입 가능여부</label>' +
-    '<select id="v_truck"><option value="">선택</option><option value="가능">가능</option><option value="불가능">불가능</option></select>' +
-    // ★ v56: 예상계약일자 — 상세 상담내용 바로 위, 년/월/일 드롭다운
-    '<div id="v_grp_ecd">' +
-    '<label for="v_ecd">예상계약일자</label>' +
-    '<div class="date-select-row">' +
-      '<input type="date" id="v_ecd" aria-label="예상계약일자"><button type="button" class="date-clear-btn" id="v_ecdClear" hidden>지우기</button>' +
-    '</div>' +
-    '</div>' +
-    // ★ v82: 학교 업장 전용 — 예상계약결정시기(학교는 계약 시작일이 같아 '언제 결정하나'를 기록)
-    '<div id="v_grp_collectTime" style="display:none;">' +
-    '<label for="v_collectLimit">수거시간 제약 여부</label>' +
-    '<select id="v_collectLimit"><option value="">선택</option><option value="없음">없음</option><option value="있음">있음</option></select>' +
-    '<div id="v_grp_collectWin" style="display:none;">' +
-    '<label>현재 업체 수거(방문) 시간대</label>' +
-    '<div class="time-range-row"><select id="v_collectFrom">' + buildTimeOptions_() + '</select><span>부터</span><select id="v_collectTo">' + buildTimeOptions_(true) + '</select><span>까지</span></div>' +
-    '<div id="v_collectHint" style="display:none;font-size:12px;color:#E53935;margin-top:3px;">종료 시각이 시작 시각보다 늦어야 저장됩니다.</div>' +
-    '</div></div>' +
-    '<div id="v_grp_decisionPeriod" style="display:none;">' +
-    '<label for="v_decisionPeriodSel"><span style="color:#E53935;">*</span> 예상계약결정시기</label>' +
-    '<select id="v_decisionPeriodSel" aria-label="예상계약결정시기"><option value="">선택</option><option value="11월">11월</option><option value="12월">12월</option><option value="1월">1월</option><option value="1월 말~2월 초">1월 말~2월 초</option><option value="1~2월">1~2월</option><option value="2월">2월</option><option value="2월 말~3월 초">2월 말~3월 초</option><option value="3월 이후">3월 이후</option><option value="미정">미정</option><option value="__custom">직접 입력</option></select>' +
-    '<input id="v_decisionPeriod" type="text" autocomplete="off" placeholder="직접 입력 (예: 1월 말~2월 초)" style="display:none;margin-top:6px;">' +
-    '</div>' +
-    '<label><span class="school-req" style="display:none;color:#E53935;">*</span> 상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
-    '<label>최종영업결과 및 폐업 여부 선택</label>' +
-    '<select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option><option value="폐업">폐업</option></select>' +
-    // ★ v60: 불발사유 (AD열) / 기타불발사유 (AE열) — 최종영업결과가 '실패'일 때만 노출
-    '<div id="v_grp_failReason" style="display:none;">' +
-      '<label>불발사유</label>' +
-      '<select id="v_failReason">' + buildFailReasonOptions_() + '</select>' +
-    '</div>' +
-    '<div id="v_grp_failReasonEtc" style="display:none;">' +
-      '<label>기타 불발사유</label>' +
-      '<input id="v_failReasonEtc" type="text" placeholder="사유를 직접 입력해주세요">' +
-    '</div>' +
-    // ★ v82: 시간제약 → 학교가 원하는 방문 시간대
-    '<div id="v_grp_preferredTime" style="display:none;">' +
-      '<label>학교가 원하는 방문 시간대</label>' +
-      '<input id="v_preferredTime" type="text" placeholder="예: 평일 오후 2~4시 (점심시간 제외)">' +
-    '</div>' +
+    // ★ v86 구역 4: 상담 결과
+    '<div class="vsec open" id="vs4" data-req-school="v_repriority,v_contactMethod,v_decisionPeriod@v_grp_decisionPeriod,v_note">' +
+      '<button type="button" class="vsec-h" aria-expanded="true"><span class="vsec-t">상담 결과</span><span class="vsec-st"></span><span class="vsec-chev" aria-hidden="true">▾</span></button>' +
+      '<div class="vsec-b">' +
+      '<div class="g2">' +
+        '<div><label for="v_repriority"><span class="school-req" style="display:none;color:#E53935;">*</span> 성사가능성</label>' +
+        '<select id="v_repriority">' + buildRepriorityOptions_() + '</select></div>' +
+        '<div><label for="v_salesType">영업구분</label>' +
+        '<select id="v_salesType"><option value="">선택</option><option value="인바운드">인바운드</option><option value="아웃바운드">아웃바운드</option></select></div>' +
+      '</div>' +
+      '<label for="v_contactMethod"><span class="school-req" style="display:none;color:#E53935;">*</span> 접촉방식</label>' +
+      '<select id="v_contactMethod">' + buildContactMethodOptions_() + '</select>' +
+      '<div id="v_grp_ecd">' +
+      '<label for="v_ecd">예상계약일자</label>' +
+      '<div class="date-select-row">' +
+        '<input type="date" id="v_ecd" aria-label="예상계약일자"><button type="button" class="date-clear-btn" id="v_ecdClear" hidden>지우기</button>' +
+      '</div>' +
+      '</div>' +
+      '<div id="v_grp_decisionPeriod" style="display:none;">' +
+      '<label for="v_decisionPeriodSel"><span style="color:#E53935;">*</span> 예상계약결정시기</label>' +
+      '<select id="v_decisionPeriodSel" aria-label="예상계약결정시기"><option value="">선택</option><option value="11월">11월</option><option value="12월">12월</option><option value="1월">1월</option><option value="1월 말~2월 초">1월 말~2월 초</option><option value="1~2월">1~2월</option><option value="2월">2월</option><option value="2월 말~3월 초">2월 말~3월 초</option><option value="3월 이후">3월 이후</option><option value="미정">미정</option><option value="__custom">직접 입력</option></select>' +
+      '<input id="v_decisionPeriod" type="text" autocomplete="off" placeholder="직접 입력 (예: 1월 말~2월 초)" style="display:none;margin-top:6px;">' +
+      '</div>' +
+      '<label for="v_note"><span class="school-req" style="display:none;color:#E53935;">*</span> 상세 상담내용</label><textarea id="v_note" placeholder="상담 내용을 기록하세요. 업장이 변경된 경우 변경된 업장명을 기재해주세요."></textarea>' +
+      '<label for="v_outcome">최종영업결과 및 폐업 여부 선택</label>' +
+      '<select id="v_outcome"><option value="">선택</option><option value="성사">성사</option><option value="실패">실패</option><option value="폐업">폐업</option></select>' +
+      '<div id="v_grp_failReason" style="display:none;">' +
+        '<label for="v_failReason">불발사유</label>' +
+        '<select id="v_failReason">' + buildFailReasonOptions_() + '</select>' +
+      '</div>' +
+      '<div id="v_grp_failReasonEtc" style="display:none;">' +
+        '<label for="v_failReasonEtc">기타 불발사유</label>' +
+        '<input id="v_failReasonEtc" type="text" placeholder="사유를 직접 입력해주세요">' +
+      '</div>' +
+      '<div id="v_grp_preferredTime" style="display:none;">' +
+        '<label for="v_preferredTime">학교가 원하는 방문 시간대</label>' +
+        '<input id="v_preferredTime" type="text" placeholder="예: 평일 오후 2~4시 (점심시간 제외)">' +
+      '</div>' +
+      '</div></div>' +
     '</div>' +
     // ★ v71: 저장은 패널 아래에 붙어 있는 바의 유일한 주 버튼. 바로 위에 '리드 기준' 안내(다음 단계까지 남은 항목)
     '<div id="v_photoBox" class="sp-box" style="display:none;"></div>' +
@@ -4926,6 +4976,7 @@ function buildVisitForm() {
 }
 // ★ v53: 선택된 폐기물 종류에 맞춰 라벨 텍스트/필드 숨김 적용
 function applyWasteTypeUI(wasteType) {
+  syncWasteTabs_(wasteType);   // ★ v86
   const labels = WASTE_FIELD_LABELS[wasteType] || WASTE_FIELD_LABELS[WASTE_TYPE_DEFAULT];
   const setLabel = function(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; };
   setLabel('lbl_amount', labels.amount);
@@ -5375,6 +5426,7 @@ function spGuardSave_(doSave) {
     '<div class="sp-btns"><button type="button" class="sp-btn main" id="sp_askUp">사진 추가하고 저장</button><button type="button" class="sp-btn" id="sp_askSkip">사진 삭제하고 저장</button></div></div>';
   document.getElementById('sp_askUp').onclick = function() { st.afterUpload = doSave; spUploadAll_(); };
   document.getElementById('sp_askSkip').onclick = function() { st.warned = true; spAskClear_(); doSave(); };
+  showNsToast('아직 추가하지 않은 사진이 ' + n + '장 있습니다. 위 안내에서 고른 뒤 다시 저장해주세요.', 3500);   // ★ v86: 저장이 막힌 이유를 바로 보이게
   a.scrollIntoView({ block: 'center', behavior: 'smooth' });
   return true;
 }
@@ -5385,6 +5437,19 @@ function bindVisitForm(store) {
   btn.onclick = function() { if (spGuardSave_(function() { saveVisit(store); })) return; saveVisit(store); };
   initSchoolPhotos_(store);   // ★ v83
   bindDecisionSel_();
+  document.querySelectorAll('.vsec-h').forEach(function(h) {   // ★ v86
+    h.onclick = function() { const s = h.parentElement, o = !s.classList.contains('open'); s.classList.toggle('open', o); h.setAttribute('aria-expanded', o ? 'true' : 'false'); };
+  });
+  document.querySelectorAll('.wtab[data-w]').forEach(function(b) {
+    b.onclick = function() {
+      const sel = document.getElementById('v_wasteType');
+      if (!sel || sel.value === b.dataset.w) return;
+      sel.value = b.dataset.w;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      syncWasteTabs_(sel.value);   // 사진 처리 중이라 되돌려졌으면 탭도 되돌린다
+    };
+  });
+  syncWasteTabs_(getVal('v_wasteType') || WASTE_TYPE_DEFAULT);
   // ★ v53: 폐기물 종류 변경 시 해당 유형의 기존 기록으로 폼 전환 (저장 안 된 새 폼이면 빈 값)
   const wasteSelect = document.getElementById('v_wasteType');
   if (wasteSelect) {
@@ -5398,6 +5463,7 @@ function bindVisitForm(store) {
       wasteSelect._prevWaste = wasteSelect.value;
       loadMyVisit(store, wasteSelect.value);
       initSchoolPhotos_(store);   // 폐기물 종류별 사진으로 바꿔 불러온다
+      updateLeadHint_();   // ★ v86: 구역 진행 표시도 새 기록 기준으로
       btn.textContent = '저장';
       btn.disabled = false;
     });
