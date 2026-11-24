@@ -588,6 +588,8 @@
   .sp-ask { margin-top: 10px; padding: 10px; border: 1px solid #E0A100; border-radius: 8px; background: #FFF8E1; font-size: 13px; color: #5C4300; }
   .sp-ask .sp-btns { margin: 8px 0 0; }
 
+  /* ════ ★ v87: 사진 필수 배지 ════ */
+  .sp-title .vsec-st { margin-left: 6px; vertical-align: middle; }
   /* ════ ★ v86 ════ */
   .ns-toast { pointer-events: none; }   /* 투명해도 화면 맨 아래 가운데에 떠 있어 저장 버튼 한가운데 탭을 가로채던 문제 */
   .save-btn, .act-row .priceGuideBtn, .act-row .navBtn, .vsec-h, .wtab, .memo-more { touch-action: manipulation; }
@@ -645,6 +647,19 @@
   .save-bar { margin: 6px -12px -12px; padding: 4px 12px calc(6px + env(safe-area-inset-bottom, 0px)); }
   .save-bar .save-btn { min-height: 42px; margin-top: 3px; }
   .lead-hint { font-size: 11.5px; }
+
+  .wok-chip { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; background: #E8F5E9; color: #2E7D32; }
+  .wok-chip.no { background: #F2F3F7; color: #8A8DA3; font-weight: 500; }
+  .wtab-ok { font-size: 11px; font-weight: 700; color: #2E7D32; }
+  .wtab-ok.no { color: #9A9CB0; }
+  .wtab-ok.chk { color: #B26A00; }
+  .wok-chip.chk { background: #FFF4E0; color: #8A5A00; }
+  .wstrip.chk { background: #FFF4E0; color: #8A5A00; }
+  .wstrip { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; font-size: 12px; line-height: 1.4; padding: 5px 8px; border-radius: 6px; margin: 0 0 6px; }
+  .wstrip[hidden] { display: none; }
+  .wstrip.ok { background: #E8F5E9; color: #1B5E20; }
+  .wstrip.no { background: #F2F3F7; color: #555870; }
+  .wstrip-go { min-height: 32px; margin-left: auto; padding: 0 10px; border: 1px solid #2E7D32; border-radius: 6px; background: #fff; color: #1B5E20; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
 </style>
 </head>
 <body>
@@ -1080,7 +1095,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v86';   // ★ v86
+const APP_VERSION = 'v87';   // ★ v87
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -3984,17 +3999,87 @@ function updateSecStatus_() {
     else { st.textContent = ''; st.className = 'vsec-st'; }
   });
 }
-function wasteTabsHtml_(store) {
-  const byType = (myVisitedStoreDataByType && myVisitedStoreDataByType[store._key]) || {};
-  const short = { FOOD: '음식물', PLASTIC: '폐합성수지', OIL: '폐식용유' };
-  return '<div class="wtabs" role="group" aria-label="폐기물 종류">' + WASTE_TYPES.map(function(w) {
-    const rec = byType[w.code];
-    const dot = rec ? '<span class="wtab-dot" style="background:' + getStatusColor(classifyVisitCurrent(rec.current)) + ';"></span>' : '';
-    return '<button type="button" class="wtab" data-w="' + w.code + '" aria-pressed="false">' + dot + escapeHtml(short[w.code] || w.label) + '</button>';
+/* ★ v86: 계약가능 폐기물(store.wok). 값이 없으면 아무것도 보이지 않는다(없음 ≠ 불가). 문자열 '음식물, 폐식용유' · 배열 · {FOOD:true,...} 모두 받는다 */
+const WOK_LABEL_ = { FOOD: '음식물', OIL: '폐식용유', PLASTIC: '폐합성수지' };
+function parseWok_(store) {   // 종류별 'ok'(가능) · 'check'(확인필요) · 'no'(목록에 없음)
+  const w = store && store.wok;
+  if (!w) return null;
+  if (typeof w === 'object' && !Array.isArray(w)) { const o = {}; ['FOOD', 'OIL', 'PLASTIC'].forEach(function(c) { o[c] = w[c] === 'check' ? 'check' : (w[c] ? 'ok' : 'no'); }); return o; }
+  const toks = (Array.isArray(w) ? w : String(w).split(/[,\/·、]+/)).map(function(x) { return String(x).trim(); }).filter(Boolean);
+  if (!toks.length) return null;
+  const st = function(re) {
+    const hit = toks.filter(function(t) { return re.test(t); });
+    if (!hit.length) return 'no';
+    return hit.some(function(t) { return !/확인필요/.test(t); }) ? 'ok' : 'check';
+  };
+  return { FOOD: st(/음식물/), OIL: st(/식용유/), PLASTIC: st(/수지|합성/) };
+}
+const WOK_MARK_ = { ok: '✓', check: '△', no: '✕' };
+const WOK_TITLE_ = { ok: '계약 가능', check: '계약 가능 여부 확인 필요', no: '계약 불가' };
+function wokChipsHtml_(store) {
+  const m = parseWok_(store);
+  if (!m) return '';
+  return '<div class="service wok-row"><span class="wok-label">계약가능</span>' + WASTE_TYPES.map(function(w) {
+    return '<span class="wok-chip' + (m[w.code] === 'ok' ? '' : (m[w.code] === 'check' ? ' chk' : ' no')) + '" title="' + WOK_TITLE_[m[w.code]] + '">' + WOK_MARK_[m[w.code]] + ' ' + WOK_LABEL_[w.code] + (m[w.code] === 'check' ? ' (확인필요)' : '') + '</span>';
   }).join('') + '</div>';
 }
+function wasteTabsHtml_(store) {
+  return '<div class="wtabs" role="group" aria-label="폐기물 종류">' + WASTE_TYPES.map(function(w) {
+    return '<button type="button" class="wtab" data-w="' + w.code + '" aria-pressed="false">' + escapeHtml(WOK_LABEL_[w.code] || w.label) + '</button>';
+  }).join('') + '</div><div class="wstrip" id="wasteStrip" hidden></div>';
+}
+function switchWaste_(code) {
+  const sel = document.getElementById('v_wasteType');
+  if (!sel || sel.value === code) return;
+  sel.value = code;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  syncWasteTabs_(sel.value);   // 사진 처리 중이라 되돌려졌으면 탭도 되돌린다
+}
+/* 탭: 영업 기록 있는 종류는 상태색 점, 계약 가능 여부(✓/✕)는 값이 있을 때만 */
 function syncWasteTabs_(code) {
-  document.querySelectorAll('.wtab[data-w]').forEach(function(b) { b.setAttribute('aria-pressed', b.dataset.w === code ? 'true' : 'false'); });
+  const tabs = document.querySelectorAll('.wtab[data-w]');
+  if (!tabs.length) return;
+  const st = (typeof selectedStore !== 'undefined') ? selectedStore : null;
+  const m = parseWok_(st);
+  const byType = (st && myVisitedStoreDataByType && myVisitedStoreDataByType[st._key]) || {};
+  tabs.forEach(function(b) {
+    const c = b.dataset.w, rec = byType[c];
+    b.setAttribute('aria-pressed', c === code ? 'true' : 'false');
+    const dot = rec ? '<span class="wtab-dot" style="background:' + getStatusColor(classifyVisitCurrent(rec.current)) + ';"></span>' : '';
+    const ok = m ? '<span class="wtab-ok' + (m[c] === 'ok' ? '' : (m[c] === 'check' ? ' chk' : ' no')) + '" aria-label="' + WOK_TITLE_[m[c]] + '">' + WOK_MARK_[m[c]] + '</span>' : '';
+    b.innerHTML = dot + escapeHtml(WOK_LABEL_[c] || c) + ok;
+  });
+  renderWasteStrip_(code);
+}
+/* 폐기물별 안내 줄: 이 종류가 계약 불가면 알리고, 가능한데 아직 기록 없는 다른 종류가 있으면 함께 제안하도록 안내(크로스셀) */
+function renderWasteStrip_(code) {
+  const el = document.getElementById('wasteStrip');
+  if (!el) return;
+  const st = (typeof selectedStore !== 'undefined') ? selectedStore : null;
+  const m = parseWok_(st);
+  el.hidden = true; el.innerHTML = ''; el.className = 'wstrip';
+  if (!m) return;
+  const byType = (myVisitedStoreDataByType && myVisitedStoreDataByType[st._key]) || {};
+  if (m[code] === 'check') {
+    el.className = 'wstrip chk';
+    el.innerHTML = '<span>' + WOK_LABEL_[code] + ' 계약 가능 여부 확인 필요' + (code === 'FOOD' ? ' · 확인할 것: 급식 식수 인원(100명 이상이면 다량배출사업장), 행정신고 구분' : '') + '</span>';
+    el.hidden = false;
+    return;
+  }
+  if (m[code] === 'no') {
+    const okL = WASTE_TYPES.filter(function(w) { return m[w.code] === 'ok'; }).map(function(w) { return WOK_LABEL_[w.code]; });
+    el.className = 'wstrip no';
+    el.innerHTML = '<span>' + WOK_LABEL_[code] + ' 계약 불가 업장입니다' + (okL.length ? ' · 가능: ' + okL.join('·') : '') + '</span>';
+    el.hidden = false;
+    return;
+  }
+  const more = WASTE_TYPES.filter(function(w) { return w.code !== code && m[w.code] === 'ok' && !byType[w.code]; });
+  if (!more.length) return;
+  el.className = 'wstrip ok';
+  el.innerHTML = '<span>' + more.map(function(w) { return WOK_LABEL_[w.code]; }).join('·') + '도 계약 가능합니다. 함께 제안해 보세요</span>' +
+    more.map(function(w) { return '<button type="button" class="wstrip-go" data-w="' + w.code + '">' + WOK_LABEL_[w.code] + ' 기록하기</button>'; }).join('');
+  el.hidden = false;
+  el.querySelectorAll('.wstrip-go').forEach(function(b) { b.onclick = function() { switchWaste_(b.dataset.w); }; });
 }
 function getVisitStatus(store) {
   if (isContractGrade(store.grade)) return "contract";
@@ -4109,11 +4194,7 @@ async function openPanel(store, opts) {
     const plusText = store.plus && store.plus !== '' ? store.plus : '-';
     serviceHtml = '<div class="service"><span class="' + basicClass + '">베이직 ' + escapeHtml(basicText) + '</span><span class="' + plusClass + '">플러스 ' + escapeHtml(plusText) + '</span></div>';
   }
-  let wokHtml = '';
-  if (!isContract && store.wok) {
-    const wl = (Array.isArray(store.wok) ? store.wok : String(store.wok).split(/[,\/·、]+/)).map(function(x) { return String(x).trim(); }).filter(Boolean);
-    if (wl.length) wokHtml = '<div class="service wok-row"><span class="wok-label">계약가능</span>' + wl.map(function(x) { return '<span class="service-badge on">' + escapeHtml(x) + '</span>'; }).join('') + '</div>';
-  }
+  const wokHtml = isContract ? '' : wokChipsHtml_(store);   // ★ v86: 음식물/폐식용유/폐합성수지 가능(✓)·불가(✕) 칩
   const infoRows = [];
   const schoolInfo_ = isSchoolStore_(store);   // ★ v85: 학교는 업종·전화번호 행을 숨긴다
   if (store.bizType && !schoolInfo_) infoRows.push({k:"업종", v:store.bizType});
@@ -5158,7 +5239,7 @@ function initSchoolPhotos_(store) {
   spState_ = { store: store, uid: spScopeUid_(store), pending: [], done: [], busy: false, warned: false, loaded: false, ops: 0, reorderPending: false, opFail: false, upFail: 0, waste: getVal('v_wasteType') || WASTE_TYPE_DEFAULT };
   box.style.display = '';
   box.innerHTML =
-    '<p class="sp-title">수거동선 사진</p>' +
+    '<p class="sp-title">수거동선 사진<span class="vsec-st" id="sp_req"></span></p>' +
     '<p class="sp-sub">차량이 들어와 수거함까지 가는 길을 순서대로 찍어주세요. 사진 순서가 동선 순서입니다. 폐기물 종류별로 따로 보관됩니다. 계약 신청서는 본사가 대신 넣어드릴 수 없어, 추가한 사진을 파트너님 전용 드라이브 폴더로 공유해 드립니다. 신청서를 낼 때 그 폴더에서 꺼내 쓰세요.</p>' +
     '<div class="sp-btns"><button type="button" class="sp-btn" id="sp_add">사진 선택</button><button type="button" class="sp-btn" id="sp_shot">바로 촬영</button></div>' +
     '<input type="file" id="sp_f1" accept="image/*" multiple hidden><input type="file" id="sp_f2" accept="image/*" capture="environment" hidden>' +
@@ -5236,9 +5317,18 @@ function spRenderPending_() {
     box.appendChild(d);
   });
 }
+/* ★ v87: 학교는 올려서 완료된 사진 1장 이상이 필수(지원금 인정 기준). 불러오기 전에는 배지를 비워 둔다 */
+function spUpdateReq_() {
+  const st = spState_, el = document.getElementById('sp_req'); if (!el) return;
+  const school = st && st.store && (typeof isSchoolStore_ === 'function') && isSchoolStore_(st.store);
+  if (!st || !school || !st.loaded) { el.textContent = ''; el.className = 'vsec-st'; return; }
+  const n = st.done.length ? 1 : 0;
+  el.textContent = '필수 ' + n + '/1'; el.className = 'vsec-st ' + (n ? 'done' : 'need');
+}
 function spRenderDone_() {
   const st = spState_; if (!st) return;
   const box = document.getElementById('sp_done'); if (!box) return;
+  try { spUpdateReq_(); } catch (e) {}   // ★ v87
   document.getElementById('sp_doneN').textContent = st.done.length ? '· ' + st.done.length + '장' : '';
   if (!st.done.length) { box.innerHTML = '<div class="sp-empty">추가한 사진이 없습니다.</div>'; return; }
   box.innerHTML = '';
@@ -5468,15 +5558,7 @@ function bindVisitForm(store) {
   document.querySelectorAll('.vsec-h').forEach(function(h) {   // ★ v86
     h.onclick = function() { const s = h.parentElement, o = !s.classList.contains('open'); s.classList.toggle('open', o); h.setAttribute('aria-expanded', o ? 'true' : 'false'); };
   });
-  document.querySelectorAll('.wtab[data-w]').forEach(function(b) {
-    b.onclick = function() {
-      const sel = document.getElementById('v_wasteType');
-      if (!sel || sel.value === b.dataset.w) return;
-      sel.value = b.dataset.w;
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-      syncWasteTabs_(sel.value);   // 사진 처리 중이라 되돌려졌으면 탭도 되돌린다
-    };
-  });
+  document.querySelectorAll('.wtab[data-w]').forEach(function(b) { b.onclick = function() { switchWaste_(b.dataset.w); }; });
   syncWasteTabs_(getVal('v_wasteType') || WASTE_TYPE_DEFAULT);
   // ★ v53: 폐기물 종류 변경 시 해당 유형의 기존 기록으로 폼 전환 (저장 안 된 새 폼이면 빈 값)
   const wasteSelect = document.getElementById('v_wasteType');
@@ -5675,6 +5757,7 @@ async function saveVisit(store) {
     // ★ v53: 폐기물 유형별 캐시 갱신 후, 대표 기록(핀 색상/칩카운트용) 재계산
     if (!myVisitedStoreDataByType[store._key]) myVisitedStoreDataByType[store._key] = {};
     myVisitedStoreDataByType[store._key][wasteType] = payload;
+    try { syncWasteTabs_(getVal('v_wasteType') || wasteType); } catch (e0) {}   // ★ v86: 탭 점·교차제안 안내를 새 기록 기준으로
     myVisitedStoreData[store._key] = pickRepresentativeVisitRecord_(myVisitedStoreDataByType[store._key]);
     _visitsRev++;   // ★ v70: 검색 중복억제 캐시 무효화
     if (isAdminUser) renderAdminView(); else renderMarkers();
