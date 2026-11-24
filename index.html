@@ -1095,7 +1095,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v87';   // ★ v87
+const APP_VERSION = 'v88';   // ★ v88
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -2997,7 +2997,7 @@ function filterLegacyDuplicatesAgainstMaster_(list) {
    나머지(학교 고유명)가 같으면서 SCHOOL_TWIN_RADIUS_M 안이면 같은 학교다. 고유명이 3글자 미만이면('대성' 등 흔한 이름) 쓰지 않는다.
    ⚠️ SCHOOL_TWIN_* 상수는 함수 안에서만 읽는다(최상위에서 읽으면 선언 순서 문제 TDZ). */
 const SCHOOL_TWIN_RADIUS_M = 250;
-const SCHOOL_TWIN_MIN_BASE_LEN = 3;
+const SCHOOL_TWIN_MIN_BASE_LEN = 2;   // ★ v88: 3 → 2. 2글자 고유명은 학제가 겹칠 때만 같은 학교로 본다(hasSchoolContractTwin_)
 const SCHOOL_LEVEL_TAIL_RE_ = /(초중고등학교|초중고|중고등학교|초중학교|초등학교|중학교|고등학교|특수학교|학교)$/;
 function schoolBaseName_(name) {
   const n = normalizeText(name).replace(/\([^)]*\)/g, '');
@@ -3005,13 +3005,26 @@ function schoolBaseName_(name) {
   const b = n.replace(SCHOOL_LEVEL_TAIL_RE_, '');
   return b.length >= SCHOOL_TWIN_MIN_BASE_LEN ? b : '';
 }
+/* ★ v88: 학교 이름 끝의 학제 글자 모음('초중고등학교' → '초중고', '고등학교' → '고', 학제를 모르면 ''). 2글자 고유명 판정용 */
+function schoolLevels_(name) {
+  const n = normalizeText(name).replace(/\([^)]*\)/g, '');
+  const m = n.match(SCHOOL_LEVEL_TAIL_RE_);
+  const tail = m ? m[1] : '';
+  return (tail.indexOf('초') !== -1 ? '초' : '') + (tail.indexOf('중') !== -1 ? '중' : '') + (tail.indexOf('고') !== -1 ? '고' : '') + (tail.indexOf('특수') !== -1 ? '특' : '');
+}
+function schoolLevelsOverlap_(a, b) {
+  for (let i = 0; i < a.length; i++) { if (b.indexOf(a.charAt(i)) !== -1) return true; }
+  return false;
+}
 function hasSchoolContractTwin_(schoolContracts, o) {
   if (!schoolContracts.length) return false;
   const ob = schoolBaseName_(o.name);
   if (!ob) return false;
+  const olv = ob.length < 3 ? schoolLevels_(o.name) : '';   // ★ v88
   for (let i = 0; i < schoolContracts.length; i++) {
     const c = schoolContracts[i];
     if (c.base !== ob) continue;
+    if (ob.length < 3 && !schoolLevelsOverlap_(olv, c.lv)) continue;   // ★ v88: 휘문중 ↔ 휘문고처럼 학제가 다르면 다른 학교
     if (haversine(o.lat, o.lng, c.s.lat, c.s.lng) * 1000 <= SCHOOL_TWIN_RADIUS_M) return true;
   }
   return false;
@@ -3021,7 +3034,7 @@ function removeContractDuplicates(list) {
   const others = list.filter(s => !isContractGrade(s.grade));
   const grid = buildGeoGrid_(contracts, CONTRACT_TWIN_CELL_M);   // ★ v79: 넓은 격자 + 넓은 규칙
   const schoolContracts = [];                                    // ★ v84: 학교 기계약만 따로(고유명 포함)
-  contracts.forEach(function(c) { const b = schoolBaseName_(c.name); if (b && isFinite(c.lat) && isFinite(c.lng)) schoolContracts.push({ s: c, base: b }); });
+  contracts.forEach(function(c) { const b = schoolBaseName_(c.name); if (b && isFinite(c.lat) && isFinite(c.lng)) schoolContracts.push({ s: c, base: b, lv: schoolLevels_(c.name) }); });   // ★ v88: lv
   const filteredOthers = others.filter(function(o) {
     if (myVisitedStoreData && myVisitedStoreData[o._key]) return true;
     return !hasContractTwin_(grid, o) && !hasSchoolContractTwin_(schoolContracts, o);
