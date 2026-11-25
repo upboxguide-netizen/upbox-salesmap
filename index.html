@@ -599,6 +599,20 @@
   .memo-t.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .memo-more { flex: none; border: 0; background: transparent; color: #8C6900; font: inherit; font-size: 12px; font-weight: 700; min-height: 28px; padding: 0 2px; cursor: pointer; }
   .memo-more[hidden] { display: none; }
+  /* ★ v89: 업장특이사항 접힘 영역(과거영업히스토리) */
+  .memo.memo-s.memo-fold { display: block; padding: 0; }
+  .memo-fh { display: flex; gap: 8px; align-items: flex-start; width: 100%; min-height: 44px; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; padding: 6px 10px; cursor: pointer; touch-action: manipulation; }
+  .memo-fh .ic { flex: none; margin-top: 2px; }
+  .memo-ft { flex: 1; min-width: 0; display: block; }
+  .memo-ftt { display: block; font-weight: 700; }
+  .memo-fp { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.5; }
+  .memo-fp[hidden] { display: none; }
+  .memo-fm { flex: none; font-size: 12px; font-weight: 700; color: #8C6900; margin-top: 2px; }
+  .memo-fb { padding: 0 10px 10px; white-space: pre-wrap; font-size: 12.5px; line-height: 1.55; }
+  .memo-fb[hidden] { display: none; }
+  .memo-fb b { color: #6B5100; }
+  .memo-hr { border: 0; border-top: 1px solid rgba(140,105,0,.35); margin: 8px 0; }
+  .memo-fh:focus-visible { outline: 3px solid var(--amber); outline-offset: 1px; }
   .wtabs { display: flex; gap: 4px; background: #EEF0F6; border-radius: 9px; padding: 3px; margin: 0 0 8px; }
   .wtab { flex: 1; min-width: 0; min-height: 36px; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: #4A4D66; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; }
   .wtab[aria-pressed="true"] { background: #fff; color: var(--navy); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
@@ -1095,7 +1109,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v88';   // ★ v88
+const APP_VERSION = 'v89';   // ★ v89
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -4129,6 +4143,41 @@ function getStoreDetail_(key) {
   return p;
 }
 // opts.fromGroup: 같은 건물 목록에서 들어왔으면 그 목록(구성원 배열) — 맨 위에 '목록으로' 버튼을 단다
+/* ★ v89: 업장특이사항(U열) = 과거 히스토리 + 나눔선(────) + 인사이트. 나눔선이 있거나 '■ '로 시작하면 '과거영업히스토리' 접힘 영역으로 보여 준다(그 밖의 메모는 v86 방식 그대로) */
+const MEMO_DIV_RE_ = /^\s*[─―━]{4,}\s*$/;
+const MEMO_HEAD_RE_ = /^(■ .*|\[[^\]]+\])$/;
+function memoParse_(memo) {
+  const lines = String(memo || '').replace(/\r/g, '').split('\n');
+  let k = -1;
+  for (let i = 0; i < lines.length; i++) { if (MEMO_DIV_RE_.test(lines[i])) { k = i; break; } }
+  const ba = (k < 0 ? lines : lines.slice(0, k)).join('\n').trim();
+  const bb = (k < 0 ? [] : lines.slice(k + 1)).join('\n').trim();
+  let first = '';
+  const bl = bb ? bb.split('\n') : [];
+  for (let i = 0; i < bl.length; i++) { const s = bl[i].trim(); if (s && !/^\[[^\]]+\]$/.test(s)) { first = s; break; } }
+  return { structured: k >= 0 || /^\s*■ /.test(ba), ba: ba, bb: bb, first: first };
+}
+function memoBodyHtml_(text) {
+  return String(text || '').split('\n').map(function(l) { return MEMO_HEAD_RE_.test(l.trim()) ? '<b>' + escapeHtml(l) + '</b>' : escapeHtml(l); }).join('\n');
+}
+function memoTopHtml_(memo) {
+  if (!memo) return '';
+  const p = memoParse_(memo);
+  if (!p.structured) return '<div class="memo memo-s">' + IC_.note + '<span class="memo-t clamp">' + escapeHtml(memo) + '</span><button type="button" class="memo-more" hidden>더보기</button></div>';
+  return '<div class="memo memo-s memo-fold">' +
+    '<button type="button" class="memo-fh" aria-expanded="false">' + IC_.note +
+    '<span class="memo-ft"><span class="memo-ftt">과거영업히스토리</span>' + (p.first ? '<span class="memo-fp">' + escapeHtml(p.first) + '</span>' : '') + '</span>' +
+    '<span class="memo-fm">더보기</span></button>' +
+    '<div class="memo-fb" hidden>' + memoBodyHtml_(p.ba) + (p.bb ? '<hr class="memo-hr">' + memoBodyHtml_(p.bb) : '') + '</div></div>';
+}
+function bindMemoFold_(root) {
+  const f = root.querySelector('.memo-fold'); if (!f) return;
+  const h = f.querySelector('.memo-fh'), b = f.querySelector('.memo-fb'), m = f.querySelector('.memo-fm'), pv = f.querySelector('.memo-fp');
+  h.onclick = function() {
+    const open = b.hidden; b.hidden = !open; h.setAttribute('aria-expanded', open ? 'true' : 'false');
+    m.textContent = open ? '접기' : '더보기'; if (pv) pv.hidden = open;
+  };
+}
 async function openPanel(store, opts) {
   const mySeq = ++_panelSeq;   // ★ v70: 빠르게 연달아 누르면 마지막 것만 그린다
   const fromGroup = (opts && opts.fromGroup) ? opts.fromGroup : null;
@@ -4215,7 +4264,7 @@ async function openPanel(store, opts) {
   if (store.phone && !schoolInfo_) infoRows.push({k:"전화번호", v:store.phone});
   if (store.volume) infoRows.push({k:"예상배출량", v:store.volume});
   const infoHtml = infoRows.length === 0 ? '' : '<div class="info-table">' + infoRows.map(r => '<div class="info-row"><span class="info-key">' + r.k + '</span><span class="info-value">' + escapeHtml(r.v) + '</span></div>').join('') + '</div>';
-  const memoTopHtml = store.memo ? '<div class="memo memo-s">' + IC_.note + '<span class="memo-t clamp">' + escapeHtml(store.memo) + '</span><button type="button" class="memo-more" hidden>더보기</button></div>' : '';   // ★ v86
+  const memoTopHtml = memoTopHtml_(store.memo);   // ★ v89: 나눔선·'■ ' 구조면 접힘 영역, 아니면 v86 방식
   // ★ v71: 단가 가이드 · 길안내는 보조 버튼(외곽선). 주 버튼은 아래 고정 바의 '저장' 하나다.
   const priceGuideBtnHtml = isContract ? '' : '<button class="priceGuideBtn" type="button" onclick="openPriceGuide()">' + IC_.chart + ' 영업기준표 확인</button>';
   const quoteBtnHtml = (isContract || !isSchoolStore_(store)) ? '' : '<a class="priceGuideBtn" id="quoteSendBtn" href="https://walla.my/survey/1tIqaX6UmN7eBkMnB1RA" target="_blank" rel="noopener noreferrer">' + IC_.note + ' 견적서 발송하기</a>';   // ★ v85: 학교 전용 외부 링크
@@ -4245,6 +4294,7 @@ async function openPanel(store, opts) {
     requestAnimationFrame(function() { if (memoT.scrollHeight > memoT.clientHeight + 1) memoMore.hidden = false; });
     memoMore.onclick = function() { const c = memoT.classList.toggle('clamp'); memoMore.textContent = c ? '더보기' : '접기'; };
   }
+  bindMemoFold_(content);   // ★ v89
   const backBtn = document.getElementById('v70BackToGroup');
   if (backBtn) backBtn.onclick = function() { openSpotGroupPanel_(fromGroup); };
   const planBack = fromPlan ? document.getElementById('v73BackToPlan') : null;   // ★ v73
