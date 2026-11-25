@@ -693,6 +693,11 @@
   .p-sticky .plan-name-row, .p-sticky > h2 { padding-right: 48px; }
   .p-sticky .addr { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .p-sticky .wtabs { margin-bottom: 0; }
+  /* ★ v92: 검색창 아래 칩 줄의 위아래 여백 축소 */
+  #searchBar { padding: 6px 10px; }
+  #quickChipRow { padding: 3px 10px; }
+  #quickChipRow .filter-chip, #quickChipRow .plan-chip { min-height: 38px; }
+  #quickChipRow .filter-icon-btn { height: 38px; min-width: 38px; }
 </style>
 </head>
 <body>
@@ -1128,7 +1133,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v91';   // ★ v91
+const APP_VERSION = 'v92';   // ★ v92
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -1421,6 +1426,24 @@ let otherPartnerLastContactMap = {};
 let myVisitedStoreData = {};
 let myVisitedStoreDataByType = {}; // ★ v53: storeKey -> { wasteType: record }
 let hasMyProjects = false;
+// ★ v92: 프로젝트영업 칩 이름 = 내 프로젝트명(하나일 때). '27년 학교영업' → '27 학교영업'
+function shortProjectName_(n) {
+  return String(n || '').replace(/^20?(\d{2})\s*년\s*/, '$1 ').replace(/\s*프로젝트\s*(영업)?\s*$/, '').trim();
+}
+function applyProjectChipLabel_() {
+  try {
+    const chip = document.getElementById('cfCategoryProjectPill'); if (!chip) return;
+    const names = {};
+    (myProjectStores || []).forEach(function(s) {
+      (s.projects || []).forEach(function(p) { const n = (p && typeof p === 'object') ? (p.name || p.id || '') : p; if (n) names[String(n)] = 1; });
+    });
+    const keys = Object.keys(names);
+    const label = keys.length === 1 ? shortProjectName_(keys[0]) : '프로젝트영업';
+    if (!label) return;
+    Array.prototype.slice.call(chip.childNodes).forEach(function(nd) { if (nd.nodeType === 3 && nd.textContent.trim()) nd.textContent = ' ' + label; });
+    CATEGORY_LABELS_.project = label;
+  } catch (e) { console.warn('프로젝트 칩 이름 실패', e); }
+}
 let myProjectStores = [];
 let isAdminUser = false;
 let adminViewActive = false;
@@ -1876,7 +1899,7 @@ async function loadMyProjectsFromIndex() {
     setCache(CACHE.MY_PROJECTS, { hasMyProjects: hasMyProjects, myProjectStores: myProjectStores });
     if (hasMyProjects) {
       const projChip = document.getElementById('cfCategoryProjectPill');
-      if (projChip) projChip.classList.add('visible');
+      if (projChip) { projChip.classList.add('visible'); applyProjectChipLabel_(); }
     }
     console.log('[partner_projects] 인덱스 로드 완료: hasAny=' + hasMyProjects + ', stores=' + myProjectStores.length);
   } catch(e) {
@@ -1913,7 +1936,7 @@ async function checkMyProjectAssignmentLegacy() {
     setCache(CACHE.MY_PROJECTS, { hasMyProjects: hasMyProjects, myProjectStores: myProjectStores });
     if (hasMyProjects) {
       const projChip = document.getElementById('cfCategoryProjectPill');
-      if (projChip) projChip.classList.add('visible');
+      if (projChip) { projChip.classList.add('visible'); applyProjectChipLabel_(); }
     }
   } catch(e) { console.warn("프로젝트 배정 확인 실패:", e); }
 }
@@ -1996,7 +2019,7 @@ async function startApp() {
     myProjectStores = cachedMyProjects.myProjectStores || [];
     if (hasMyProjects) {
       const projChip = document.getElementById('cfCategoryProjectPill');
-      if (projChip) projChip.classList.add('visible');
+      if (projChip) { projChip.classList.add('visible'); applyProjectChipLabel_(); }
     }
   }
   // 방문기록·관리자 집계 캐시·카카오 SDK 를 동시에 받는다
