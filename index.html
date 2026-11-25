@@ -688,6 +688,11 @@
   .wtab, .wstrip { font-size: 12px; }
   .act-row .priceGuideBtn, .act-row .navBtn { font-size: 12px; }
   .save-btn, .save-bar .save-btn { font-size: 16px; }
+  /* ★ v91: 업장명·주소·폐기물 탭 상단 고정. 닫기(X, z-index 10)가 위에 뜨므로 이름 줄 오른쪽을 비운다 */
+  .p-sticky { position: sticky; top: 0; z-index: 8; background: #fff; padding-bottom: 4px; box-shadow: 0 3px 4px -3px rgba(0,0,0,.18); }
+  .p-sticky .plan-name-row, .p-sticky > h2 { padding-right: 48px; }
+  .p-sticky .addr { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-sticky .wtabs { margin-bottom: 0; }
 </style>
 </head>
 <body>
@@ -1123,7 +1128,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v90';   // ★ v90
+const APP_VERSION = 'v91';   // ★ v91
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -4292,13 +4297,22 @@ async function openPanel(store, opts) {
     ? '<button type="button" class="v70-back" id="v70BackToGroup">‹ 목록으로 (' + fromGroup.length + '곳)</button>'
     : (fromPlan ? '<button type="button" class="v70-back" id="v73BackToPlan">‹ 갈 곳 목록</button>' : '');   // ★ v73
   const partnerListHtml = buildAdminPartnerListHtml_(store);
+  // ★ v91: 이름 + 주소 + 폐기물 탭은 스크롤해도 위에 고정(.p-sticky). 탭 뒤 안내 줄(#wasteStrip)은 고정 밖.
+  const wasteTabsAll = isContract ? '' : wasteTabsHtml_(store);
+  const wsAt = wasteTabsAll.indexOf('<div class="wstrip"');
+  const wasteTabsOnly = wsAt < 0 ? wasteTabsAll : wasteTabsAll.slice(0, wsAt);
+  const wasteStripOnly = wsAt < 0 ? '' : wasteTabsAll.slice(wsAt);
   content.innerHTML =
     backHtml +
-    planNameRowHtml_(store) +   // ★ v74: 이름 + 오른쪽 별 토글(외주면 이름만)
-    '<div class="addr">' + escapeHtml(store.address || '') + '</div>' +
+    '<div class="p-sticky">' +
+      planNameRowHtml_(store) +   // ★ v74: 이름 + 오른쪽 별 토글(외주면 이름만)
+      '<div class="addr">' + escapeHtml(store.address || '') + '</div>' +
+      wasteTabsOnly +
+    '</div>' +
+    wasteStripOnly +
     partnerListHtml +
     memoTopHtml +
-    (isContract ? wasteBadgesHtml : wasteTabsHtml_(store)) +
+    (isContract ? wasteBadgesHtml : '') +
     '<div class="badges">' + adminBadge + gradeBadge + closedBadge + '</div>' +
     projectsBadgeHtml + adminInfoHtml + otherContactHtml + serviceHtml + wokHtml +
     infoHtml + actRowHtml + visitFormHtml;
