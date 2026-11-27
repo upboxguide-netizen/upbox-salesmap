@@ -770,6 +770,7 @@
       <button type="button" class="filter-chip quick-cat" data-val="target">타겟업장</button>
       <button type="button" class="filter-chip quick-cat" data-val="lead">리드건</button>
       <button type="button" class="filter-chip quick-cat" data-val="contract" id="quickCatContract" aria-describedby="contractChipHint"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg> 기계약</button><span id="contractChipHint" class="v75-sr-only"></span><!-- ★ v75: 기계약 거리 안내(글자는 syncContractChipHint_) -->
+      <button type="button" class="filter-chip quick-cat" data-val="schoolContract" id="quickCatSchoolContract" aria-describedby="contractChipHint"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg> 학교 기계약</button>
       <button type="button" class="filter-chip quick-cat filter-chip-project" data-val="project" id="cfCategoryProjectPill"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg> 프로젝트영업</button>
     </div>
     <div id="appliedChipsRow"></div>
@@ -1133,7 +1134,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v93';   // ★ v93
+const APP_VERSION = 'v94';   // ★ v94
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -1373,7 +1374,7 @@ let currentFilter = "all";
  *     "지도 흰 화면 + 로그아웃 버튼 무반응" 증상이 났습니다.
  *   ⚠️ 이 선언을 partnerComboFilter 아래로 다시 옮기지 마세요. */
 const CATEGORY_DEFAULT_ = ['target', 'lead'];
-const CATEGORY_LABELS_ = { target: '타겟업장', lead: '리드건', contract: '기계약', project: '프로젝트영업' };   // ★ v71: 이모지 제거
+const CATEGORY_LABELS_ = { target: '타겟업장', lead: '리드건', contract: '기계약', schoolContract: '학교 기계약', project: '프로젝트영업' };   // ★ v71: 이모지 제거
 // ★ 파트너 조합필터 상태 (currentFilter === 'all' + 파트너 화면일 때만 적용됨. 관리자/외주는 무관)
 // ★ v68: bizType(업종) · areaBand(면적) facet 추가.
 //   areaIncludeBlank 기본 true — 면적은 41%가 공백이라 끄면 23,579곳이 한꺼번에 사라진다.
@@ -1391,6 +1392,7 @@ function computeCategoryFlags_(store, status) {
     target:   status === 'none',
     lead:     status !== 'none' && status !== 'contract',
     contract: status === 'contract',
+    schoolContract: status === 'contract' && String((store && store.name) || '').indexOf('학교') !== -1,   // ★ v94: 기계약 중 이름에 '학교'가 들어가면 전부
     project:  amIAssignedToProject(store, currentUser.key)
   };
 }
@@ -3511,7 +3513,7 @@ function bindQuickCategoryChips_() {
       partnerComboFilter.category = arr;
       syncQuickCategoryChips_();
       updateComboFilterBadgeAndChips();
-      if (v === 'contract' && i === -1) maybeContractHint_();   // ★ v75: 휴대폰은 hover 가 없어 켤 때 토스트로
+      if ((v === 'contract' || v === 'schoolContract') && i === -1) maybeContractHint_();   // ★ v75: 휴대폰은 hover 가 없어 켤 때 토스트로
       // ★ v70: 넓은 화면(레벨 8+)에선 프로젝트 칩에 따라 보여줄 목록 자체가 달라지므로 다시 고른다(조회 없음)
       if (!isAdminUser && !isExternalUser && map && map.getLevel() > PARTNER_FETCH_MAX_LEVEL) { loadStoresInView(); return; }
       if (currentFilter === 'all') renderMarkers();   // 패널을 열 필요 없이 바로 반영
@@ -3526,7 +3528,8 @@ function bindQuickCategoryChips_() {
      데스크톱은 title, 화면낭독기는 aria-describedby(#contractChipHint). 상태 바에도 짧게 붙인다.
    ⚠️ 문구는 함수로 만든다 — CONTRACT_RADIUS_KM 은 상수 블록보다 아래에 선언돼 있어 위쪽 const 에서 쓰면 TDZ. */
 function contractChipOn_() {
-  return (partnerComboFilter.category || []).indexOf('contract') !== -1;
+  const c = partnerComboFilter.category || [];
+  return c.indexOf('contract') !== -1 || c.indexOf('schoolContract') !== -1;   // ★ v94
 }
 function contractHintText_() {
   return '기계약 업장은 지도 화면 가운데에서 ' + CONTRACT_RADIUS_KM + 'km 안만 표시됩니다. 지도를 옮기거나 검색으로 찾을 수 있어요';   // ★ v76
@@ -4033,7 +4036,12 @@ function updateLeadHint_() {
   if (!el) return;
   try {
     const f = readVisitFormCurrent_();
-    const h = leadHintFor_(f.cur, f.hidden);
+    let h = leadHintFor_(f.cur, f.hidden);
+    const sm = (typeof selectedStore !== 'undefined') ? schoolMissingReq_(selectedStore, f.cur, getVal('v_wasteType') || WASTE_TYPE_DEFAULT) : null;   // ★ v94: 학교는 필수값 충족 기준
+    if (sm && (h.status === 'none' || h.status === 'simpleContact' || h.status === 'visit')) {
+      h = sm.length ? { status: h.status, lines: ['유효리드까지: 필수값 ' + sm.slice(0, 4).join('·') + (sm.length > 4 ? ' 외 ' + (sm.length - 4) + '개' : '') + ' 남음'] }
+                    : { status: 'lead', lines: ['유효리드 기준 충족 (학교 필수값 모두 입력)'] };
+    }
     el.innerHTML = '<span class="lead-hint-now">지금: ' + escapeHtml(getStatusLabel(h.status)) + '</span>' +
       h.lines.map(function(l) { return '<span class="lead-hint-line">' + escapeHtml(l) + '</span>'; }).join('');
     el.title = ['지금: ' + getStatusLabel(h.status)].concat(h.lines).join(' · ');   // ★ v72: 한 줄로 잘려도 전체 문구
@@ -4150,11 +4158,30 @@ function renderWasteStrip_(code) {
   el.hidden = false;
   el.querySelectorAll('.wstrip-go').forEach(function(b) { b.onclick = function() { switchWaste_(b.dataset.w); }; });
 }
+/* ★ v94: 학교 필수값 11개(지원금 집계와 같은 목록)가 폐기물 종류를 가로질러 모두 채워졌나.
+   반환: 학교가 아니면 null, 학교면 비어 있는 항목 이름 배열(빈 배열 = 모두 충족).
+   formCur/formWaste 를 주면 그 폐기물은 저장본 대신 지금 폼 값으로 본다(저장 바 안내용). 동선사진은 서버 데이터라 여기서 보지 않는다. */
+function schoolMissingReq_(store, formCur, formWaste) {
+  if (!store || !isSchoolStore_(store)) return null;
+  const F = [['currentStoreName', '업체명'], ['bins', '통 갯수'], ['vinyl', '비닐'], ['truck', '5톤진입'], ['collectLimit', '수거시간제약'],
+             ['amount', '배출량'], ['suggestedPrice', '제안단가'], ['repriority', '성사가능성'], ['contactMethod', '접촉방식'],
+             ['decisionPeriod', '계약결정시기'], ['note', '상담내용']];
+  const byType = (myVisitedStoreDataByType && myVisitedStoreDataByType[store._key]) || {};
+  const curs = [];
+  Object.keys(byType).forEach(function(w) { if (formCur && w === formWaste) return; const r = byType[w]; if (r && r.current) curs.push(r.current); });
+  if (formCur) curs.push(formCur);
+  return F.filter(function(f) { return !curs.some(function(c) { return hasValue_(c[f[0]]); }); }).map(function(f) { return f[1]; });
+}
 function getVisitStatus(store) {
   if (isContractGrade(store.grade)) return "contract";
   const rec = myVisitedStoreData[store._key];
   if (!rec) return "none";
-  return classifyVisitCurrent(rec.current);
+  const st = classifyVisitCurrent(rec.current);
+  if (st === 'none' || st === 'simpleContact' || st === 'visit') {   // ★ v94: 성사·실패·폐업·유효리드는 그대로
+    const miss = schoolMissingReq_(store);
+    if (miss && !miss.length) return 'lead';
+  }
+  return st;
 }
 // ★ v55: "영업중인 폐기물" 배지 — 기록 있는 유형만, 상태색으로 진행도 표시 (2안)
 function buildWasteBadgesHtml_(store) {
