@@ -962,7 +962,7 @@
             <select id="nsBagSpec"><option value="75L">75L</option><option value="100L">100L</option></select>
           </div>
           <div class="ns-form-group">
-            <label for="nsAmount"><span id="lbl_nsAmount">월 예상배출량 (L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
+            <label for="nsAmount"><span style="color:#E53935;">*</span> <span id="lbl_nsAmount">월 예상배출량 (L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
             <input type="text" id="nsAmount" inputmode="numeric" placeholder="예: 500">
           </div>
           <div class="ns-form-group">
@@ -976,7 +976,7 @@
             <input type="text" id="nsPrice" inputmode="numeric" placeholder="예: 180">
           </div>
           <div class="ns-form-group">
-            <label for="nsSuggestedPrice"><span id="lbl_nsSuggestedPrice">제안 단가 (원/L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
+            <label for="nsSuggestedPrice"><span style="color:#E53935;">*</span> <span id="lbl_nsSuggestedPrice">제안 단가 (원/L)</span><span class="num-warn-msg">숫자만 기재해주세요</span></label>
             <input type="text" id="nsSuggestedPrice" inputmode="numeric" placeholder="예: 170">
           </div>
         </div>
@@ -1133,7 +1133,7 @@ const ADMIN_CONTRACT_RADIUS_KM = 10;
 const ADMIN_CONTRACT_MAX_PINS = 500;
 /* ★ v70 상수 — ⚠️ 전부 여기(스크립트 위쪽)에 둔다. 아래로 내리면 TDZ 로 스크립트 전체가 죽을 수 있다(2026-09-28 백지 사고).
    APP_VERSION 은 화면 표시·콘솔 확인용이다. 공지 팝업(notices/*.version)은 서버 값이라 여기와 무관하다. */
-const APP_VERSION = 'v92';   // ★ v92
+const APP_VERSION = 'v93';   // ★ v93
 /* ★ v73: 오늘 갈 곳 — plans/<내 키>/<YYYYMMDD KST>/<업장키>. ★ v75: 읽기는 질의 한 번(orderByKey · limitToLast). ⚠️ 상수·상태는 여기(TDZ). */
 const PLAN_ROOT_ = 'plans';
 const PLAN_TIMEOUT_MS_ = 15000;              // 갈 곳 읽기/쓰기 응답 상한(저장과 같은 15초)
@@ -5116,19 +5116,19 @@ function buildVisitForm() {
         '</div></div>' +
       '</div></div>' +
     // ★ v86 구역 2: 배출량·단가
-    '<div class="vsec open" id="vs2" data-opt="v_amount,v_price,v_suggestedPrice,v_freq">' +
+    '<div class="vsec open" id="vs2" data-req="v_amount,v_suggestedPrice" data-opt="v_price,v_freq">' +
       '<button type="button" class="vsec-h" aria-expanded="true"><span class="vsec-t">배출량·단가</span><span class="vsec-st"></span><span class="vsec-chev" aria-hidden="true">▾</span></button>' +
       '<div class="vsec-b">' +
       '<div id="grp_bagSpec" style="display:none;"><label for="v_bagSpec">봉투 규격</label>' +
       '<select id="v_bagSpec"><option value="75L">75L</option><option value="100L">100L</option></select></div>' +
       '<div class="g2">' +
-        '<div><label for="v_amount"><span id="lbl_amount">월 예상배출량 (L)</span>' + NUM_WARN_HTML_ + '</label>' +
+        '<div><label for="v_amount"><span style="color:#E53935;">*</span> <span id="lbl_amount">월 예상배출량 (L)</span>' + NUM_WARN_HTML_ + '</label>' +
         '<input id="v_amount" type="text" inputmode="numeric" placeholder="예: 500"></div>' +
         '<div><label for="v_price"><span id="lbl_price">현재 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
         '<input id="v_price" type="text" inputmode="numeric" placeholder="예: 180"></div>' +
       '</div>' +
       '<div class="g2">' +
-        '<div><label for="v_suggestedPrice"><span id="lbl_suggestedPrice">제안 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
+        '<div><label for="v_suggestedPrice"><span style="color:#E53935;">*</span> <span id="lbl_suggestedPrice">제안 단가 (원/L)</span>' + NUM_WARN_HTML_ + '</label>' +
         '<input id="v_suggestedPrice" type="text" inputmode="numeric" placeholder="예: 170"></div>' +
         '<div><label for="v_freq">현재 주 수거횟수' + NUM_WARN_HTML_ + '</label>' +
         '<input id="v_freq" type="text" inputmode="numeric" placeholder="예: 3"></div>' +
@@ -5363,6 +5363,7 @@ function initSchoolPhotos_(store) {
     '<div class="sp-h">추가한 사진 <span class="sp-n" id="sp_doneN"></span></div>' +
     '<div class="sp-strip" id="sp_done"><div class="sp-empty">불러오는 중…</div></div>' +
     '<div id="sp_ask"></div><p class="sp-msg" id="sp_msg"></p>';
+  try { spUpdateReq_(); } catch (e) {}   // ★ v93: 폐기물 종류를 바꿀 때마다 바로 표시
   document.getElementById('sp_add').onclick = function() { document.getElementById('sp_f1').click(); };
   document.getElementById('sp_shot').onclick = function() { document.getElementById('sp_f2').click(); };
   ['sp_f1', 'sp_f2'].forEach(function(id) {
@@ -5435,8 +5436,8 @@ function spRenderPending_() {
 function spUpdateReq_() {
   const st = spState_, el = document.getElementById('sp_req'); if (!el) return;
   const school = st && st.store && (typeof isSchoolStore_ === 'function') && isSchoolStore_(st.store);
-  if (!st || !school || !st.loaded) { el.textContent = ''; el.className = 'vsec-st'; return; }
-  const n = st.done.length ? 1 : 0;
+  if (!st || !school) { el.textContent = ''; el.className = 'vsec-st'; return; }
+  const n = (st.loaded && st.done.length) ? 1 : 0;   // ★ v93: 불러오기 전·실패여도 폐기물 종류와 무관하게 '필수 0/1'(빨강)을 먼저 보인다
   el.textContent = '필수 ' + n + '/1'; el.className = 'vsec-st ' + (n ? 'done' : 'need');
 }
 function spRenderDone_() {
